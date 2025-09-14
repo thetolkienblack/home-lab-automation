@@ -40,6 +40,11 @@
         name: "{{ os_specific_packages }}"
         state: present
 
+    - name: "Configure hostname FQDN"
+      ansible.builtin.hostname:
+        name: "{{ hostname_fqdn | default(ansible_hostname) }}"
+        use: "{{ ansible_os_family | lower }}"
+
     - name: "Check disk space"
       ansible.builtin.command: df -h
       register: disk_usage

@@ -1,6 +1,8 @@
 ---
 # Global Variables
 timezone: "UTC"
+ansible_python_interpreter: /usr/bin/python3
+
 #NTP
 ntp_servers:
   - pool.ntp.org
