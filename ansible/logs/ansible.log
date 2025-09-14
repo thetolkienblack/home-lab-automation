@@ -1,0 +1,546 @@
+2025-09-13 21:32:01,103 p=22759 u=sidney n=ansible INFO| [DEPRECATION WARNING]: [defaults]collections_paths option. Reason: does not fit var naming standard, use the singular form collections_path 
+instead Alternatives: none. This feature will be removed in version 2.19. Deprecation warnings can be disabled by setting 
+deprecation_warnings=False in ansible.cfg.
+2025-09-13 21:32:02,355 p=22759 u=sidney n=ansible INFO| [DEPRECATION WARNING]: community.general.yaml has been deprecated. The plugin has been superseded by the the option `result_format=yaml` in 
+callback plugin ansible.builtin.default from ansible-core 2.13 onwards. This feature will be removed from community.general in version 13.0.0.
+ Deprecation warnings can be disabled by setting deprecation_warnings=False in ansible.cfg.
+2025-09-13 21:32:02,390 p=22759 u=sidney n=ansible INFO| PLAY [System Maintenance] *********************************************************************************************************************
+2025-09-13 21:32:05,548 p=22759 u=sidney n=ansible ERROR|  [ERROR]: User interrupted execution
+
+2025-09-13 21:36:11,561 p=25524 u=sidney n=ansible INFO| PLAY [System Maintenance] *********************************************************************************************************************
+2025-09-13 21:36:15,740 p=25524 u=sidney n=ansible INFO| TASK [Gathering Facts] ************************************************************************************************************************
+2025-09-13 21:36:15,741 p=25524 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-13 21:37:10,976 p=25524 u=sidney n=ansible INFO| TASK [Update package cache] *******************************************************************************************************************
+2025-09-13 21:37:10,977 p=25524 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-13 21:37:36,461 p=25524 u=sidney n=ansible INFO| TASK [Upgrade all packages (Debian/Ubuntu)] ***************************************************************************************************
+2025-09-13 21:37:36,462 p=25524 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-13 21:37:37,887 p=25524 u=sidney n=ansible INFO| TASK [Check disk space] ***********************************************************************************************************************
+2025-09-13 21:37:37,888 p=25524 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-13 21:37:37,933 p=25524 u=sidney n=ansible INFO| TASK [Display disk usage] *********************************************************************************************************************
+2025-09-13 21:37:37,934 p=25524 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": [
+        "Filesystem      Size  Used Avail Use% Mounted on",
+        "/dev/root       118G  3.8G  109G   4% /",
+        "devtmpfs        3.9G     0  3.9G   0% /dev",
+        "tmpfs           3.9G     0  3.9G   0% /dev/shm",
+        "tmpfs           1.6G  116M  1.5G   8% /run",
+        "tmpfs           5.0M     0  5.0M   0% /run/lock",
+        "tmpfs            50M   60K   50M   1% /var/log",
+        "tmpfs           3.9G  321M  3.6G   9% /tmp",
+        "/dev/mmcblk0p1  127M   34M   94M  27% /boot/firmware",
+        "tmpfs           1.0M     0  1.0M   0% /run/credentials/getty@tty1.service",
+        "tmpfs           1.0M     0  1.0M   0% /run/credentials/systemd-journald.service",
+        "/dev/sda1       1.9T  158G  1.7T   9% /media/devmon/sda1-usb-Seagate_Expansio",
+        "/dev/sdb1       916G   28K  916G   1% /media/devmon/sdb1-ata-WDC_WD10SMZW-11Y",
+        "tmpfs           7.7G   12K  7.7G   1% /var/lib/kubelet/pods/0cabec62-8490-474b-b30c-1d59c0aa8c46/volumes/kubernetes.io~projected/kube-api-access-bc8nj",
+        "tmpfs           170M   12K  170M   1% /var/lib/kubelet/pods/54d8db4c-75f6-4a8a-a41d-9f81eaec1bc0/volumes/kubernetes.io~projected/kube-api-access-v5znq",
+        "tmpfs           7.7G   12K  7.7G   1% /var/lib/kubelet/pods/6dac01b4-11bd-49e8-b15f-29bc7a221e85/volumes/kubernetes.io~projected/kube-api-access-djwgq",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/7a6c5dfe85413b74552dededf49fdbc4b4695873fed3f7689ebc02b47b8ac471/shm",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/123ccaa4c9540c22dd2f0b110571d5d4b3938c951e02f4a2265b5f0ff67b10c8/shm",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/123ccaa4c9540c22dd2f0b110571d5d4b3938c951e02f4a2265b5f0ff67b10c8/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/7a6c5dfe85413b74552dededf49fdbc4b4695873fed3f7689ebc02b47b8ac471/rootfs",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/8639279b0333d0f9f02efb2953f012537c6092cf38a63dae2b9267bd845d66d9/shm",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/8639279b0333d0f9f02efb2953f012537c6092cf38a63dae2b9267bd845d66d9/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/fb74ce5642ae1cca3de7eab569dd23bc2683a900724d272a760aa8d731b5c6d7/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/4146274126a846de47ead7658b9967e580a52529ddbfe61c6638feef7927ad43/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/2396ec9a442940db44105638406d4cb6fd2f5782aec1f0b54b4dfd01c6c51854/rootfs",
+        "tmpfs           7.7G   12K  7.7G   1% /var/lib/kubelet/pods/4f48f491-6153-49f4-ab28-4e2c38aaf0b1/volumes/kubernetes.io~projected/kube-api-access-97hbc",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/35a5f09f10f0c9d7339c2666f9419bd9b76219b47ac7a79d2624fc2af7ff7640/shm",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/fab31c670b7ea571530ef10f82a11417d34123ce981f7f8cca8b0748f49d3a56/shm",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/35a5f09f10f0c9d7339c2666f9419bd9b76219b47ac7a79d2624fc2af7ff7640/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/fab31c670b7ea571530ef10f82a11417d34123ce981f7f8cca8b0748f49d3a56/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/dcc5abc17cbe843286d5e522835ea0fb7622dd613b6d5734e67ea43c99deeabd/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/fa5b65769b9eefa68181e2625cc4dbf83571388f31d26eb5d8fe6272f49bd558/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/9588a2b581e7f53d2af43274f09a2b8991025e1d254cb9b1644a0d252ab5091e/rootfs"
+    ]
+}
+2025-09-13 21:37:37,955 p=25524 u=sidney n=ansible INFO| TASK [Install Common packages] ****************************************************************************************************************
+2025-09-13 21:37:37,956 p=25524 u=sidney n=ansible INFO| fatal: [ironwolf.local]: FAILED! => {"msg": "The task includes an option with an undefined variable.. 'common_packages' is undefined\n\nThe error appears to be in '/Users/sidney/Developer/home-lab-automation/ansible/playbooks/runbooks/system/system_maintenance.yml': line 38, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: \"Install Common packages\"\n      ^ here\n"}
+2025-09-13 21:37:37,956 p=25524 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-13 21:37:37,956 p=25524 u=sidney n=ansible INFO| ironwolf.local             : ok=5    changed=0    unreachable=0    failed=1    skipped=1    rescued=0    ignored=0   
+2025-09-14 00:23:42,236 p=92100 u=sidney n=ansible INFO| PLAY [Test Variable Loading] ******************************************************************************************************************
+2025-09-14 00:23:42,241 p=92100 u=sidney n=ansible ERROR| ERROR! We were unable to read either as JSON nor YAML, these are the errors we got from each:
+JSON: Expecting value: line 1 column 1 (char 0)
+
+Syntax Error while loading YAML.
+  did not find expected key. while parsing a block mapping
+  in "<unicode string>", line 3, column 1
+did not find expected key
+  in "<unicode string>", line 29, column 3
+
+The error appears to be in '/Users/sidney/Developer/home-lab-automation/ansible/group_vars/all/main.yml': line 29, column 3, but may
+be elsewhere in the file depending on the exact syntax problem.
+
+The offending line appears to be:
+
+## Rate limiting
+  ntp_rate_limit:
+  ^ here
+
+2025-09-14 00:24:44,356 p=92785 u=sidney n=ansible INFO| PLAY [System Maintenance] *********************************************************************************************************************
+2025-09-14 00:25:17,462 p=92785 u=sidney n=ansible INFO| TASK [Update package cache] *******************************************************************************************************************
+2025-09-14 00:25:17,463 p=92785 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 00:25:44,022 p=92785 u=sidney n=ansible INFO| TASK [Upgrade all packages (Debian/Ubuntu)] ***************************************************************************************************
+2025-09-14 00:25:44,024 p=92785 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 00:25:44,885 p=92785 u=sidney n=ansible INFO| TASK [Check disk space] ***********************************************************************************************************************
+2025-09-14 00:25:44,886 p=92785 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 00:25:44,934 p=92785 u=sidney n=ansible INFO| TASK [Display disk usage] *********************************************************************************************************************
+2025-09-14 00:25:44,935 p=92785 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": [
+        "Filesystem      Size  Used Avail Use% Mounted on",
+        "/dev/root       118G  3.8G  109G   4% /",
+        "devtmpfs        3.9G     0  3.9G   0% /dev",
+        "tmpfs           3.9G     0  3.9G   0% /dev/shm",
+        "tmpfs           1.6G  116M  1.5G   8% /run",
+        "tmpfs           5.0M     0  5.0M   0% /run/lock",
+        "tmpfs            50M   24K   50M   1% /var/log",
+        "tmpfs           3.9G  321M  3.6G   9% /tmp",
+        "/dev/mmcblk0p1  127M   34M   94M  27% /boot/firmware",
+        "tmpfs           1.0M     0  1.0M   0% /run/credentials/getty@tty1.service",
+        "tmpfs           1.0M     0  1.0M   0% /run/credentials/systemd-journald.service",
+        "/dev/sda1       1.9T  158G  1.7T   9% /media/devmon/sda1-usb-Seagate_Expansio",
+        "/dev/sdb1       916G   28K  916G   1% /media/devmon/sdb1-ata-WDC_WD10SMZW-11Y",
+        "tmpfs           7.7G   12K  7.7G   1% /var/lib/kubelet/pods/0cabec62-8490-474b-b30c-1d59c0aa8c46/volumes/kubernetes.io~projected/kube-api-access-bc8nj",
+        "tmpfs           170M   12K  170M   1% /var/lib/kubelet/pods/54d8db4c-75f6-4a8a-a41d-9f81eaec1bc0/volumes/kubernetes.io~projected/kube-api-access-v5znq",
+        "tmpfs           7.7G   12K  7.7G   1% /var/lib/kubelet/pods/6dac01b4-11bd-49e8-b15f-29bc7a221e85/volumes/kubernetes.io~projected/kube-api-access-djwgq",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/7a6c5dfe85413b74552dededf49fdbc4b4695873fed3f7689ebc02b47b8ac471/shm",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/123ccaa4c9540c22dd2f0b110571d5d4b3938c951e02f4a2265b5f0ff67b10c8/shm",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/123ccaa4c9540c22dd2f0b110571d5d4b3938c951e02f4a2265b5f0ff67b10c8/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/7a6c5dfe85413b74552dededf49fdbc4b4695873fed3f7689ebc02b47b8ac471/rootfs",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/8639279b0333d0f9f02efb2953f012537c6092cf38a63dae2b9267bd845d66d9/shm",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/8639279b0333d0f9f02efb2953f012537c6092cf38a63dae2b9267bd845d66d9/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/fb74ce5642ae1cca3de7eab569dd23bc2683a900724d272a760aa8d731b5c6d7/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/4146274126a846de47ead7658b9967e580a52529ddbfe61c6638feef7927ad43/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/2396ec9a442940db44105638406d4cb6fd2f5782aec1f0b54b4dfd01c6c51854/rootfs",
+        "tmpfs           7.7G   12K  7.7G   1% /var/lib/kubelet/pods/4f48f491-6153-49f4-ab28-4e2c38aaf0b1/volumes/kubernetes.io~projected/kube-api-access-97hbc",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/35a5f09f10f0c9d7339c2666f9419bd9b76219b47ac7a79d2624fc2af7ff7640/shm",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/fab31c670b7ea571530ef10f82a11417d34123ce981f7f8cca8b0748f49d3a56/shm",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/35a5f09f10f0c9d7339c2666f9419bd9b76219b47ac7a79d2624fc2af7ff7640/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/fab31c670b7ea571530ef10f82a11417d34123ce981f7f8cca8b0748f49d3a56/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/dcc5abc17cbe843286d5e522835ea0fb7622dd613b6d5734e67ea43c99deeabd/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/fa5b65769b9eefa68181e2625cc4dbf83571388f31d26eb5d8fe6272f49bd558/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/9588a2b581e7f53d2af43274f09a2b8991025e1d254cb9b1644a0d252ab5091e/rootfs"
+    ]
+}
+2025-09-14 00:25:44,964 p=92785 u=sidney n=ansible INFO| TASK [Install Common packages] ****************************************************************************************************************
+2025-09-14 00:25:44,964 p=92785 u=sidney n=ansible INFO| fatal: [ironwolf.local]: FAILED! => {"msg": "The task includes an option with an undefined variable.. 'common_packages' is undefined\n\nThe error appears to be in '/Users/sidney/Developer/home-lab-automation/ansible/playbooks/runbooks/system/system_maintenance.yml': line 38, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: \"Install Common packages\"\n      ^ here\n"}
+2025-09-14 00:25:44,965 p=92785 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 00:25:44,965 p=92785 u=sidney n=ansible INFO| ironwolf.local             : ok=4    changed=0    unreachable=0    failed=1    skipped=1    rescued=0    ignored=0   
+2025-09-14 00:29:42,234 p=95624 u=sidney n=ansible INFO| PLAY [Test Variable Loading] ******************************************************************************************************************
+2025-09-14 00:29:42,261 p=95624 u=sidney n=ansible INFO| TASK [Show current working directory] *********************************************************************************************************
+2025-09-14 00:29:42,262 p=95624 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "Playbook dir: /Users/sidney/Developer/home-lab-automation/ansible"
+}
+2025-09-14 00:29:42,295 p=95624 u=sidney n=ansible INFO| TASK [Test common_packages variable] **********************************************************************************************************
+2025-09-14 00:29:42,295 p=95624 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "common_packages is DEFINED"
+}
+2025-09-14 00:29:42,316 p=95624 u=sidney n=ansible INFO| TASK [Show common_packages content] ***********************************************************************************************************
+2025-09-14 00:29:42,316 p=95624 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "common_packages": [
+        "curl",
+        "wget",
+        "vim",
+        "htop",
+        "tree",
+        "unzip",
+        "git",
+        "jq",
+        "btop"
+    ]
+}
+2025-09-14 00:29:42,334 p=95624 u=sidney n=ansible INFO| TASK [Test os_specific_packages variable] *****************************************************************************************************
+2025-09-14 00:29:42,334 p=95624 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "os_specific_packages is DEFINED"
+}
+2025-09-14 00:29:42,353 p=95624 u=sidney n=ansible INFO| TASK [Show os_specific_packages content] ******************************************************************************************************
+2025-09-14 00:29:42,354 p=95624 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "os_specific_packages": [
+        "apt-transport-https",
+        "ca-certificates",
+        "software-properties-common",
+        "python3-pip",
+        "bind9-dnsutils",
+        "bind9-utils",
+        "ntp",
+        "sudo",
+        "logrotate",
+        "rsyslog"
+    ]
+}
+2025-09-14 00:29:42,375 p=95624 u=sidney n=ansible INFO| TASK [Show host groups] ***********************************************************************************************************************
+2025-09-14 00:29:42,375 p=95624 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "This host belongs to groups: ['debian']"
+}
+2025-09-14 00:29:42,396 p=95624 u=sidney n=ansible INFO| TASK [Show OS family] *************************************************************************************************************************
+2025-09-14 00:29:42,396 p=95624 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "OS Family: Debian | Distribution: Debian"
+}
+2025-09-14 00:29:42,397 p=95624 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 00:29:42,397 p=95624 u=sidney n=ansible INFO| ironwolf.local             : ok=7    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+2025-09-14 00:32:00,334 p=96955 u=sidney n=ansible INFO| Starting galaxy collection install process
+2025-09-14 00:32:00,355 p=96955 u=sidney n=ansible INFO| Nothing to do. All requested collections are already installed. If you want to reinstall them, consider using `--force`.
+2025-09-14 00:32:00,569 p=96981 u=sidney n=ansible INFO| {"/Users/sidney/.ansible/collections/ansible_collections": {"ansible.posix": {"version": "1.6.2"}, "community.crypto": {"version": "2.26.1"}, "community.docker": {"version": "4.5.2"}, "community.general": {"version": "10.6.0"}, "community.grafana": {"version": "2.2.0"}, "community.libvirt": {"version": "1.3.1"}, "containers.podman": {"version": "1.16.3"}}}
+2025-09-14 00:32:00,876 p=96985 u=sidney n=ansible INFO| ansible-playbook [core 2.18.8]
+  config file = /Users/sidney/Developer/home-lab-automation/ansible/ansible.cfg
+  configured module search path = ['/Users/sidney/Developer/home-lab-automation/ansible/.ansible/modules', '/Users/sidney/Developer/home-lab-automation/ansible/library']
+  ansible python module location = /opt/homebrew/Cellar/ansible-lint/25.8.2/libexec/lib/python3.13/site-packages/ansible
+  ansible collection location = /Users/sidney/Developer/home-lab-automation/ansible/collections:/Users/sidney/.ansible/collections:/usr/share/ansible/collections:/opt/homebrew/opt/python@3.13/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages:/opt/homebrew/lib/python3.13/site-packages:/opt/homebrew/Cellar/ansible-lint/25.8.2/libexec/lib/python3.13/site-packages
+  executable location = /opt/homebrew/Cellar/ansible-lint/25.8.2/libexec/bin/ansible-playbook
+  python version = 3.13.7 (main, Aug 14 2025, 11:12:11) [Clang 17.0.0 (clang-1700.0.13.3)] (/opt/homebrew/Cellar/ansible-lint/25.8.2/libexec/bin/python)
+  jinja version = 3.1.6
+  libyaml = True
+2025-09-14 00:32:00,876 p=96985 u=sidney n=ansible INFO| Using /Users/sidney/Developer/home-lab-automation/ansible/ansible.cfg as config file
+2025-09-14 00:32:00,975 p=96985 u=sidney n=ansible INFO| 1 plays in playbooks/runbooks/system/system_maintenance.yml
+2025-09-14 00:32:00,975 p=96985 u=sidney n=ansible INFO| playbook: playbooks/runbooks/system/system_maintenance.yml
+2025-09-14 00:32:01,335 p=96987 u=sidney n=ansible INFO| {
+    "ansible.builtin.runas": "Run As user",
+    "ansible.builtin.su": "Substitute User",
+    "ansible.builtin.sudo": "Substitute User DO",
+    "community.general.doas": "Do As user",
+    "community.general.dzdo": "Centrify's Direct Authorize",
+    "community.general.ksu": "Kerberos substitute user",
+    "community.general.machinectl": "Systemd's machinectl privilege escalation",
+    "community.general.pbrun": "PowerBroker run",
+    "community.general.pfexec": "profile based execution",
+    "community.general.pmrun": "Privilege Manager run",
+    "community.general.run0": "Systemd's run0",
+    "community.general.sesu": "CA Privileged Access Manager",
+    "community.general.sudosu": "Run tasks using sudo su -",
+    "containers.podman.podman_unshare": "Run tasks using podman unshare"
+}
+2025-09-14 00:47:39,634 p=5979 u=sidney n=ansible INFO| PLAY [System Maintenance] *********************************************************************************************************************
+2025-09-14 00:48:07,319 p=5979 u=sidney n=ansible INFO| TASK [Update package cache] *******************************************************************************************************************
+2025-09-14 00:48:07,321 p=5979 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 00:48:29,992 p=5979 u=sidney n=ansible INFO| TASK [Upgrade all packages (Debian/Ubuntu)] ***************************************************************************************************
+2025-09-14 00:48:29,993 p=5979 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 00:48:32,748 p=5979 u=sidney n=ansible INFO| TASK [Check disk space] ***********************************************************************************************************************
+2025-09-14 00:48:32,748 p=5979 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 00:48:32,794 p=5979 u=sidney n=ansible INFO| TASK [Display disk usage] *********************************************************************************************************************
+2025-09-14 00:48:32,795 p=5979 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": [
+        "Filesystem      Size  Used Avail Use% Mounted on",
+        "/dev/root       118G  3.8G  109G   4% /",
+        "devtmpfs        3.9G     0  3.9G   0% /dev",
+        "tmpfs           3.9G     0  3.9G   0% /dev/shm",
+        "tmpfs           1.6G  116M  1.5G   8% /run",
+        "tmpfs           5.0M     0  5.0M   0% /run/lock",
+        "tmpfs            50M   36K   50M   1% /var/log",
+        "tmpfs           3.9G  321M  3.6G   9% /tmp",
+        "/dev/mmcblk0p1  127M   34M   94M  27% /boot/firmware",
+        "tmpfs           1.0M     0  1.0M   0% /run/credentials/getty@tty1.service",
+        "tmpfs           1.0M     0  1.0M   0% /run/credentials/systemd-journald.service",
+        "/dev/sda1       1.9T  158G  1.7T   9% /media/devmon/sda1-usb-Seagate_Expansio",
+        "/dev/sdb1       916G   28K  916G   1% /media/devmon/sdb1-ata-WDC_WD10SMZW-11Y",
+        "tmpfs           7.7G   12K  7.7G   1% /var/lib/kubelet/pods/0cabec62-8490-474b-b30c-1d59c0aa8c46/volumes/kubernetes.io~projected/kube-api-access-bc8nj",
+        "tmpfs           170M   12K  170M   1% /var/lib/kubelet/pods/54d8db4c-75f6-4a8a-a41d-9f81eaec1bc0/volumes/kubernetes.io~projected/kube-api-access-v5znq",
+        "tmpfs           7.7G   12K  7.7G   1% /var/lib/kubelet/pods/6dac01b4-11bd-49e8-b15f-29bc7a221e85/volumes/kubernetes.io~projected/kube-api-access-djwgq",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/7a6c5dfe85413b74552dededf49fdbc4b4695873fed3f7689ebc02b47b8ac471/shm",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/123ccaa4c9540c22dd2f0b110571d5d4b3938c951e02f4a2265b5f0ff67b10c8/shm",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/123ccaa4c9540c22dd2f0b110571d5d4b3938c951e02f4a2265b5f0ff67b10c8/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/7a6c5dfe85413b74552dededf49fdbc4b4695873fed3f7689ebc02b47b8ac471/rootfs",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/8639279b0333d0f9f02efb2953f012537c6092cf38a63dae2b9267bd845d66d9/shm",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/8639279b0333d0f9f02efb2953f012537c6092cf38a63dae2b9267bd845d66d9/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/fb74ce5642ae1cca3de7eab569dd23bc2683a900724d272a760aa8d731b5c6d7/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/4146274126a846de47ead7658b9967e580a52529ddbfe61c6638feef7927ad43/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/2396ec9a442940db44105638406d4cb6fd2f5782aec1f0b54b4dfd01c6c51854/rootfs",
+        "tmpfs           7.7G   12K  7.7G   1% /var/lib/kubelet/pods/4f48f491-6153-49f4-ab28-4e2c38aaf0b1/volumes/kubernetes.io~projected/kube-api-access-97hbc",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/35a5f09f10f0c9d7339c2666f9419bd9b76219b47ac7a79d2624fc2af7ff7640/shm",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/fab31c670b7ea571530ef10f82a11417d34123ce981f7f8cca8b0748f49d3a56/shm",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/35a5f09f10f0c9d7339c2666f9419bd9b76219b47ac7a79d2624fc2af7ff7640/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/fab31c670b7ea571530ef10f82a11417d34123ce981f7f8cca8b0748f49d3a56/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/dcc5abc17cbe843286d5e522835ea0fb7622dd613b6d5734e67ea43c99deeabd/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/fa5b65769b9eefa68181e2625cc4dbf83571388f31d26eb5d8fe6272f49bd558/rootfs",
+        "overlay         118G  3.8G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/9588a2b581e7f53d2af43274f09a2b8991025e1d254cb9b1644a0d252ab5091e/rootfs"
+    ]
+}
+2025-09-14 00:48:32,822 p=5979 u=sidney n=ansible INFO| TASK [Install Common packages] ****************************************************************************************************************
+2025-09-14 00:48:32,823 p=5979 u=sidney n=ansible INFO| fatal: [ironwolf.local]: FAILED! => {"msg": "The task includes an option with an undefined variable.. 'common_packages' is undefined\n\nThe error appears to be in '/Users/sidney/Developer/home-lab-automation/ansible/playbooks/runbooks/system/system_maintenance.yml': line 38, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: \"Install Common packages\"\n      ^ here\n"}
+2025-09-14 00:48:32,823 p=5979 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 00:48:32,823 p=5979 u=sidney n=ansible INFO| ironwolf.local             : ok=4    changed=0    unreachable=0    failed=1    skipped=1    rescued=0    ignored=0   
+2025-09-14 00:49:31,563 p=7142 u=sidney n=ansible INFO| PLAY [System Maintenance] *********************************************************************************************************************
+2025-09-14 00:49:59,486 p=7142 u=sidney n=ansible INFO| TASK [Update package cache] *******************************************************************************************************************
+2025-09-14 00:49:59,487 p=7142 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 00:50:22,251 p=7142 u=sidney n=ansible INFO| TASK [Upgrade all packages (Debian/Ubuntu)] ***************************************************************************************************
+2025-09-14 00:50:22,253 p=7142 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 00:50:22,308 p=7142 u=sidney n=ansible INFO| TASK [Install Common packages] ****************************************************************************************************************
+2025-09-14 00:50:22,308 p=7142 u=sidney n=ansible INFO| fatal: [ironwolf.local]: FAILED! => {"msg": "The task includes an option with an undefined variable.. 'common_packages' is undefined\n\nThe error appears to be in '/Users/sidney/Developer/home-lab-automation/ansible/playbooks/runbooks/system/system_maintenance.yml': line 38, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: \"Install Common packages\"\n      ^ here\n"}
+2025-09-14 00:50:22,309 p=7142 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 00:50:22,309 p=7142 u=sidney n=ansible INFO| ironwolf.local             : ok=2    changed=0    unreachable=0    failed=1    skipped=1    rescued=0    ignored=0   
+2025-09-14 00:52:06,791 p=8676 u=sidney n=ansible INFO| PLAY [System Maintenance] *********************************************************************************************************************
+2025-09-14 00:52:30,243 p=8676 u=sidney n=ansible INFO| TASK [Update package cache] *******************************************************************************************************************
+2025-09-14 00:52:30,245 p=8676 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 00:52:52,630 p=8676 u=sidney n=ansible INFO| TASK [Upgrade all packages (Debian/Ubuntu)] ***************************************************************************************************
+2025-09-14 00:52:52,632 p=8676 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 00:52:52,688 p=8676 u=sidney n=ansible INFO| TASK [Install OS-specific packages] ***********************************************************************************************************
+2025-09-14 00:52:52,688 p=8676 u=sidney n=ansible INFO| fatal: [ironwolf.local]: FAILED! => {"msg": "The task includes an option with an undefined variable.. 'os_specific_packages' is undefined\n\nThe error appears to be in '/Users/sidney/Developer/home-lab-automation/ansible/playbooks/runbooks/system/system_maintenance.yml': line 43, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: \"Install OS-specific packages\"\n      ^ here\n"}
+2025-09-14 00:52:52,689 p=8676 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 00:52:52,689 p=8676 u=sidney n=ansible INFO| ironwolf.local             : ok=2    changed=0    unreachable=0    failed=1    skipped=1    rescued=0    ignored=0   
+2025-09-14 00:55:46,549 p=10952 u=sidney n=ansible INFO| PLAY [System Maintenance] *********************************************************************************************************************
+2025-09-14 00:56:08,599 p=10952 u=sidney n=ansible INFO| TASK [Update package cache] *******************************************************************************************************************
+2025-09-14 00:56:08,600 p=10952 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 00:56:30,693 p=10952 u=sidney n=ansible INFO| TASK [Upgrade all packages (Debian/Ubuntu)] ***************************************************************************************************
+2025-09-14 00:56:30,695 p=10952 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 00:56:30,755 p=10952 u=sidney n=ansible INFO| TASK [Install OS-specific packages] ***********************************************************************************************************
+2025-09-14 00:56:30,756 p=10952 u=sidney n=ansible INFO| fatal: [ironwolf.local]: FAILED! => {"msg": "The task includes an option with an undefined variable.. 'os_specific_packages' is undefined\n\nThe error appears to be in '/Users/sidney/Developer/home-lab-automation/ansible/playbooks/runbooks/system/system_maintenance.yml': line 45, column 7, but may\nbe elsewhere in the file depending on the exact syntax problem.\n\nThe offending line appears to be:\n\n\n    - name: \"Install OS-specific packages\"\n      ^ here\n"}
+2025-09-14 00:56:30,756 p=10952 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 00:56:30,756 p=10952 u=sidney n=ansible INFO| ironwolf.local             : ok=2    changed=0    unreachable=0    failed=1    skipped=1    rescued=0    ignored=0   
+2025-09-14 00:58:03,330 p=12493 u=sidney n=ansible INFO| PLAY [Debug Groups] ***************************************************************************************************************************
+2025-09-14 00:58:03,353 p=12493 u=sidney n=ansible INFO| TASK [Show group membership] ******************************************************************************************************************
+2025-09-14 00:58:03,354 p=12493 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": [
+        "Host: ironwolf.local",
+        "Groups: ['debian']",
+        "All groups: {'all': ['ironwolf.local'], 'ungrouped': [], 'debian': ['ironwolf.local']}"
+    ]
+}
+2025-09-14 00:58:03,354 p=12493 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 00:58:03,354 p=12493 u=sidney n=ansible INFO| ironwolf.local             : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+2025-09-14 00:59:51,076 p=13601 u=sidney n=ansible WARNING| [WARNING]: Skipping 'timezone' as this is not a valid group definition
+
+2025-09-14 00:59:51,076 p=13601 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_servers' as this is not a valid group definition
+
+2025-09-14 00:59:51,076 p=13601 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_pool_servers' as this is not a valid group definition
+
+2025-09-14 00:59:51,076 p=13601 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_pool_maxsources' as this is not a valid group
+definition
+
+2025-09-14 00:59:51,076 p=13601 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_enabled' as this is not a valid group definition
+
+2025-09-14 00:59:51,077 p=13601 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_poll_interval_min' as this is not a valid group
+definition
+
+2025-09-14 00:59:51,077 p=13601 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_poll_interval_max' as this is not a valid group
+definition
+
+2025-09-14 01:05:45,217 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'timezone' as this is not a valid group definition
+
+2025-09-14 01:05:45,217 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_servers' as this is not a valid group definition
+
+2025-09-14 01:05:45,217 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_pool_servers' as this is not a valid group definition
+
+2025-09-14 01:05:45,217 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_pool_maxsources' as this is not a valid group definition
+
+2025-09-14 01:05:45,217 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_enabled' as this is not a valid group definition
+
+2025-09-14 01:05:45,217 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_poll_interval_min' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_poll_interval_max' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_connection_retry' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_save_interval' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_makestep_threshold' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_makestep_limit' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_log_level' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_statistics_enabled' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_server_enabled' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ntp_security_hardening' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping key (interval) in group (ntp_rate_limit) as it is not a mapping, it is a <class 'int'>
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping key (burst) in group (ntp_rate_limit) as it is not a mapping, it is a <class 'int'>
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ssh_port' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ssh_permit_root_login' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ssh_password_authentication' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'ssh_max_auth_tries' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'firewall_enabled' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'fail2ban_enabled' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'automatic_security_updates' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'unattended_upgrades' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'monitoring_enabled' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'log_retention_days' as this is not a valid group definition
+
+2025-09-14 01:05:45,218 p=17016 u=sidney n=ansible WARNING| [WARNING]: Skipping 'common_packages' as this is not a valid group definition
+
+2025-09-14 01:05:45,221 p=17016 u=sidney n=ansible WARNING| [WARNING]: provided hosts list is empty, only localhost is available. Note that the implicit localhost does not match 'all'
+
+2025-09-14 01:05:45,345 p=17016 u=sidney n=ansible INFO| PLAY [Test Variable Loading] ******************************************************************************************************************
+2025-09-14 01:05:45,345 p=17016 u=sidney n=ansible INFO| skipping: no hosts matched
+2025-09-14 01:05:45,345 p=17016 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 01:07:20,562 p=17947 u=sidney n=ansible INFO| PLAY [Test Variable Loading] ******************************************************************************************************************
+2025-09-14 01:07:20,588 p=17947 u=sidney n=ansible INFO| TASK [Show current working directory] *********************************************************************************************************
+2025-09-14 01:07:20,588 p=17947 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "Playbook dir: /Users/sidney/Developer/home-lab-automation/ansible"
+}
+2025-09-14 01:07:20,608 p=17947 u=sidney n=ansible INFO| TASK [Test common_packages variable] **********************************************************************************************************
+2025-09-14 01:07:20,609 p=17947 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "common_packages is DEFINED"
+}
+2025-09-14 01:07:20,629 p=17947 u=sidney n=ansible INFO| TASK [Show common_packages content] ***********************************************************************************************************
+2025-09-14 01:07:20,629 p=17947 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "common_packages": [
+        "curl",
+        "wget",
+        "vim",
+        "htop",
+        "tree",
+        "unzip",
+        "git",
+        "jq",
+        "btop"
+    ]
+}
+2025-09-14 01:07:20,649 p=17947 u=sidney n=ansible INFO| TASK [Test os_specific_packages variable] *****************************************************************************************************
+2025-09-14 01:07:20,650 p=17947 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "os_specific_packages is DEFINED"
+}
+2025-09-14 01:07:20,684 p=17947 u=sidney n=ansible INFO| TASK [Show os_specific_packages content] ******************************************************************************************************
+2025-09-14 01:07:20,684 p=17947 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "os_specific_packages": [
+        "apt-transport-https",
+        "ca-certificates",
+        "software-properties-common",
+        "python3-pip",
+        "bind9-dnsutils",
+        "bind9-utils",
+        "ntp",
+        "sudo",
+        "logrotate",
+        "rsyslog"
+    ]
+}
+2025-09-14 01:07:20,708 p=17947 u=sidney n=ansible INFO| TASK [Show host groups] ***********************************************************************************************************************
+2025-09-14 01:07:20,708 p=17947 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "This host belongs to groups: ['debian']"
+}
+2025-09-14 01:07:20,727 p=17947 u=sidney n=ansible INFO| TASK [Show OS family] *************************************************************************************************************************
+2025-09-14 01:07:20,728 p=17947 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "OS Family: Debian | Distribution: Debian"
+}
+2025-09-14 01:07:20,728 p=17947 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 01:07:20,728 p=17947 u=sidney n=ansible INFO| ironwolf.local             : ok=7    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+2025-09-14 01:07:55,271 p=18393 u=sidney n=ansible INFO| PLAY [Test Variable Loading] ******************************************************************************************************************
+2025-09-14 01:07:55,296 p=18393 u=sidney n=ansible INFO| TASK [Show current working directory] *********************************************************************************************************
+2025-09-14 01:07:55,297 p=18393 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "Playbook dir: /Users/sidney/Developer/home-lab-automation/ansible/playbooks/runbooks/system"
+}
+2025-09-14 01:07:55,317 p=18393 u=sidney n=ansible INFO| TASK [Test common_packages variable] **********************************************************************************************************
+2025-09-14 01:07:55,318 p=18393 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "common_packages is UNDEFINED"
+}
+2025-09-14 01:07:55,356 p=18393 u=sidney n=ansible INFO| TASK [Test os_specific_packages variable] *****************************************************************************************************
+2025-09-14 01:07:55,356 p=18393 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "os_specific_packages is UNDEFINED"
+}
+2025-09-14 01:07:55,398 p=18393 u=sidney n=ansible INFO| TASK [Show host groups] ***********************************************************************************************************************
+2025-09-14 01:07:55,398 p=18393 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "This host belongs to groups: ['debian']"
+}
+2025-09-14 01:07:55,419 p=18393 u=sidney n=ansible INFO| TASK [Show OS family] *************************************************************************************************************************
+2025-09-14 01:07:55,419 p=18393 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": "OS Family: Debian | Distribution: Debian"
+}
+2025-09-14 01:07:55,419 p=18393 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 01:07:55,420 p=18393 u=sidney n=ansible INFO| ironwolf.local             : ok=5    changed=0    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+2025-09-14 01:14:45,600 p=22490 u=sidney n=ansible INFO| PLAY [System Maintenance] *********************************************************************************************************************
+2025-09-14 01:15:14,389 p=22490 u=sidney n=ansible INFO| TASK [Update package cache] *******************************************************************************************************************
+2025-09-14 01:15:14,391 p=22490 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 01:15:40,186 p=22490 u=sidney n=ansible INFO| TASK [Upgrade all packages (Debian/Ubuntu)] ***************************************************************************************************
+2025-09-14 01:15:40,187 p=22490 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 01:16:53,189 p=22490 u=sidney n=ansible INFO| TASK [Install Common packages] ****************************************************************************************************************
+2025-09-14 01:16:53,191 p=22490 u=sidney n=ansible INFO| changed: [ironwolf.local]
+2025-09-14 01:17:08,978 p=22490 u=sidney n=ansible INFO| TASK [Install OS-specific packages] ***********************************************************************************************************
+2025-09-14 01:17:08,979 p=22490 u=sidney n=ansible INFO| fatal: [ironwolf.local]: FAILED! => {"changed": false, "msg": "No package matching 'epel-release' is available"}
+2025-09-14 01:17:08,980 p=22490 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 01:17:08,980 p=22490 u=sidney n=ansible INFO| ironwolf.local             : ok=3    changed=1    unreachable=0    failed=1    skipped=1    rescued=0    ignored=0   
+2025-09-14 01:20:48,347 p=26105 u=sidney n=ansible INFO| PLAY [System Maintenance] *********************************************************************************************************************
+2025-09-14 01:21:13,081 p=26105 u=sidney n=ansible INFO| TASK [Update package cache] *******************************************************************************************************************
+2025-09-14 01:21:13,082 p=26105 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 01:21:38,706 p=26105 u=sidney n=ansible INFO| TASK [Upgrade all packages (Debian/Ubuntu)] ***************************************************************************************************
+2025-09-14 01:21:38,706 p=26105 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 01:21:59,373 p=26105 u=sidney n=ansible INFO| TASK [Install Common packages] ****************************************************************************************************************
+2025-09-14 01:21:59,373 p=26105 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 01:22:11,919 p=26105 u=sidney n=ansible INFO| TASK [Install OS-specific packages] ***********************************************************************************************************
+2025-09-14 01:22:11,920 p=26105 u=sidney n=ansible INFO| fatal: [ironwolf.local]: FAILED! => {"changed": false, "msg": "No package matching 'software-properties-common' is available"}
+2025-09-14 01:22:11,921 p=26105 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 01:22:11,922 p=26105 u=sidney n=ansible INFO| ironwolf.local             : ok=3    changed=0    unreachable=0    failed=1    skipped=1    rescued=0    ignored=0   
+2025-09-14 10:56:02,785 p=76213 u=sidney n=ansible INFO| PLAY [System Maintenance] *********************************************************************************************************************
+2025-09-14 10:56:25,070 p=76213 u=sidney n=ansible INFO| TASK [Update package cache] *******************************************************************************************************************
+2025-09-14 10:56:25,072 p=76213 u=sidney n=ansible INFO| changed: [ironwolf.local]
+2025-09-14 10:56:47,484 p=76213 u=sidney n=ansible INFO| TASK [Upgrade all packages (Debian/Ubuntu)] ***************************************************************************************************
+2025-09-14 10:56:47,485 p=76213 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 10:57:11,750 p=76213 u=sidney n=ansible INFO| TASK [Install Common packages] ****************************************************************************************************************
+2025-09-14 10:57:11,752 p=76213 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 10:57:26,815 p=76213 u=sidney n=ansible INFO| TASK [Install OS-specific packages] ***********************************************************************************************************
+2025-09-14 10:57:26,816 p=76213 u=sidney n=ansible INFO| fatal: [ironwolf.local]: FAILED! => {"changed": false, "msg": "No package matching 'software-properties-common' is available"}
+2025-09-14 10:57:26,817 p=76213 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 10:57:26,818 p=76213 u=sidney n=ansible INFO| ironwolf.local             : ok=3    changed=1    unreachable=0    failed=1    skipped=1    rescued=0    ignored=0   
+2025-09-14 10:58:31,765 p=77672 u=sidney n=ansible INFO| PLAY [System Maintenance] *********************************************************************************************************************
+2025-09-14 10:58:53,369 p=77672 u=sidney n=ansible INFO| TASK [Update package cache] *******************************************************************************************************************
+2025-09-14 10:58:53,372 p=77672 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 10:59:15,816 p=77672 u=sidney n=ansible INFO| TASK [Upgrade all packages (Debian/Ubuntu)] ***************************************************************************************************
+2025-09-14 10:59:15,817 p=77672 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 10:59:40,288 p=77672 u=sidney n=ansible INFO| TASK [Install Common packages] ****************************************************************************************************************
+2025-09-14 10:59:40,289 p=77672 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 10:59:55,935 p=77672 u=sidney n=ansible INFO| TASK [Install OS-specific packages] ***********************************************************************************************************
+2025-09-14 10:59:55,936 p=77672 u=sidney n=ansible INFO| fatal: [ironwolf.local]: FAILED! => {"changed": false, "msg": "No package matching 'ntp' is available"}
+2025-09-14 10:59:55,937 p=77672 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 10:59:55,937 p=77672 u=sidney n=ansible INFO| ironwolf.local             : ok=3    changed=0    unreachable=0    failed=1    skipped=1    rescued=0    ignored=0   
+2025-09-14 11:01:01,344 p=79137 u=sidney n=ansible INFO| PLAY [System Maintenance] *********************************************************************************************************************
+2025-09-14 11:01:23,415 p=79137 u=sidney n=ansible INFO| TASK [Update package cache] *******************************************************************************************************************
+2025-09-14 11:01:23,416 p=79137 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 11:01:48,310 p=79137 u=sidney n=ansible INFO| TASK [Upgrade all packages (Debian/Ubuntu)] ***************************************************************************************************
+2025-09-14 11:01:48,311 p=79137 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 11:02:12,069 p=79137 u=sidney n=ansible INFO| TASK [Install Common packages] ****************************************************************************************************************
+2025-09-14 11:02:12,069 p=79137 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 11:04:22,410 p=79137 u=sidney n=ansible INFO| TASK [Install OS-specific packages] ***********************************************************************************************************
+2025-09-14 11:04:22,412 p=79137 u=sidney n=ansible INFO| changed: [ironwolf.local]
+2025-09-14 11:04:23,855 p=79137 u=sidney n=ansible INFO| TASK [Check disk space] ***********************************************************************************************************************
+2025-09-14 11:04:23,856 p=79137 u=sidney n=ansible INFO| ok: [ironwolf.local]
+2025-09-14 11:04:23,888 p=79137 u=sidney n=ansible INFO| TASK [Display disk usage] *********************************************************************************************************************
+2025-09-14 11:04:23,888 p=79137 u=sidney n=ansible INFO| ok: [ironwolf.local] => {
+    "msg": [
+        "Filesystem      Size  Used Avail Use% Mounted on",
+        "/dev/root       118G  4.2G  109G   4% /",
+        "devtmpfs        3.9G     0  3.9G   0% /dev",
+        "tmpfs           3.9G     0  3.9G   0% /dev/shm",
+        "tmpfs           1.6G  135M  1.5G   9% /run",
+        "tmpfs           5.0M     0  5.0M   0% /run/lock",
+        "tmpfs            50M  328K   50M   1% /var/log",
+        "tmpfs           3.9G  321M  3.6G   9% /tmp",
+        "/dev/mmcblk0p1  127M   34M   94M  27% /boot/firmware",
+        "tmpfs           1.0M     0  1.0M   0% /run/credentials/getty@tty1.service",
+        "tmpfs           1.0M     0  1.0M   0% /run/credentials/systemd-journald.service",
+        "/dev/sda1       1.9T  158G  1.7T   9% /media/devmon/sda1-usb-Seagate_Expansio",
+        "/dev/sdb1       916G   28K  916G   1% /media/devmon/sdb1-ata-WDC_WD10SMZW-11Y",
+        "tmpfs           7.7G   12K  7.7G   1% /var/lib/kubelet/pods/0cabec62-8490-474b-b30c-1d59c0aa8c46/volumes/kubernetes.io~projected/kube-api-access-bc8nj",
+        "tmpfs           170M   12K  170M   1% /var/lib/kubelet/pods/54d8db4c-75f6-4a8a-a41d-9f81eaec1bc0/volumes/kubernetes.io~projected/kube-api-access-v5znq",
+        "tmpfs           7.7G   12K  7.7G   1% /var/lib/kubelet/pods/6dac01b4-11bd-49e8-b15f-29bc7a221e85/volumes/kubernetes.io~projected/kube-api-access-djwgq",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/7a6c5dfe85413b74552dededf49fdbc4b4695873fed3f7689ebc02b47b8ac471/shm",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/123ccaa4c9540c22dd2f0b110571d5d4b3938c951e02f4a2265b5f0ff67b10c8/shm",
+        "overlay         118G  4.2G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/123ccaa4c9540c22dd2f0b110571d5d4b3938c951e02f4a2265b5f0ff67b10c8/rootfs",
+        "overlay         118G  4.2G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/7a6c5dfe85413b74552dededf49fdbc4b4695873fed3f7689ebc02b47b8ac471/rootfs",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/8639279b0333d0f9f02efb2953f012537c6092cf38a63dae2b9267bd845d66d9/shm",
+        "overlay         118G  4.2G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/8639279b0333d0f9f02efb2953f012537c6092cf38a63dae2b9267bd845d66d9/rootfs",
+        "overlay         118G  4.2G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/fb74ce5642ae1cca3de7eab569dd23bc2683a900724d272a760aa8d731b5c6d7/rootfs",
+        "overlay         118G  4.2G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/4146274126a846de47ead7658b9967e580a52529ddbfe61c6638feef7927ad43/rootfs",
+        "overlay         118G  4.2G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/2396ec9a442940db44105638406d4cb6fd2f5782aec1f0b54b4dfd01c6c51854/rootfs",
+        "tmpfs           7.7G   12K  7.7G   1% /var/lib/kubelet/pods/4f48f491-6153-49f4-ab28-4e2c38aaf0b1/volumes/kubernetes.io~projected/kube-api-access-97hbc",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/35a5f09f10f0c9d7339c2666f9419bd9b76219b47ac7a79d2624fc2af7ff7640/shm",
+        "shm              64M     0   64M   0% /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/fab31c670b7ea571530ef10f82a11417d34123ce981f7f8cca8b0748f49d3a56/shm",
+        "overlay         118G  4.2G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/35a5f09f10f0c9d7339c2666f9419bd9b76219b47ac7a79d2624fc2af7ff7640/rootfs",
+        "overlay         118G  4.2G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/fab31c670b7ea571530ef10f82a11417d34123ce981f7f8cca8b0748f49d3a56/rootfs",
+        "overlay         118G  4.2G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/dcc5abc17cbe843286d5e522835ea0fb7622dd613b6d5734e67ea43c99deeabd/rootfs",
+        "overlay         118G  4.2G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/fa5b65769b9eefa68181e2625cc4dbf83571388f31d26eb5d8fe6272f49bd558/rootfs",
+        "overlay         118G  4.2G  109G   4% /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/9588a2b581e7f53d2af43274f09a2b8991025e1d254cb9b1644a0d252ab5091e/rootfs"
+    ]
+}
+2025-09-14 11:04:23,889 p=79137 u=sidney n=ansible INFO| PLAY RECAP ************************************************************************************************************************************
+2025-09-14 11:04:23,889 p=79137 u=sidney n=ansible INFO| ironwolf.local             : ok=6    changed=1    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   

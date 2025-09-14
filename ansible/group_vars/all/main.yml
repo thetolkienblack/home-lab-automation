@@ -1,0 +1,61 @@
+---
+# Global Variables
+timezone: "UTC"
+#NTP
+ntp_servers:
+  - pool.ntp.org
+  - time.google.com
+  - time.cloudflare.com
+  - time.nist.gov
+ntp_pool_servers:
+  - "0.pool.ntp.org"
+  - "1.pool.ntp.org"
+  - "2.pool.ntp.org"
+  - "3.pool.ntp.org"
+ntp_pool_maxsources: 4
+ntp_enabled: true
+ntp_poll_interval_min: 32
+ntp_poll_interval_max: 2048
+ntp_connection_retry: 30
+ntp_save_interval: 60
+ntp_makestep_threshold: 1.0
+ntp_makestep_limit: 3
+ntp_log_level: "measurements statistics tracking"
+ntp_statistics_enabled: false
+ntp_server_enabled: false
+ntp_security_hardening: true
+
+## Rate limiting
+ntp_rate_limit:
+  interval: 3
+  burst: 8
+
+# SSH Configuration
+ssh_port: 22
+ssh_permit_root_login: false
+ssh_password_authentication: false
+ssh_max_auth_tries: 3
+
+# Firewall Settings
+firewall_enabled: true
+fail2ban_enabled: true
+
+# Security Settings
+automatic_security_updates: true
+unattended_upgrades: true
+
+# Monitoring
+monitoring_enabled: true
+log_retention_days: 30
+
+# Common packages
+common_packages:
+  - curl
+  - wget
+  - vim
+  - htop
+  - tree
+  - unzip
+  - git
+  - jq
+  - btop

@@ -1,0 +1,24 @@
+---
+# Debian/Ubuntu specific variables
+package_manager: apt
+service_manager: systemctl
+
+# Package repositories
+security_repo: "deb http://security.debian.org/debian-security"
+updates_repo: "deb http://deb.debian.org/debian"
+
+# System packages
+os_specific_packages:
+  - apt-transport-https
+  - ca-certificates
+  - build-essential
+  - python3-pip
+  - bind9-dnsutils
+  - bind9-utils
+  - sudo
+  - logrotate
+  - rsyslog
+
+# Services
+ssh_service_name: ssh
+firewall_service_name: ufw

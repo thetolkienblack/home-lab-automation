@@ -1,0 +1,28 @@
+---
+# Encrypted variables (use ansible-vault encrypt to secure)
+# Example: ansible-vault encrypt group_vars/all/vault.yml
+
+# Database credentials
+vault_mysql_root_password: "super_secure_password_123"
+vault_mysql_app_password: "app_secure_password_456"
+
+# API Keys
+vault_monitoring_api_key: "your_monitoring_api_key_here"
+vault_backup_encryption_key: "backup_encryption_key_here"
+
+# SSH Keys (for deployment)
+vault_deploy_ssh_private_key: |
+  -----BEGIN OPENSSH PRIVATE KEY-----
+  # Your private key content here
+  -----END OPENSSH PRIVATE KEY-----
+
+# Certificates
+vault_ssl_certificate: |
+  -----BEGIN CERTIFICATE-----
+  # Your SSL certificate here
+  -----END CERTIFICATE-----
+
+vault_ssl_private_key: |
+  -----BEGIN PRIVATE KEY-----
+  # Your SSL private key here
+  -----END PRIVATE KEY-----
