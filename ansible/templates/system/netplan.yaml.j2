@@ -1,0 +1,82 @@
+# ===========================================
+# templates/system/netplan.yaml.j2
+# Netplan configuration for Ubuntu/Modern Debian/DietPi
+# ===========================================
+
+# Netplan Network Configuration
+# Managed by Ansible - {{ ansible_managed }}
+# Generated on: {{ ansible_date_time.iso8601 }}
+# Mode: {{ network_config_mode }}
+
+network:
+  version: 2
+  renderer: {{ network_renderer | default('networkd') }}
+  
+  ethernets:
+    {{ network_interface | default(default_network_interface) }}:
+{% if network_config_mode == "dhcp" %}
+      # DHCP Configuration
+      dhcp4: true
+      dhcp6: {{ network_enable_ipv6 | default(false) }}
+      optional: true
+{% if network_dhcp_identifier is defined %}
+      dhcp-identifier: {{ network_dhcp_identifier }}
+{% endif %}
+{% if network_accept_dhcp_dns is defined and not network_accept_dhcp_dns %}
+      dhcp4-overrides:
+        use-dns: false
+{% endif %}
+
+{% else %}
+      # Static IP Configuration
+      dhcp4: false
+      dhcp6: false
+      addresses:
+        - {{ network_static_ip }}/{{ network_netmask | ipaddr('prefix') if '/' not in network_netmask else network_netmask.split('/')[1] if '/' in network_netmask else (network_netmask | ipaddr('prefix')) }}
+{% if network_additional_ips is defined %}
+{% for additional_ip in network_additional_ips %}
+        - {{ additional_ip }}/{{ network_netmask | ipaddr('prefix') if '/' not in network_netmask else network_netmask.split('/')[1] if '/' in network_netmask else (network_netmask | ipaddr('prefix')) }}
+{% endfor %}
+{% endif %}
+
+      routes:
+        - to: default
+          via: {{ network_gateway }}
+{% if network_static_routes is defined %}
+{% for route in network_static_routes %}
+        - to: {{ route.destination }}
+          via: {{ route.gateway }}
+{% if route.metric is defined %}
+          metric: {{ route.metric }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if network_dns_servers is defined and network_dns_servers | length > 0 %}
+      nameservers:
+        addresses:
+{% for dns in network_dns_servers %}
+          - {{ dns }}
+{% endfor %}
+{% if network_search_domain is defined %}
+        search:
+          - {{ network_search_domain }}
+{% endif %}
+{% endif %}
+{% endif %}
+
+{% if network_mtu is defined %}
+      mtu: {{ network_mtu }}
+{% endif %}
+
+{% if network_wake_on_lan is defined and network_wake_on_lan %}
+      wakeonlan: true
+{% endif %}
+
+{% if network_link_local is defined %}
+      link-local: {{ network_link_local }}
+{% endif %}
+
+{% if network_accept_ra is defined %}
+      accept-ra: {{ network_accept_ra }}
+{% endif %}

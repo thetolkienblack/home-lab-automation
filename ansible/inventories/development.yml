@@ -1,0 +1,11 @@
+---
+all:
+  children:
+    debian:
+      hosts:
+        ironwolf:
+          ansible_host: 192.168.50.115
+          ansible_user: sidney
+          network_static_ip: 192.168.50.115
+          network_gateway: 192.168.50.1
+          hostname_fqdn: ansblt01.graylock.eu

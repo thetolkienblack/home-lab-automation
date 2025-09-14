@@ -1,0 +1,41 @@
+# ===========================================
+# templates/system/networkmanager.conf.j2
+# NetworkManager configuration (optional)
+# ===========================================
+
+# NetworkManager Configuration
+# Managed by Ansible - {{ ansible_managed }}
+# Generated on: {{ ansible_date_time.iso8601 }}
+
+[main]
+plugins={{ network_nm_plugins | default('keyfile') }}
+{% if network_nm_dns is defined %}
+dns={{ network_nm_dns }}
+{% endif %}
+{% if network_nm_rc_manager is defined %}
+rc-manager={{ network_nm_rc_manager }}
+{% endif %}
+
+{% if network_nm_system_connections_dir is defined %}
+[keyfile]
+path={{ network_nm_system_connections_dir }}
+{% endif %}
+
+{% if network_nm_logging_level is defined %}
+[logging]  
+level={{ network_nm_logging_level }}
+{% if network_nm_logging_domains is defined %}
+domains={{ network_nm_logging_domains | join(',') }}
+{% endif %}
+{% endif %}
+
+{% if network_nm_connectivity_check is defined %}
+[connectivity]
+enabled={{ network_nm_connectivity_check }}
+{% if network_nm_connectivity_uri is defined %}
+uri={{ network_nm_connectivity_uri }}
+{% endif %}
+{% if network_nm_connectivity_interval is defined %}
+interval={{ network_nm_connectivity_interval }}
+{% endif %}
+{% endif %}

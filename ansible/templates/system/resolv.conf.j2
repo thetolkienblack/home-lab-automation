@@ -1,0 +1,43 @@
+# ===========================================
+# templates/system/resolv.conf.j2
+# DNS resolver configuration
+# ===========================================
+
+# DNS Resolver Configuration  
+# Managed by Ansible - {{ ansible_managed }}
+# Generated on: {{ ansible_date_time.iso8601 }}
+
+{% if network_dns_servers is defined and network_dns_servers | length > 0 %}
+# DNS Nameservers
+{% for dns_server in network_dns_servers %}
+nameserver {{ dns_server }}
+{% endfor %}
+{% endif %}
+
+{% if network_search_domain is defined %}
+# Search domain
+search {{ network_search_domain }}
+{% elif network_search_domains is defined %}
+# Search domains
+search {{ network_search_domains | join(' ') }}
+{% endif %}
+
+{% if network_dns_options is defined %}
+# DNS Options
+{% for option in network_dns_options %}
+options {{ option }}
+{% endfor %}
+{% else %}
+# Default DNS options for better performance and reliability
+options timeout:2 attempts:3 rotate single-request-reopen
+{% endif %}
+
+{% if network_domain is defined %}
+# Domain name
+domain {{ network_domain }}
+{% endif %}
+
+{% if network_sortlist is defined %}
+# Sort list for address selection  
+sortlist {{ network_sortlist | join(' ') }}
+{% endif %}

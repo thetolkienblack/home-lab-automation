@@ -61,3 +61,15 @@ common_packages:
   - git
   - jq
   - btop
+
+# Network
+network_interface: eth0 # Network interface name
+network_mtu: 1500 # MTU size
+network_wake_on_lan: true # Wake on LAN
+network_enable_ipv6: true # Enable IPv6
+network_link_local: [] # Link-local addresses
+network_accept_ra: true # Accept router advertisements
+network_dns_servers:
+  - 9.9.9.9
+  - 1.1.1.1
+network_netmask: 24 # Subnet mask (CIDR or dotted decimal)

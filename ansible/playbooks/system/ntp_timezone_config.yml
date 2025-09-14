@@ -8,6 +8,11 @@
   become: true
   gather_facts: true
 
+  vars_files:
+    - "{{ playbook_dir }}/../../group_vars/all/main.yml"
+    - "{{ playbook_dir }}/../../group_vars/all/vault.yml"
+    - "{{ playbook_dir }}/../../group_vars/bg/main.yml"
+
   pre_tasks:
     - name: "Display current time before configuration"
       ansible.builtin.command: timedatectl status
@@ -32,6 +37,9 @@
     # ===========================================
     # TIMEZONE CONFIGURATION (Both OS families)
     # ===========================================
+    - name: "Timezone debug"
+      ansible.builtin.debug:
+        msg: "Timezone is {{ timezone }}"
 
     - name: "Configure system timezone"
       community.general.timezone:
@@ -76,7 +84,7 @@
 
     - name: "Configure timesyncd (Debian 13)"
       ansible.builtin.template:
-        src: templates/ntp/timesyncd.conf.j2
+        src: "{{ playbook_dir }}/../../templates/system/ntp/timesyncd.conf.j2" # noqa no-relative-paths
         dest: /etc/systemd/timesyncd.conf
         owner: root
         group: root
@@ -194,7 +202,7 @@
 
     - name: "Configure chrony (RHEL 10)"
       ansible.builtin.template:
-        src: templates/ntp/chrony.conf.j2
+        src: "{{ playbook_dir }}/../../templates/system/ntp/chrony.conf.j2" # noqa no-relative-paths
         dest: /etc/chrony.conf
         owner: root
         group: root

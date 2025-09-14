@@ -22,3 +22,13 @@ os_specific_packages:
 # Services
 ssh_service_name: ssh
 firewall_service_name: ufw
+
+# Network
+# Network Mode
+network_config_mode: static
+
+# Interface Configuration
+network_renderer: networkd # Netplan renderer (Ubuntu/Debian)
+# Static IP Configuration
+network_static_ip: 192.168.1.100 # Primary IP address
+network_gateway: 192.168.1.1

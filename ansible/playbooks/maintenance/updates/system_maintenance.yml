@@ -6,8 +6,9 @@
   gather_facts: true
 
   vars_files:
-    - "../../../group_vars/all/main.yml"
-    - "../../../group_vars/{{ ansible_os_family | lower }}/main.yml"
+    - "{{ playbook_dir }}/../../../group_vars/all/main.yml"
+    - "{{ playbook_dir }}/../../../group_vars/all/vault.yml"
+    - "{{ playbook_dir }}/../../../group_vars/{{ ansible_os_family | lower  }}/main.yml"
 
   tasks:
     - name: "Update package cache"
@@ -44,6 +45,7 @@
       ansible.builtin.hostname:
         name: "{{ hostname_fqdn | default(ansible_hostname) }}"
         use: "{{ ansible_os_family | lower }}"
+      when: ansible_fqdn != hostname_fqdn
 
     - name: "Check disk space"
       ansible.builtin.command: df -h
@@ -53,3 +55,19 @@
     - name: "Display disk usage"
       ansible.builtin.debug:
         msg: "{{ disk_usage.stdout_lines }}"
+
+    - name: "Show memory usage"
+      ansible.builtin.debug:
+        msg: >
+          Total: {{ ansible_facts.memtotal_mb }} MB,
+          Free: {{ ansible_facts.memfree_mb }} MB,
+          Used: {{ ansible_facts.memtotal_mb - ansible_facts.memfree_mb }} MB
+
+    - name: Show CPU count
+      ansible.builtin.debug:
+        msg: "CPU cores: {{ ansible_facts.processor_cores }}"
+
+    - name: Show system load
+      ansible.builtin.debug:
+        msg: "Load average: {{ ansible_facts.loadavg }}"
+

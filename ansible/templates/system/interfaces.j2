@@ -1,0 +1,107 @@
+# ===========================================
+# templates/system/interfaces.j2  
+# Legacy /etc/network/interfaces for old Debian
+# ===========================================
+
+# Network Interfaces Configuration
+# Managed by Ansible - {{ ansible_managed }}
+# Generated on: {{ ansible_date_time.iso8601 }}
+# Mode: {{ network_config_mode }}
+
+# Loopback interface
+auto lo
+iface lo inet loopback
+
+{% if network_config_mode == "dhcp" %}
+# Primary network interface - DHCP Configuration
+auto {{ network_interface | default(default_network_interface) }}
+iface {{ network_interface | default(default_network_interface) }} inet dhcp
+{% if network_hostname is defined %}
+    hostname {{ network_hostname }}
+{% endif %}
+{% if network_dhcp_client_id is defined %}
+    client {{ network_dhcp_client_id }}
+{% endif %}
+{% if network_lease_time is defined %}
+    leasetime {{ network_lease_time }}
+{% endif %}
+
+{% else %}
+# Primary network interface - Static Configuration  
+auto {{ network_interface | default(default_network_interface) }}
+iface {{ network_interface | default(default_network_interface) }} inet static
+    address {{ network_static_ip }}
+{% if network_netmask is match('^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$') %}
+    netmask {{ network_netmask }}
+{% else %}
+    netmask {{ network_netmask | ipaddr('netmask') }}
+{% endif %}
+    gateway {{ network_gateway }}
+{% if network_dns_servers is defined and network_dns_servers | length > 0 %}
+    dns-nameservers {{ network_dns_servers | join(' ') }}
+{% endif %}
+{% if network_search_domain is defined %}
+    dns-search {{ network_search_domain }}
+{% endif %}
+{% if network_broadcast is defined %}
+    broadcast {{ network_broadcast }}
+{% endif %}
+{% if network_network is defined %}
+    network {{ network_network }}
+{% endif %}
+{% if network_mtu is defined %}
+    mtu {{ network_mtu }}
+{% endif %}
+
+{% if network_additional_ips is defined %}
+# Additional IP addresses
+{% for additional_ip in network_additional_ips %}
+auto {{ network_interface | default(default_network_interface) }}:{{ loop.index }}
+iface {{ network_interface | default(default_network_interface) }}:{{ loop.index }} inet static
+    address {{ additional_ip }}
+{% if network_netmask is match('^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$') %}
+    netmask {{ network_netmask }}
+{% else %}
+    netmask {{ network_netmask | ipaddr('netmask') }}
+{% endif %}
+
+{% endfor %}
+{% endif %}
+
+{% if network_static_routes is defined %}
+# Static routes
+{% for route in network_static_routes %}
+up route add -net {{ route.destination }} gw {{ route.gateway }}
+down route del -net {{ route.destination }} gw {{ route.gateway }}
+{% endfor %}
+{% endif %}
+
+{% endif %}
+
+{% if network_pre_up_commands is defined %}
+# Pre-up commands
+{% for command in network_pre_up_commands %}
+    pre-up {{ command }}
+{% endfor %}
+{% endif %}
+
+{% if network_post_up_commands is defined %}
+# Post-up commands  
+{% for command in network_post_up_commands %}
+    post-up {{ command }}
+{% endfor %}
+{% endif %}
+
+{% if network_pre_down_commands is defined %}
+# Pre-down commands
+{% for command in network_pre_down_commands %}
+    pre-down {{ command }}
+{% endfor %}
+{% endif %}
+
+{% if network_post_down_commands is defined %}
+# Post-down commands
+{% for command in network_post_down_commands %}
+    post-down {{ command }}
+{% endfor %}
+{% endif %}

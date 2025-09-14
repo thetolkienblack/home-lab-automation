@@ -1,0 +1,30 @@
+# ===========================================
+# templates/system/systemd-networkd.conf.j2  
+# systemd-networkd configuration (optional)
+# ===========================================
+
+# systemd-networkd Configuration
+# Managed by Ansible - {{ ansible_managed }}  
+# Generated on: {{ ansible_date_time.iso8601 }}
+
+[Network]
+{% if network_networkd_speed_meter is defined %}
+SpeedMeter={{ network_networkd_speed_meter }}
+{% endif %}
+{% if network_networkd_speed_meter_interval is defined %}
+SpeedMeterIntervalSec={{ network_networkd_speed_meter_interval }}
+{% endif %}
+
+[DHCP]
+{% if network_networkd_dhcp_use_domain is defined %}
+UseDomains={{ network_networkd_dhcp_use_domain }}
+{% endif %}
+{% if network_networkd_dhcp_use_ntp is defined %}  
+UseNTP={{ network_networkd_dhcp_use_ntp }}
+{% endif %}
+{% if network_networkd_dhcp_use_dns is defined %}
+UseDNS={{ network_networkd_dhcp_use_dns }}
+{% endif %}
+{% if network_networkd_dhcp_use_hostname is defined %}
+UseHostname={{ network_networkd_dhcp_use_hostname }}
+{% endif %}
