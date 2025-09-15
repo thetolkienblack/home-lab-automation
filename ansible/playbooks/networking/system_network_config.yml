@@ -1,27 +1,24 @@
 ---
-# Universal Network Configuration Task (Refactored with Templates)
-# Description: Configures network settings for Debian, Ubuntu, DietPi, and RHEL
-# Supports both DHCP and static IP configuration
+# Universal NetworkManager Configuration Task
+# Description: Configures network settings using NetworkManager across all distributions
+# Supports both DHCP and static IP configuration with enhanced security
 # Usage: Include this in your playbooks or run standalone
 
-- name: "Configure Network Settings"
+- name: "Configure Network Settings via NetworkManager"
   hosts: all
   become: true
   gather_facts: true
 
   vars_files:
-    - "../../../group_vars/all/main.yml"
-    - "../../../group_vars/all/vault.yml"
-    - "../../../group_vars/{{ ansible_os_family | lower }}/main.yml"
-  
+    - "{{ playbook_dir }}/../../group_vars/all/main.yml"
+    - "{{ playbook_dir }}/../../group_vars/all/vault.yml"
+
   # Default network configuration variables
   vars:
-    ansible_become_password: "{{ vault_become_password }}"
-    # Default network interface (can be overridden in inventory)
-    default_network_interface: "{{ ansible_default_ipv4.interface | default('eth0') }}"
-    # Network configuration mode validation
     valid_network_modes: ['dhcp', 'static']
-    
+    # Security settings
+    network_rollback_timeout: 300  # 5 minutes to rollback if connectivity lost
+
   pre_tasks:
     - name: "Validate network configuration variables"
       ansible.builtin.assert:
@@ -31,19 +28,58 @@
           - network_interface is defined or default_network_interface is defined
         fail_msg: "Network configuration variables are not properly defined"
         success_msg: "Network configuration variables validated successfully"
-        
+
+    - name: "Validate network interface exists"
+      ansible.builtin.stat:
+        path: "/sys/class/net/{{ network_interface | default(default_network_interface) }}"
+      register: network_interface_check
+      failed_when: not network_interface_check.stat.exists
+
     - name: "Validate static IP configuration"
       ansible.builtin.assert:
         that:
           - network_static_ip is defined
-          - network_netmask is defined  
+          - network_static_ip | ansible.utils.ipaddr
+          - network_netmask is defined
           - network_gateway is defined
+          - network_gateway | ansible.utils.ipaddr
           - network_dns_servers is defined
           - network_dns_servers | length > 0
-        fail_msg: "Static IP configuration requires: network_static_ip, network_netmask, network_gateway, network_dns_servers"
+          - network_dns_servers | map('ansible.utils.ipaddr') | select() | list | length == network_dns_servers | length
+        fail_msg: "Static IP configuration requires valid: network_static_ip, network_netmask, network_gateway, network_dns_servers"
         success_msg: "Static IP configuration validated successfully"
       when: network_config_mode == "static"
-      
+
+    - name: "Validate IP is not in use (static mode)"
+      ansible.builtin.wait_for:
+        host: "{{ network_static_ip }}"
+        port: 22
+        timeout: 5
+        state: stopped
+      when:
+        - network_config_mode == "static"
+        - network_static_ip != ansible_default_ipv4.address | default('')
+      register: ip_conflict_check
+      failed_when: false
+
+    - name: "Fail if IP conflict detected"
+      ansible.builtin.fail:
+        msg: "IP address {{ network_static_ip }} appears to be in use (SSH responded)"
+      when:
+        - network_config_mode == "static"
+        - ip_conflict_check is defined
+        - ip_conflict_check.failed is defined
+        - not ip_conflict_check.failed
+
+    - name: "Store original network configuration for rollback"
+      ansible.builtin.set_fact:
+        original_network_config:
+          interface: "{{ ansible_default_ipv4.interface | default('Unknown') }}"
+          address: "{{ ansible_default_ipv4.address | default('Unknown') }}"
+          netmask: "{{ ansible_default_ipv4.netmask | default('Unknown') }}"
+          gateway: "{{ ansible_default_ipv4.gateway | default('Unknown') }}"
+          dns: "{{ ansible_dns.nameservers | default([]) }}"
+
     - name: "Display network configuration summary"
       ansible.builtin.debug:
         msg:
@@ -56,154 +92,237 @@
           - "{% if network_config_mode == 'static' %}Target IP: {{ network_static_ip }}{% endif %}"
           - "{% if network_config_mode == 'static' %}Gateway: {{ network_gateway }}{% endif %}"
           - "{% if network_config_mode == 'static' %}DNS: {{ network_dns_servers | join(', ') }}{% endif %}"
+          - "Rollback timeout: {{ network_rollback_timeout }}s"
 
   tasks:
     # ===========================================
     # BACKUP EXISTING NETWORK CONFIGURATION
     # ===========================================
-    
-    - name: "Backup existing network configuration (Debian/Ubuntu/DietPi)"
-      ansible.builtin.copy:
-        src: /etc/netplan/
-        dest: "/etc/netplan.backup.{{ ansible_date_time.epoch }}"
-        remote_src: true
-      when: 
-        - ansible_os_family == "Debian"
-        - ansible_distribution_major_version | int >= 18 or ansible_distribution == "Ubuntu"
-      ignore_errors: true
-      
-    - name: "Backup existing network configuration (Legacy Debian)"
-      ansible.builtin.copy:
-        src: /etc/network/interfaces
-        dest: "/etc/network/interfaces.backup.{{ ansible_date_time.epoch }}"
-        remote_src: true
-      when: 
-        - ansible_os_family == "Debian"
-        - ansible_distribution_major_version | int < 18
-      ignore_errors: true
-      
-    - name: "Backup existing network configuration (RHEL)"
-      ansible.builtin.copy:
-        src: "/etc/NetworkManager/system-connections/"
-        dest: "/etc/NetworkManager/system-connections.backup.{{ ansible_date_time.epoch }}"
-        remote_src: true
-      when: ansible_os_family == "RedHat"
-      ignore_errors: true
 
-    # ===========================================
-    # DEBIAN/UBUNTU/DIETPI - NETPLAN CONFIGURATION
-    # ===========================================
-    
-    - name: "Install netplan (if not present)"
-      ansible.builtin.package:
-        name: netplan.io
-        state: present
-      when: 
-        - ansible_os_family == "Debian"
-        - ansible_distribution_major_version | int >= 18 or ansible_distribution == "Ubuntu"
-        
-    - name: "Configure netplan (Debian/Ubuntu/DietPi)"
-      ansible.builtin.template:
-        src: "../../../templates/system/netplan.yaml.j2"
-        dest: "/etc/netplan/01-{{ network_interface | default(default_network_interface) }}.yaml"
+    - name: "Create network backup directory"
+      ansible.builtin.file:
+        path: "/etc/network-backups"
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+
+    - name: "Backup existing configurations"
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "/etc/network-backups/{{ item.name }}.backup.{{ ansible_date_time.epoch }}"
+        remote_src: true
         owner: root
         group: root
         mode: '0600'
-        backup: true
-      when: 
-        - ansible_os_family == "Debian"
-        - (ansible_distribution_major_version | int >= 18 or ansible_distribution == "Ubuntu")
-      notify: apply_netplan
+      loop:
+        - { src: "/etc/netplan/", name: "netplan" }
+        - { src: "/etc/network/interfaces", name: "interfaces" }
+        - { src: "/etc/NetworkManager/system-connections/", name: "networkmanager" }
+      failed_when: false
 
     # ===========================================
-    # LEGACY DEBIAN - /etc/network/interfaces
+    # INSTALL AND CONFIGURE NETWORKMANAGER
     # ===========================================
-    
-    - name: "Configure legacy interfaces (Old Debian)"
+
+    - name: "Install NetworkManager"
+      ansible.builtin.package:
+        name:
+          - network-manager
+        state: present
+
+    - name: "Enable and start NetworkManager"
+      ansible.builtin.systemd:
+        name: NetworkManager
+        enabled: true
+        state: started
+
+    - name: "Configure NetworkManager main config"
       ansible.builtin.template:
-        src: "../../../templates/system/interfaces.j2"
-        dest: /etc/network/interfaces
+        src: "{{ playbook_dir }}/../../templates/system/networking/networkmanager.conf.j2" # noqa no-relative-paths
+        dest: /etc/NetworkManager/NetworkManager.conf
         owner: root
         group: root
         mode: '0644'
         backup: true
-      when: 
-        - ansible_os_family == "Debian"
-        - ansible_distribution_major_version | int < 18
-      notify: restart_networking_legacy
+
+    - name: "Force NetworkManager to manage all interfaces"
+      ansible.builtin.lineinfile:
+        path: /etc/NetworkManager/NetworkManager.conf
+        regexp: '^unmanaged-devices='
+        line: 'unmanaged-devices=none'
+        insertafter: '^\[keyfile\]'
+        create: false
+
+    - name: "Disable cloud-init network configuration"
+      ansible.builtin.copy:
+        content: "network: {config: disabled}"
+        dest: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+        owner: root
+        group: root
+        mode: '0644'
+      failed_when: false
+
+    - name: "Remove conflicting network configurations"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/netplan
+        - /etc/systemd/network
+      failed_when: false
+
+    - name: "Restart NetworkManager to apply configuration"
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: restarted
+
+    - name: "Wait for NetworkManager restart"
+      ansible.builtin.pause:
+        seconds: 10
 
     # ===========================================
-    # RHEL/CENTOS - NETWORKMANAGER CONFIGURATION
+    # NETWORK CONFIGURATION VIA NMCLI
     # ===========================================
-    
-    - name: "Get existing NetworkManager connection name (RHEL)"
-      ansible.builtin.command: nmcli -t -f NAME connection show --active
-      register: nm_active_connections
-      changed_when: false
-      when: ansible_os_family == "RedHat"
-      
-    - name: "Set NetworkManager connection name"
+
+    - name: "Get current interface name"
       ansible.builtin.set_fact:
-        nm_connection_name: "{{ nm_active_connections.stdout_lines[0] | default('System ' + (network_interface | default(default_network_interface))) }}"
-      when: ansible_os_family == "RedHat"
-      
-    - name: "Configure NetworkManager for DHCP (RHEL)"
-      ansible.builtin.command: >
-        nmcli connection modify "{{ nm_connection_name }}"
-        ipv4.method auto
-        ipv4.addresses ""
-        ipv4.gateway ""
-        ipv4.dns ""
-      when: 
-        - ansible_os_family == "RedHat"
-        - network_config_mode == "dhcp"
-      notify: restart_networkmanager
-      
-    - name: "Configure NetworkManager for Static IP (RHEL)"
-      ansible.builtin.command: >
-        nmcli connection modify "{{ nm_connection_name }}"
-        ipv4.method manual
-        ipv4.addresses "{{ network_static_ip }}/{{ network_netmask | ipaddr('prefix') if '/' not in network_netmask else network_netmask.split('/')[1] if '/' in network_netmask else (network_netmask | ipaddr('prefix')) }}"
-        ipv4.gateway "{{ network_gateway }}"
-        ipv4.dns "{{ network_dns_servers | join(',') }}"
-      when: 
-        - ansible_os_family == "RedHat"
-        - network_config_mode == "static"
-      notify: restart_networkmanager
+        actual_interface: "{{ ansible_default_ipv4.interface | default(network_interface | default(default_network_interface)) }}"
+
+    - name: "Debug interface information"
+      ansible.builtin.debug:
+        msg:
+          - "Detected interface: {{ actual_interface }}"
+          - "Manual interface: {{ network_interface | default('not set') }}"
+          - "Default fallback: {{ default_network_interface | default('not set') }}"
+
+    - name: "Check NetworkManager device status"
+      ansible.builtin.command: nmcli device status
+      register: nm_device_status
+      changed_when: false
+
+    - name: "Display NetworkManager device status"
+      ansible.builtin.debug:
+        var: nm_device_status.stdout_lines
+
+    - name: "Create new NetworkManager connection for DHCP"
+      community.general.nmcli:
+        conn_name: "{{ actual_interface }}-new"
+        ifname: "{{ actual_interface }}"
+        type: ethernet
+        method4: auto
+        autoconnect: true
+        state: present
+      when: network_config_mode == "dhcp"
+
+    - name: "Create new NetworkManager connection for Static IP"
+      community.general.nmcli:
+        conn_name: "{{ actual_interface }}-new"
+        ifname: "{{ actual_interface }}"
+        type: ethernet
+        method4: manual
+        ip4: "{{ network_static_ip }}/{{ network_netmask if network_netmask | string | regex_search('^\\d+$') else (network_netmask | ansible.utils.ipaddr('prefix')) }}"
+        gw4: "{{ network_gateway }}"
+        dns4: "{{ network_dns_servers }}"
+        autoconnect: true
+        state: present
+      when: network_config_mode == "static"
+
+    - name: "Activate new connection"
+      community.general.nmcli:
+        conn_name: "{{ actual_interface }}-new"
+        state: present
+
+    - name: "Wait for new connection to stabilize"
+      ansible.builtin.pause:
+        seconds: 10
+
+    - name: "Test connectivity with new connection"
+      ansible.builtin.uri:
+        url: "https://1.1.1.1"
+        method: HEAD
+        timeout: 10
+        validate_certs: true
+      register: test_connectivity
+      failed_when: false
+
+    - name: "Remove old connections after new one is working"
+      community.general.nmcli:
+        conn_name: "{{ item }}"
+        state: absent
+      loop:
+        - "Wired connection 1"
+        - "System {{ actual_interface }}"
+        - "{{ actual_interface }}"
+        - "netplan-{{ actual_interface }}"
+      failed_when: false
+      when: test_connectivity.status | default(0) == 200
+
+    - name: "Rename new connection to final name"
+      ansible.builtin.command: nmcli connection modify "{{ actual_interface }}-new" connection.id "{{ actual_interface }}"
+      when: test_connectivity.status | default(0) == 200
 
     # ===========================================
-    # UNIVERSAL DNS CONFIGURATION
+    # SECURITY HARDENING
     # ===========================================
-    
-    - name: "Configure resolv.conf for static DNS"
-      ansible.builtin.template:
-        src: "../../../templates/system/resolv.conf.j2"
-        dest: /etc/resolv.conf
-        owner: root
-        group: root
-        mode: '0644'
-        backup: true
-      when: 
-        - network_config_mode == "static"
-        - network_dns_servers is defined
-        - network_dns_servers | length > 0
 
-    # ===========================================
-    # VERIFICATION TASKS
-    # ===========================================
-    
-    - name: "Wait for network reconfiguration"
-      ansible.builtin.wait_for:
-        timeout: 30
-      when: network_handlers_triggered is defined
-      
+    - name: "Disable IPv6 if not configured"
+      ansible.posix.sysctl:
+        name: "{{ item }}"
+        value: '1'
+        state: present
+        reload: true
+        sysctl_file: /etc/sysctl.d/99-network-security.conf
+      loop:
+        - net.ipv6.conf.all.disable_ipv6
+        - net.ipv6.conf.default.disable_ipv6
+      when:
+        - not (network_ipv6_enabled | default(false))
+
+    - name: "Enable network security settings"
+      ansible.posix.sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: true
+        sysctl_file: /etc/sysctl.d/99-network-security.conf
+      loop:
+        - { name: 'net.ipv4.conf.all.send_redirects', value: '0' }
+        - { name: 'net.ipv4.conf.default.send_redirects', value: '0' }
+        - { name: 'net.ipv4.conf.all.accept_redirects', value: '0' }
+        - { name: 'net.ipv4.conf.default.accept_redirects', value: '0' }
+        - { name: 'net.ipv4.conf.all.secure_redirects', value: '0' }
+        - { name: 'net.ipv4.conf.default.secure_redirects', value: '0' }
+        - { name: 'net.ipv4.ip_forward', value: '0' }
+        - { name: 'net.ipv4.conf.all.log_martians', value: '1' }
+        - { name: 'net.ipv4.conf.default.log_martians', value: '1' }
+        - { name: 'net.ipv4.icmp_ignore_bogus_error_responses', value: '1' }
+        - { name: 'net.ipv4.icmp_echo_ignore_broadcasts', value: '1' }
+        - { name: 'net.ipv4.conf.all.rp_filter', value: '1' }
+        - { name: 'net.ipv4.conf.default.rp_filter', value: '1' }
+
   post_tasks:
     - name: "Verify network configuration"
       block:
         - name: "Get current network configuration"
           ansible.builtin.setup:
-            filter: "ansible_default_ipv4"
-            
+            filter: "ansible_default_ipv4,ansible_dns"
+
+        - name: "Test secure connectivity (HTTPS)"
+          ansible.builtin.uri:
+            url: "https://1.1.1.1"
+            method: HEAD
+            timeout: 15
+            validate_certs: true
+          register: connectivity_test_secure
+          failed_when: false
+
+        - name: "Test DNS resolution"
+          ansible.builtin.command: nslookup google.com
+          register: dns_test
+          changed_when: false
+          failed_when: false
+
         - name: "Display final network status"
           ansible.builtin.debug:
             msg:
@@ -213,53 +332,59 @@
               - "Netmask: {{ ansible_default_ipv4.netmask | default('Unknown') }}"
               - "Gateway: {{ ansible_default_ipv4.gateway | default('Unknown') }}"
               - "DNS: {{ ansible_dns.nameservers | default(['Unknown']) | join(', ') }}"
-              - "Status: {{ 'SUCCESS' if ansible_default_ipv4.address is defined else 'FAILED - No IP assigned' }}"
-              
-        - name: "Test internet connectivity"
-          ansible.builtin.uri:
-            url: "http://1.1.1.1"
-            method: HEAD
-            timeout: 10
-          register: connectivity_test
-          ignore_errors: true
-          
-        - name: "Display connectivity test result"
-          ansible.builtin.debug:
-            msg: "Internet connectivity: {{ 'OK' if connectivity_test.status == 200 else 'FAILED' }}"
+              - "HTTPS: {{ 'OK' if connectivity_test_secure.status | default(0) == 200 else 'FAILED' }}"
+              - "DNS Resolution: {{ 'OK' if dns_test.rc | default(1) == 0 else 'FAILED' }}"
+              - "Status: {{ 'SUCCESS' if ansible_default_ipv4.address is defined else 'FAILED' }}"
 
-  # ===========================================
-  # HANDLERS
-  # ===========================================
-  
-  handlers:
-    - name: apply_netplan
-      block:
-        - name: "Apply netplan configuration"
-          ansible.builtin.command: netplan apply
-          
-        - name: "Set handler trigger flag"
-          ansible.builtin.set_fact:
-            network_handlers_triggered: true
-      listen: apply_netplan
-      
-    - name: restart_networking_legacy
-      block:
-        - name: "Restart networking service (legacy)"
+        - name: "Log successful network configuration"
+          ansible.builtin.lineinfile:
+            path: /var/log/network-config.log
+            create: true
+            owner: root
+            group: root
+            mode: '0600'
+            line: >-
+              {{ ansible_date_time.iso8601 }} - SUCCESS: NetworkManager configured on
+              {{ inventory_hostname }} - IP: {{ ansible_default_ipv4.address | default('Unknown') }}
+          when:
+            - ansible_default_ipv4.address is defined
+            - connectivity_test_secure.status | default(0) == 200
+
+        - name: "Stop and disable conflicting network services"
           ansible.builtin.systemd:
-            name: networking
-            state: restarted
-            
-        - name: "Set handler trigger flag"
-          ansible.builtin.set_fact:
-            network_handlers_triggered: true
-      listen: restart_networking_legacy
-      
-    - name: restart_networkmanager
-      block:
-        - name: "Restart NetworkManager connection"
-          ansible.builtin.command: nmcli connection up "{{ nm_connection_name }}"
-          
-        - name: "Set handler trigger flag"
-          ansible.builtin.set_fact:
-            network_handlers_triggered: true
-      listen: restart_networkmanager
+            name: "{{ item }}"
+            enabled: false
+            state: stopped
+          loop:
+            - systemd-networkd
+            - networking
+            - systemd-resolved
+          failed_when: false
+
+      rescue:
+        - name: "Log failed network configuration"
+          ansible.builtin.lineinfile:
+            path: /var/log/network-config.log
+            create: true
+            owner: root
+            group: root
+            mode: '0600'
+            line: >-
+              {{ ansible_date_time.iso8601 }} - FAILED: NetworkManager configuration failed on
+              {{ inventory_hostname }} - Rollback may be required
+
+        - name: "Display rollback information"
+          ansible.builtin.debug:
+            msg:
+              - "=== NETWORK CONFIGURATION FAILED ==="
+              - "Original configuration was:"
+              - "  Interface: {{ original_network_config.interface }}"
+              - "  IP: {{ original_network_config.address }}"
+              - "  Gateway: {{ original_network_config.gateway }}"
+              - "  DNS: {{ original_network_config.dns | join(', ') }}"
+              - "Manual rollback may be required if connectivity is lost"
+              - "Backup files are available in /etc/network-backups/"
+
+        - name: "Fail the playbook with rollback info"
+          ansible.builtin.fail:
+            msg: "NetworkManager configuration failed. Check connectivity and consider manual rollback."

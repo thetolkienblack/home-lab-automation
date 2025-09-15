@@ -218,11 +218,13 @@
     "ansible_distribution_release": "trixie",
     "ansible_distribution_version": "13.1",
     "ansible_dns": {
-        "domain": "graylock.eu",
         "nameservers": [
-            "192.168.50.102",
-            "37.114.63.170",
-            "192.168.50.1"
+            "9.9.9.9",
+            "1.1.1.1",
+            "37.114.63.170"
+        ],
+        "search": [
+            "graylock.eu"
         ]
     },
     "ansible_domain": "graylock.eu",

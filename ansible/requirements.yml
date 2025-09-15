@@ -10,8 +10,8 @@ collections:
   #   version: ">=1.4.0"
   # - name: community.crypto
   #   version: ">=2.0.0"
-  # - name: community.docker
-  #   version: ">=3.0.0"
+  - name: community.docker
+    version: ">=3.0.0"
   # - name: community.mysql
   #   version: ">=3.0.0"
   # - name: community.postgresql
@@ -20,7 +20,6 @@ collections:
   #   version: ">=1.0.0"
   # - name: prometheus.prometheus
   #   version: ">=0.1.0"
-  # - name: community.general
 # Community Roles
 # roles:
 #   - name: geerlingguy.security
