@@ -1,0 +1,9 @@
+# /etc/hosts.deny - TCP Wrappers access control
+# Only deny SSH connections from non-whitelisted IPs
+# Web services (HTTP/HTTPS) remain open to all
+
+# Deny SSH connections from non-whitelisted IPs
+sshd: ALL: spawn /bin/echo "$(date) TCP Wrappers denied SSH from %c" >> /var/log/tcp_wrappers.log
+
+# Note: HTTP/HTTPS services are not blocked here to allow public web access
+# UFW firewall handles the broader network filtering

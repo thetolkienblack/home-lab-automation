@@ -1,0 +1,47 @@
+# Fail2ban local configuration
+# This file overrides settings in jail.conf
+
+[DEFAULT]
+# IP addresses/ranges to ignore (whitelist)
+# Add your trusted IP addresses here
+ignoreip = 127.0.0.1/8 ::1 {{ ssh_fail2ban_whitelist_ip }}
+
+# Ban settings
+bantime = 3600
+findtime = 600
+maxretry = 5
+
+# Email notifications (optional)
+# destemail = admin@yourdomain.com
+# sender = fail2ban@yourdomain.com
+# mta = sendmail
+
+# Backend to use
+backend = systemd
+
+[sshd]
+# SSH jail configuration
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+bantime = 3600
+findtime = 600
+
+# Additional SSH-related jails
+[ssh-ddos]
+enabled = true
+port = ssh
+filter = sshd-ddos
+logpath = /var/log/auth.log
+maxretry = 2
+bantime = 3600
+
+[ssh-badprotocol]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 1
+bantime = 3600

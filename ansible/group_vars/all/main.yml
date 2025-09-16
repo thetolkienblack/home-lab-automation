@@ -39,6 +39,30 @@ ssh_password_authentication: false
 ssh_public_key_authentication: true
 ssh_auth_key
 ssh_max_auth_tries: 3
+ssh_authorized_keys_file: ".ssh/authorized_keys"
+ssh_challenge_response_auth: false
+ssh_use_pam: true
+ssh_x11_forwarding: false
+ssh_print_motd: false
+ssh_client_alive_interval: 300
+ssh_client_alive_count_max: 2
+ssh_max_sessions: 2
+ssh_protocol: 2
+ssh_ignore_rhosts: true
+ssh_fail2ban_whitelist_ip: # Check how to iterate over this
+  - 91.216.57.29 
+  - 85.14.55.128 
+  - 100.73.121.62 
+  - 100.110.201.70 
+  - 100.67.7.113 
+  - 100.84.189.46 
+  - 100.101.107.37 
+  - 100.103.91.2 
+  - 100.117.119.74 
+  - 100.95.29.89 
+  - 100.68.28.91
+ssh_host_based_auth: true
+ssh_permit_empty_password: true 
 authorized_keys_exclusive: true # Set to true to remove all unlisted keys
 backup_keys: true # Set to false to skip backups
 

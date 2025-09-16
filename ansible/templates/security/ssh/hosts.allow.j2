@@ -1,0 +1,9 @@
+# Allow localhost
+ALL: 127.0.0.1
+ALL: ::1
+ALL: localhost
+
+# Allow local network (if needed)
+# ALL: 192.168.0.0/255.255.0.0
+# ALL: 10.0.0.0/255.0.0.0
+ALL: {{ ssh_fail2ban_whitelist_ip }}
