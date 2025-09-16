@@ -1,0 +1,18 @@
+# Custom SSH security configuration
+Port {{ ssh_port | default('22') }}
+PermitRootLogin {{ 'yes' if ssh_permit_root_login else 'no' }}
+PasswordAuthentication {{ 'yes' if ssh_password_authentication else 'no' }}
+PubkeyAuthentication {{ 'yes' if ssh_public_key_authentication else 'no' }}
+AuthorizedKeysFile .ssh/authorized_keys
+ChallengeResponseAuthentication no
+UsePAM yes
+X11Forwarding no
+PrintMotd no
+ClientAliveInterval 300
+ClientAliveCountMax 2
+MaxAuthTries 3
+MaxSessions 2
+Protocol 2
+IgnoreRhosts yes
+HostbasedAuthentication no
+PermitEmptyPasswords no

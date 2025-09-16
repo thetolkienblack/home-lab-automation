@@ -1,0 +1,370 @@
+---
+# Security Hardening Playbook
+# Description: Comprehensive security hardening for Linux systems
+# Features: SSH hardening, UFW firewall, fail2ban, unattended upgrades, sysctl security
+# Usage: ansible-playbook -i inventory security_hardening.yml
+
+- name: "Security Hardening"
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../group_vars/all/main.yml"
+    - "{{ playbook_dir }}/../../group_vars/all/vault.yml"
+
+  vars:
+    # SSH security settings
+    ssh_port: 22
+    ssh_protocol: 2
+    ssh_permit_root_login: "no"
+    ssh_password_authentication: "no"
+    ssh_pubkey_authentication: "yes"
+    ssh_permit_empty_passwords: "no"
+    ssh_challenge_response_auth: "no"
+    ssh_x11_forwarding: "no"
+    ssh_max_auth_tries: 3
+    ssh_client_alive_interval: 300
+    ssh_client_alive_count_max: 2
+    ssh_max_sessions: 10
+    ssh_login_grace_time: 60
+    ssh_allow_users: []
+    ssh_allow_groups: ["ssh", "sudo"]
+    
+    # UFW Firewall settings
+    ufw_enabled: true
+    ufw_default_incoming_policy: "deny"
+    ufw_default_outgoing_policy: "allow"
+    ufw_default_forward_policy: "deny"
+    
+    # Fail2ban settings
+    fail2ban_bantime: 3600
+    fail2ban_findtime: 600
+    fail2ban_maxretry: 5
+    fail2ban_ssh_maxretry: 3
+    fail2ban_backend: "systemd"
+    
+    # Security settings
+    disable_ipv6: true
+    enable_unattended_upgrades: true
+
+  pre_tasks:
+    - name: "Validate required variables"
+      ansible.builtin.assert:
+        that:
+          - allowed_ips is defined
+          - allowed_ips | length > 0
+        fail_msg: "allowed_ips must be defined with at least one IP/CIDR"
+        success_msg: "Security configuration validated"
+
+    - name: "Display security hardening summary"
+      ansible.builtin.debug:
+        msg:
+          - "=== SECURITY HARDENING SUMMARY ==="
+          - "Host: {{ inventory_hostname }}"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "UFW enabled: {{ ufw_enabled }}"
+          - "Allowed IPs: {{ allowed_ips | join(', ') }}"
+          - "IPv6 disabled: {{ disable_ipv6 }}"
+          - "Unattended upgrades: {{ enable_unattended_upgrades }}"
+
+  tasks:
+    # ===========================================
+    # SSH DAEMON INSTALLATION AND CONFIGURATION
+    # ===========================================
+
+    - name: "Check if SSH server is installed"
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: "Install SSH server if not present"
+      ansible.builtin.package:
+        name: openssh-server
+        state: present
+      when: "'openssh-server' not in ansible_facts.packages"
+
+    - name: "Ensure SSH daemon is enabled and running"
+      ansible.builtin.systemd:
+        name: "{{ 'sshd' if ansible_os_family == 'RedHat' else 'ssh' }}"
+        enabled: true
+        state: started
+
+    - name: "Backup original SSH configuration"
+      ansible.builtin.copy:
+        src: /etc/ssh/sshd_config
+        dest: "/etc/ssh/sshd_config.backup.{{ ansible_date_time.epoch }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: '0600'
+
+    - name: "Configure SSH daemon security settings"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/system/ssh/sshd_config.j2" # noqa no-relative-paths
+        dest: /etc/ssh/sshd_config
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+        validate: '/usr/sbin/sshd -t -f %s'
+      notify: "Restart ssh"
+
+    # ===========================================
+    # UFW FIREWALL CONFIGURATION
+    # ===========================================
+
+    - name: "Install UFW firewall"
+      ansible.builtin.package:
+        name: ufw
+        state: present
+      when: ufw_enabled
+
+    - name: "Reset UFW to defaults"
+      community.general.ufw:
+        state: reset
+      when: ufw_enabled
+
+    - name: "Configure UFW default policies"
+      community.general.ufw:
+        direction: "{{ item.direction }}"
+        policy: "{{ item.policy }}"
+      loop:
+        - { direction: 'incoming', policy: "{{ ufw_default_incoming_policy }}" }
+        - { direction: 'outgoing', policy: "{{ ufw_default_outgoing_policy }}" }
+        - { direction: 'routed', policy: "{{ ufw_default_forward_policy }}" }
+      when: ufw_enabled
+
+    - name: "Allow SSH from allowed IPs"
+      community.general.ufw:
+        rule: allow
+        port: "{{ ssh_port }}"
+        proto: tcp
+        src: "{{ item }}"
+        comment: "SSH from {{ item }}"
+      loop: "{{ allowed_ips }}"
+      when: ufw_enabled
+
+    - name: "Enable UFW firewall"
+      community.general.ufw:
+        state: enabled
+        logging: "on"
+      when: ufw_enabled
+
+    # ===========================================
+    # FAIL2BAN CONFIGURATION
+    # ===========================================
+
+    - name: "Install fail2ban"
+      ansible.builtin.package:
+        name: fail2ban
+        state: present
+
+    - name: "Create fail2ban configuration"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/security/fail2ban/jail.local.j2" # noqa no-relative-paths
+        dest: /etc/fail2ban/jail.local
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      notify: "Restart fail2ban"
+
+    - name: "Ensure fail2ban is enabled and running"
+      ansible.builtin.systemd:
+        name: fail2ban
+        enabled: true
+        state: started
+
+    # ===========================================
+    # UNATTENDED UPGRADES
+    # ===========================================
+
+    - name: "Install unattended-upgrades"
+      ansible.builtin.package:
+        name: unattended-upgrades
+        state: present
+      when: enable_unattended_upgrades
+
+    - name: "Configure unattended-upgrades"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/system/unattended-upgrades/50unattended-upgrades.j2" # noqa no-relative-paths
+        dest: /etc/apt/apt.conf.d/50unattended-upgrades
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      when: 
+        - enable_unattended_upgrades
+        - ansible_os_family == "Debian"
+
+    - name: "Enable automatic updates"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/system/unattended-upgrades/20auto-upgrades.j2" # noqa no-relative-paths
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        owner: root
+        group: root
+        mode: '0644'
+      when:
+        - enable_unattended_upgrades
+        - ansible_os_family == "Debian"
+
+    # ===========================================
+    # SYSTEM SECURITY PARAMETERS
+    # ===========================================
+
+    - name: "Configure security sysctl parameters"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/system/sysctl/99-security.conf.j2" # noqa no-relative-paths
+        dest: /etc/sysctl.d/99-security.conf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      notify: "Reload sysctl"
+
+    # ===========================================
+    # LOG ROTATION CONFIGURATION
+    # ===========================================
+
+    - name: "Configure custom log rotation"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/system/logrotate/custom.j2" # noqa no-relative-paths
+        dest: /etc/logrotate.d/custom
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+
+    # ===========================================
+    # RSYSLOG CONFIGURATION
+    # ===========================================
+
+    - name: "Install rsyslog"
+      ansible.builtin.package:
+        name: rsyslog
+        state: present
+
+    - name: "Configure rsyslog"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/system/rsyslog/rsyslog.conf.j2" # noqa no-relative-paths
+        dest: /etc/rsyslog.conf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      notify: "Restart rsyslog"
+
+    - name: "Ensure rsyslog is enabled and running"
+      ansible.builtin.systemd:
+        name: rsyslog
+        enabled: true
+        state: started
+
+    # ===========================================
+    # HOSTS.ALLOW CONFIGURATION
+    # ===========================================
+
+    - name: "Configure hosts.allow with allowed IPs"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/system/tcpwrappers/hosts.allow.j2" # noqa no-relative-paths
+        dest: /etc/hosts.allow
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+
+    - name: "Configure hosts.deny to deny all others"
+      ansible.builtin.copy:
+        content: "ALL: ALL\n"
+        dest: /etc/hosts.deny
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+
+  post_tasks:
+    - name: "Verify security configuration"
+      block:
+        - name: "Test SSH daemon configuration"
+          ansible.builtin.command: /usr/sbin/sshd -t
+          changed_when: false
+
+        - name: "Check UFW status"
+          ansible.builtin.command: ufw status
+          register: ufw_status
+          changed_when: false
+          when: ufw_enabled
+
+        - name: "Check fail2ban status"
+          ansible.builtin.command: fail2ban-client status
+          register: fail2ban_status
+          changed_when: false
+
+        - name: "Display security hardening results"
+          ansible.builtin.debug:
+            msg:
+              - "=== SECURITY HARDENING COMPLETED ==="
+              - "SSH daemon: Configured and running"
+              - "UFW firewall: {{ 'Active' if ufw_enabled else 'Disabled' }}"
+              - "Fail2ban: {{ 'Active' if fail2ban_status.rc == 0 else 'Failed' }}"
+              - "Unattended upgrades: {{ 'Configured' if enable_unattended_upgrades else 'Disabled' }}"
+              - "Security parameters: Applied"
+              - "Log rotation: Configured"
+              - "Rsyslog: Running"
+
+        - name: "Log successful security hardening"
+          ansible.builtin.lineinfile:
+            path: /var/log/security-hardening.log
+            create: true
+            owner: root
+            group: root
+            mode: '0600'
+            line: >-
+              {{ ansible_date_time.iso8601 }} - SUCCESS: Security hardening completed on {{ inventory_hostname }}
+
+      rescue:
+        - name: "Log failed security hardening"
+          ansible.builtin.lineinfile:
+            path: /var/log/security-hardening.log
+            create: true
+            owner: root
+            group: root
+            mode: '0600'
+            line: >-
+              {{ ansible_date_time.iso8601 }} - FAILED: Security hardening failed on {{ inventory_hostname }}
+
+        - name: "Display rollback information"
+          ansible.builtin.debug:
+            msg:
+              - "=== SECURITY HARDENING FAILED ==="
+              - "Check individual service status manually"
+              - "Backup files are available for restoration"
+              - "Review logs for specific errors"
+
+        - name: "Fail with security error info"
+          ansible.builtin.fail:
+            msg: "Security hardening failed. Check logs and service status."
+
+  # ===========================================
+  # HANDLERS
+  # ===========================================
+
+  handlers:
+    - name: "Restart ssh"
+      ansible.builtin.systemd:
+        name: "{{ 'sshd' if ansible_os_family == 'RedHat' else 'ssh' }}"
+        state: restarted
+
+    - name: "Restart fail2ban"
+      ansible.builtin.systemd:
+        name: fail2ban
+        state: restarted
+
+    - name: "Reload sysctl"
+      ansible.builtin.command: sysctl -p /etc/sysctl.d/99-security.conf
+      changed_when: true
+
+    - name: "Restart rsyslog"
+      ansible.builtin.systemd:
+        name: rsyslog
+        state: restarted

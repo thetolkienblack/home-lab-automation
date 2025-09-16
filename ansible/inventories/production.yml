@@ -4,6 +4,16 @@ all:
     debian:
       hosts:
         ironwolf:
+          ansible_host: 100.84.189.46
+        skynet:
+          ansible_host: 100.102.80.89
+        loki:
+          ansible_host: 100.84.189.46
+        ark:
+          ansible_host: 192.168.50.229
+        nighthawk:
+          ansible_host: 100.103.91.2
+        skynet:
           ansible_host: 192.168.50.115
           ansible_user: sidney
           timezone: "Europe/Sofia"

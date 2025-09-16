@@ -1,6 +1,6 @@
 ---
 # Global Variables
-timezone: "UTC"
+timezone: "Europe/Sofia"
 ansible_python_interpreter: /usr/bin/python3
 
 #NTP
@@ -36,7 +36,11 @@ ntp_rate_limit:
 ssh_port: 22
 ssh_permit_root_login: false
 ssh_password_authentication: false
+ssh_public_key_authentication: true
+ssh_auth_key
 ssh_max_auth_tries: 3
+authorized_keys_exclusive: true # Set to true to remove all unlisted keys
+backup_keys: true # Set to false to skip backups
 
 # Firewall Settings
 firewall_enabled: true
