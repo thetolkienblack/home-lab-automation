@@ -14,9 +14,26 @@ os_specific_packages:
   - device-mapper-persistent-data
   - lvm2
   - selinux
-  - ntp
+  - chrony
   - sudo
   - logrotate
+
+os_essential_packages:
+  - curl
+  - wget
+  - vim
+  - git
+  - htop
+  - tree
+  - unzip
+  - ca-certificates
+  - gnupg2
+  - fail2ban
+  - firewalld
+  - logrotate
+  - rsyslog
+  - sudo
+  - openssh-server
 
 # Services
 ssh_service_name: sshd

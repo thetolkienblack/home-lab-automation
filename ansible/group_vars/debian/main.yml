@@ -19,6 +19,24 @@ os_specific_packages:
   - logrotate
   - rsyslog
 
+os_essential_packages:
+  - curl
+  - wget
+  - vim
+  - git
+  - htop
+  - tree
+  - unzip
+  - apt-transport-https
+  - ca-certificates
+  - gnupg
+  - lsb-release
+  - fail2ban
+  - ufw
+  - logrotate
+  - rsyslog
+  - openssh-server
+
 # Services
 ssh_service_name: ssh
 firewall_service_name: ufw

@@ -34,41 +34,55 @@ ntp_rate_limit:
 
 # SSH Configuration
 ssh_port: 22
-ssh_permit_root_login: false
-ssh_password_authentication: false
-ssh_public_key_authentication: true
-ssh_auth_key
+ssh_permit_root_login: "no"
+ssh_password_authentication: "no"
+ssh_pubkey_authentication: "yes"
+ssh_challenge_response_auth: "no"
+ssh_x11_forwarding: "no"
 ssh_max_auth_tries: 3
-ssh_authorized_keys_file: ".ssh/authorized_keys"
-ssh_challenge_response_auth: false
-ssh_use_pam: true
-ssh_x11_forwarding: false
-ssh_print_motd: false
+ssh_max_sessions: 2
 ssh_client_alive_interval: 300
 ssh_client_alive_count_max: 2
-ssh_max_sessions: 2
 ssh_protocol: 2
-ssh_ignore_rhosts: true
-ssh_fail2ban_whitelist_ip: # Check how to iterate over this
-  - 91.216.57.29 
-  - 85.14.55.128 
-  - 100.73.121.62 
-  - 100.110.201.70 
-  - 100.67.7.113 
-  - 100.84.189.46 
-  - 100.101.107.37 
-  - 100.103.91.2 
-  - 100.117.119.74 
-  - 100.95.29.89 
-  - 100.68.28.91
-ssh_host_based_auth: true
-ssh_permit_empty_password: true 
 authorized_keys_exclusive: true # Set to true to remove all unlisted keys
 backup_keys: true # Set to false to skip backups
 
 # Firewall Settings
 firewall_enabled: true
+firewall_reset_before_config: true
+firewall_default_incoming: "deny"
+firewall_default_outgoing: "allow"
+firewall_allow_ssh_from_anywhere: true
+firewall_allow_http: true
+firewall_allow_https: true
+whitelist_ips:
+  - "192.168.50.0/24"
+  - "10.10.10.0/24"
+  - "37.114.63.170"
+  - "91.216.57.29"
+  - "85.14.55.128"
+  - "100.67.7.113"
+  - "100.93.54.62"
+  - "100.103.91.2"
+  - "100.96.98.101"
+  - "100.73.121.62"
+
+# Fail2ban Configuration
 fail2ban_enabled: true
+fail2ban_bantime: 3600
+fail2ban_findtime: 600
+fail2ban_maxretry: 5
+fail2ban_ssh_maxretry: 3
+fail2ban_backend: "systemd"
+
+# TCP Wrappers
+tcp_wrappers_enabled: true
+tcp_wrappers_allow_private_networks: false
+
+# System Security
+enable_unattended_upgrades: true
+configure_sysctl_security: true
+disable_ipv6: true
 
 # Security Settings
 automatic_security_updates: true
@@ -77,6 +91,12 @@ unattended_upgrades: true
 # Monitoring
 monitoring_enabled: true
 log_retention_days: 30
+configure_custom_logrotate: true
+
+# System Limits
+configure_system_limits: true
+max_open_files: 65536
+max_processes: 32768
 
 # Common packages
 common_packages:

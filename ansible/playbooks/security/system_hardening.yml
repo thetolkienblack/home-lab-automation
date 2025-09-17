@@ -1,226 +1,348 @@
 ---
-# Security Hardening Playbook
-# Description: Comprehensive security hardening for Linux systems
-# Features: SSH hardening, UFW firewall, fail2ban, unattended upgrades, sysctl security
-# Usage: ansible-playbook -i inventory security_hardening.yml
+# Comprehensive Security Hardening Playbook
+# Description: Complete server security hardening for RHEL/CentOS, Ubuntu, and Debian
+# Features: SSH hardening, UFW/firewalld, fail2ban, TCP wrappers, unattended upgrades
+# Usage: ansible-playbook -i inventory comprehensive_security.yml
 
-- name: "Security Hardening"
+- name: "Comprehensive Security Hardening"
   hosts: all
   become: true
   gather_facts: true
+  environment:
+    PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
   vars_files:
     - "{{ playbook_dir }}/../../group_vars/all/main.yml"
     - "{{ playbook_dir }}/../../group_vars/all/vault.yml"
 
-  vars:
-    # SSH security settings
-    ssh_port: 22
-    ssh_protocol: 2
-    ssh_permit_root_login: "no"
-    ssh_password_authentication: "no"
-    ssh_pubkey_authentication: "yes"
-    ssh_permit_empty_passwords: "no"
-    ssh_challenge_response_auth: "no"
-    ssh_x11_forwarding: "no"
-    ssh_max_auth_tries: 3
-    ssh_client_alive_interval: 300
-    ssh_client_alive_count_max: 2
-    ssh_max_sessions: 10
-    ssh_login_grace_time: 60
-    ssh_allow_users: []
-    ssh_allow_groups: ["ssh", "sudo"]
-    
-    # UFW Firewall settings
-    ufw_enabled: true
-    ufw_default_incoming_policy: "deny"
-    ufw_default_outgoing_policy: "allow"
-    ufw_default_forward_policy: "deny"
-    
-    # Fail2ban settings
-    fail2ban_bantime: 3600
-    fail2ban_findtime: 600
-    fail2ban_maxretry: 5
-    fail2ban_ssh_maxretry: 3
-    fail2ban_backend: "systemd"
-    
-    # Security settings
-    disable_ipv6: true
-    enable_unattended_upgrades: true
-
   pre_tasks:
+    - name: "Load OS-specific variables (Debian)"
+      ansible.builtin.include_vars: "{{ playbook_dir }}/../../group_vars/{{ ansible_os_family | lower }}/main.yml"
+      when: ansible_os_family == "Debian"
+      changed_when: false
+
+    - name: "Check if running as root or with sudo"
+      ansible.builtin.command: whoami
+      register: current_user
+      changed_when: false
+
     - name: "Validate required variables"
       ansible.builtin.assert:
         that:
-          - allowed_ips is defined
-          - allowed_ips | length > 0
-        fail_msg: "allowed_ips must be defined with at least one IP/CIDR"
-        success_msg: "Security configuration validated"
+          - whitelist_ips is defined
+          - whitelist_ips | length > 0
+        fail_msg: "whitelist_ips must be defined with at least one IP/CIDR"
+        success_msg: "Security configuration variables validated"
 
-    - name: "Display security hardening summary"
+    - name: "Display comprehensive security summary"
       ansible.builtin.debug:
         msg:
-          - "=== SECURITY HARDENING SUMMARY ==="
+          - "=== COMPREHENSIVE SECURITY HARDENING SUMMARY ==="
           - "Host: {{ inventory_hostname }}"
           - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
-          - "UFW enabled: {{ ufw_enabled }}"
-          - "Allowed IPs: {{ allowed_ips | join(', ') }}"
-          - "IPv6 disabled: {{ disable_ipv6 }}"
+          - "SSH port: {{ ssh_port }}"
+          - "Firewall enabled: {{ firewall_enabled }}"
+          - "Fail2ban enabled: {{ fail2ban_enabled }}"
+          - "Whitelist IPs: {{ whitelist_ips | join(', ') }}"
+          - "Timezone: {{ timezone }}"
           - "Unattended upgrades: {{ enable_unattended_upgrades }}"
+
+    - name: "Update package cache (Debian/Ubuntu)"
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: "Update package cache (RHEL/CentOS)"
+      ansible.builtin.dnf:
+        update_cache: true
+      when: ansible_os_family == "RedHat"
+
+    - name: "Upgrade all packages (Debian/Ubuntu)"
+      ansible.builtin.apt:
+        upgrade: dist
+      when: ansible_os_family == "Debian"
+
+    - name: "Upgrade all packages (RHEL/CentOS)"
+      ansible.builtin.dnf:
+        name: "*"
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: "Install essential packages"
+      ansible.builtin.package:
+        name: "{{ os_essential_packages }}"
+        state: present
 
   tasks:
     # ===========================================
-    # SSH DAEMON INSTALLATION AND CONFIGURATION
+    # TIMEZONE CONFIGURATION
     # ===========================================
 
-    - name: "Check if SSH server is installed"
-      ansible.builtin.package_facts:
-        manager: auto
+    - name: "Configure system timezone"
+      community.general.timezone:
+        name: "{{ timezone }}"
 
-    - name: "Install SSH server if not present"
-      ansible.builtin.package:
-        name: openssh-server
-        state: present
-      when: "'openssh-server' not in ansible_facts.packages"
+    # ===========================================
+    # SSH SECURITY CONFIGURATION
+    # ===========================================
 
-    - name: "Ensure SSH daemon is enabled and running"
-      ansible.builtin.systemd:
-        name: "{{ 'sshd' if ansible_os_family == 'RedHat' else 'ssh' }}"
-        enabled: true
-        state: started
-
-    - name: "Backup original SSH configuration"
-      ansible.builtin.copy:
-        src: /etc/ssh/sshd_config
-        dest: "/etc/ssh/sshd_config.backup.{{ ansible_date_time.epoch }}"
-        remote_src: true
-        owner: root
-        group: root
-        mode: '0600'
-
-    - name: "Configure SSH daemon security settings"
+    - name: "Configure SSH security settings"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/system/ssh/sshd_config.j2" # noqa no-relative-paths
-        dest: /etc/ssh/sshd_config
+        src: "{{ playbook_dir }}/../../templates/security/ssh/sshd_config.j2" # noqa no-relative-paths
+        dest: /etc/ssh/sshd_config.d/99-custom-security.conf
         owner: root
         group: root
         mode: '0644'
-        backup: true
         validate: '/usr/sbin/sshd -t -f %s'
       notify: "Restart ssh"
 
     # ===========================================
-    # UFW FIREWALL CONFIGURATION
+    # FIREWALL CONFIGURATION (UFW for Debian/Ubuntu, firewalld for RHEL)
     # ===========================================
 
-    - name: "Install UFW firewall"
-      ansible.builtin.package:
-        name: ufw
-        state: present
-      when: ufw_enabled
-
-    - name: "Reset UFW to defaults"
+    - name: "Reset UFW to defaults (Debian/Ubuntu)"
       community.general.ufw:
         state: reset
-      when: ufw_enabled
+      when:
+        - ansible_os_family == "Debian"
+        - firewall_enabled
+        - firewall_reset_before_config
 
-    - name: "Configure UFW default policies"
+    - name: "Configure UFW default policies (Debian/Ubuntu)"
       community.general.ufw:
         direction: "{{ item.direction }}"
         policy: "{{ item.policy }}"
       loop:
-        - { direction: 'incoming', policy: "{{ ufw_default_incoming_policy }}" }
-        - { direction: 'outgoing', policy: "{{ ufw_default_outgoing_policy }}" }
-        - { direction: 'routed', policy: "{{ ufw_default_forward_policy }}" }
-      when: ufw_enabled
+        - { direction: 'incoming', policy: "{{ firewall_default_incoming }}" }
+        - { direction: 'outgoing', policy: "{{ firewall_default_outgoing }}" }
+        - { direction: 'routed', policy: "deny" }
+      when:
+        - ansible_os_family == "Debian"
+        - firewall_enabled
 
-    - name: "Allow SSH from allowed IPs"
+    - name: "Allow all traffic from whitelisted IPs (UFW)"
+      community.general.ufw:
+        rule: allow
+        from_ip: "{{ item }}"
+        comment: "Whitelist {{ item }}"
+      loop: "{{ whitelist_ips }}"
+      when:
+        - ansible_os_family == "Debian"
+        - firewall_enabled
+
+    - name: "Allow SSH from anywhere (UFW)"
       community.general.ufw:
         rule: allow
         port: "{{ ssh_port }}"
         proto: tcp
-        src: "{{ item }}"
-        comment: "SSH from {{ item }}"
-      loop: "{{ allowed_ips }}"
-      when: ufw_enabled
+        comment: "SSH access"
+      when:
+        - ansible_os_family == "Debian"
+        - firewall_enabled
+        - firewall_allow_ssh_from_anywhere
 
-    - name: "Enable UFW firewall"
+    - name: "Allow HTTP from anywhere (UFW)"
+      community.general.ufw:
+        rule: allow
+        port: "80"
+        proto: tcp
+        comment: "HTTP access"
+      when:
+        - ansible_os_family == "Debian"
+        - firewall_enabled
+        - firewall_allow_http
+
+    - name: "Allow HTTPS from anywhere (UFW)"
+      community.general.ufw:
+        rule: allow
+        port: "443"
+        proto: tcp
+        comment: "HTTPS access"
+      when:
+        - ansible_os_family == "Debian"
+        - firewall_enabled
+        - firewall_allow_https
+
+    - name: "Enable UFW logging and firewall (Debian/Ubuntu)"
       community.general.ufw:
         state: enabled
         logging: "on"
-      when: ufw_enabled
+      when:
+        - ansible_os_family == "Debian"
+        - firewall_enabled
+
+    # Firewalld configuration for RHEL/CentOS
+    - name: "Start and enable firewalld (RHEL/CentOS)"
+      ansible.builtin.systemd:
+        name: firewalld
+        enabled: true
+        state: started
+      when:
+        - ansible_os_family == "RedHat"
+        - firewall_enabled
+
+    - name: "Configure firewalld rich rules for whitelisted IPs (RHEL/CentOS)"
+      ansible.posix.firewalld:
+        rich_rule: "rule family='ipv4' source address='{{ item }}' accept"
+        permanent: true
+        immediate: true
+        state: enabled
+      loop: "{{ whitelist_ips }}"
+      when:
+        - ansible_os_family == "RedHat"
+        - firewall_enabled
+
+    - name: "Allow SSH in firewalld (RHEL/CentOS)"
+      ansible.posix.firewalld:
+        service: ssh
+        permanent: true
+        immediate: true
+        state: enabled
+      when:
+        - ansible_os_family == "RedHat"
+        - firewall_enabled
+        - firewall_allow_ssh_from_anywhere
+
+    - name: "Allow HTTP in firewalld (RHEL/CentOS)"
+      ansible.posix.firewalld:
+        service: http
+        permanent: true
+        immediate: true
+        state: enabled
+      when:
+        - ansible_os_family == "RedHat"
+        - firewall_enabled
+        - firewall_allow_http
+
+    - name: "Allow HTTPS in firewalld (RHEL/CentOS)"
+      ansible.posix.firewalld:
+        service: https
+        permanent: true
+        immediate: true
+        state: enabled
+      when:
+        - ansible_os_family == "RedHat"
+        - firewall_enabled
+        - firewall_allow_https
 
     # ===========================================
     # FAIL2BAN CONFIGURATION
     # ===========================================
 
-    - name: "Install fail2ban"
-      ansible.builtin.package:
-        name: fail2ban
-        state: present
-
-    - name: "Create fail2ban configuration"
+    - name: "Configure fail2ban jail settings"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/security/fail2ban/jail.local.j2" # noqa no-relative-paths
+        src: "{{ playbook_dir }}/../../templates/security/ssh/jail.local.j2" # noqa no-relative-paths
         dest: /etc/fail2ban/jail.local
         owner: root
         group: root
         mode: '0644'
         backup: true
       notify: "Restart fail2ban"
+      when: fail2ban_enabled
 
-    - name: "Ensure fail2ban is enabled and running"
+    - name: "Ensure fail2ban is enabled and started"
       ansible.builtin.systemd:
         name: fail2ban
         enabled: true
         state: started
+      when: fail2ban_enabled
 
     # ===========================================
-    # UNATTENDED UPGRADES
+    # UNATTENDED UPGRADES (Debian/Ubuntu only)
     # ===========================================
 
-    - name: "Install unattended-upgrades"
+    - name: "Install unattended-upgrades (Debian/Ubuntu)"
       ansible.builtin.package:
         name: unattended-upgrades
         state: present
-      when: enable_unattended_upgrades
+      when:
+        - ansible_os_family == "Debian"
+        - enable_unattended_upgrades
 
-    - name: "Configure unattended-upgrades"
+    - name: "Configure automatic updates (Debian/Ubuntu)"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/system/unattended-upgrades/50unattended-upgrades.j2" # noqa no-relative-paths
+        src: "{{ playbook_dir }}/../../templates/security/system/20auto-upgrades.j2" # noqa no-relative-paths
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      when:
+        - ansible_os_family == "Debian"
+        - enable_unattended_upgrades
+
+    - name: "Configure unattended-upgrades settings (Debian/Ubuntu)"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/security/system/50unattended-upgrades.j2" # noqa no-relative-paths
         dest: /etc/apt/apt.conf.d/50unattended-upgrades
         owner: root
         group: root
         mode: '0644'
         backup: true
-      when: 
-        - enable_unattended_upgrades
+      when:
         - ansible_os_family == "Debian"
+        - enable_unattended_upgrades
 
-    - name: "Enable automatic updates"
+    - name: "Enable automatic updates (RHEL/CentOS)"
+      ansible.builtin.package:
+        name: dnf-automatic
+        state: present
+      when:
+        - ansible_os_family == "RedHat"
+        - enable_unattended_upgrades
+
+    - name: "Configure dnf-automatic for security updates (RHEL/CentOS)"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/system/unattended-upgrades/20auto-upgrades.j2" # noqa no-relative-paths
-        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        src: "{{ playbook_dir }}/../../templates/security/ssh/dnf-automatic.conf.j2" # noqa no-relative-paths
+        dest: /etc/dnf/automatic.conf
         owner: root
         group: root
         mode: '0644'
+        backup: true
+      notify: "Restart dnf-automatic"
       when:
+        - ansible_os_family == "RedHat"
         - enable_unattended_upgrades
-        - ansible_os_family == "Debian"
 
     # ===========================================
-    # SYSTEM SECURITY PARAMETERS
+    # SYSCTL SECURITY PARAMETERS
     # ===========================================
 
-    - name: "Configure security sysctl parameters"
+    - name: "Configure kernel security parameters"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/system/sysctl/99-security.conf.j2" # noqa no-relative-paths
+        src: "{{ playbook_dir }}/../../templates/security/system/99-security.conf.j2" # noqa no-relative-paths
         dest: /etc/sysctl.d/99-security.conf
         owner: root
         group: root
         mode: '0644'
         backup: true
       notify: "Reload sysctl"
+      when: configure_sysctl_security
+
+    # ===========================================
+    # TCP WRAPPERS CONFIGURATION
+    # ===========================================
+
+    - name: "Configure hosts.allow with whitelist"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/security/ssh/hosts.allow.j2" # noqa no-relative-paths
+        dest: /etc/hosts.allow
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      when: tcp_wrappers_enabled
+
+    - name: "Configure hosts.deny"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/security/ssh/hosts.deny.j2" # noqa no-relative-paths
+        dest: /etc/hosts.deny
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      when: tcp_wrappers_enabled
 
     # ===========================================
     # LOG ROTATION CONFIGURATION
@@ -228,59 +350,70 @@
 
     - name: "Configure custom log rotation"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/system/logrotate/custom.j2" # noqa no-relative-paths
+        src: "{{ playbook_dir }}/../../templates/security/logs/logrotate-custom.j2" # noqa no-relative-paths
         dest: /etc/logrotate.d/custom
         owner: root
         group: root
         mode: '0644'
         backup: true
+      when: configure_custom_logrotate
 
     # ===========================================
-    # RSYSLOG CONFIGURATION
+    # SYSTEM LIMITS CONFIGURATION
     # ===========================================
 
-    - name: "Install rsyslog"
-      ansible.builtin.package:
-        name: rsyslog
-        state: present
-
-    - name: "Configure rsyslog"
+    - name: "Configure system limits"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/system/rsyslog/rsyslog.conf.j2" # noqa no-relative-paths
-        dest: /etc/rsyslog.conf
+        src: "{{ playbook_dir }}/../../templates/security/system/99-custom.conf.j2" # noqa no-relative-paths
+        dest: /etc/security/limits.d/99-custom.conf
         owner: root
         group: root
         mode: '0644'
         backup: true
-      notify: "Restart rsyslog"
+      when: configure_system_limits
 
-    - name: "Ensure rsyslog is enabled and running"
+    # ===========================================
+    # SERVICE MANAGEMENT
+    # ===========================================
+
+    - name: "Ensure critical services are enabled and running (Debian/Ubuntu)"
       ansible.builtin.systemd:
-        name: rsyslog
+        name: "{{ item }}"
         enabled: true
         state: started
+      loop:
+        - ssh
+        - rsyslog
+        - ntp
+      failed_when: false
+      when: ansible_os_family == "Debian"
+
+    - name: "Ensure critical services are enabled and running (RHEL/CentOS)"
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop:
+        - sshd
+        - rsyslog
+        - chronyd
+      failed_when: false
+      when: ansible_os_family == "RedHat"
 
     # ===========================================
-    # HOSTS.ALLOW CONFIGURATION
+    # CLEANUP
     # ===========================================
 
-    - name: "Configure hosts.allow with allowed IPs"
-      ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/system/tcpwrappers/hosts.allow.j2" # noqa no-relative-paths
-        dest: /etc/hosts.allow
-        owner: root
-        group: root
-        mode: '0644'
-        backup: true
+    - name: "Clean up package cache (Debian/Ubuntu)"
+      ansible.builtin.apt:
+        autoremove: true
+        autoclean: true
+      when: ansible_os_family == "Debian"
 
-    - name: "Configure hosts.deny to deny all others"
-      ansible.builtin.copy:
-        content: "ALL: ALL\n"
-        dest: /etc/hosts.deny
-        owner: root
-        group: root
-        mode: '0644'
-        backup: true
+    - name: "Clean up package cache (RHEL/CentOS)"
+      ansible.builtin.dnf:
+        autoremove: true
+      when: ansible_os_family == "RedHat"
 
   post_tasks:
     - name: "Verify security configuration"
@@ -289,28 +422,45 @@
           ansible.builtin.command: /usr/sbin/sshd -t
           changed_when: false
 
-        - name: "Check UFW status"
+        - name: "Check firewall status (UFW)"
           ansible.builtin.command: ufw status
-          register: ufw_status
+          register: ufw_status_result
           changed_when: false
-          when: ufw_enabled
+          when:
+            - ansible_os_family == "Debian"
+            - firewall_enabled
+
+        - name: "Check firewall status (firewalld)"
+          ansible.builtin.command: firewall-cmd --state
+          register: firewalld_status_result
+          changed_when: false
+          when:
+            - ansible_os_family == "RedHat"
+            - firewall_enabled
 
         - name: "Check fail2ban status"
           ansible.builtin.command: fail2ban-client status
-          register: fail2ban_status
+          register: fail2ban_status_result
           changed_when: false
+          when: fail2ban_enabled
 
-        - name: "Display security hardening results"
+        - name: "Display comprehensive security results"
           ansible.builtin.debug:
             msg:
-              - "=== SECURITY HARDENING COMPLETED ==="
+              - "=== COMPREHENSIVE SECURITY HARDENING COMPLETED ==="
+              - "Hostname: {{ ansible_hostname }}"
+              - "IP Address: {{ ansible_default_ipv4.address | default('Unknown') }}"
+              - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
               - "SSH daemon: Configured and running"
-              - "UFW firewall: {{ 'Active' if ufw_enabled else 'Disabled' }}"
-              - "Fail2ban: {{ 'Active' if fail2ban_status.rc == 0 else 'Failed' }}"
-              - "Unattended upgrades: {{ 'Configured' if enable_unattended_upgrades else 'Disabled' }}"
-              - "Security parameters: Applied"
-              - "Log rotation: Configured"
-              - "Rsyslog: Running"
+              - >
+                "Firewall:
+                  {{ 'Active (UFW)' if ansible_os_family == 'Debian' and firewall_enabled
+                   else 'Active (firewalld)' if ansible_os_family == 'RedHat' and firewall_enabled
+                   else 'Disabled' }}"
+              - "Fail2ban: {{ 'Active' if fail2ban_enabled else 'Disabled' }}"
+              - "TCP Wrappers: {{ 'Configured' if tcp_wrappers_enabled else 'Disabled' }}"
+              - "Unattended upgrades: {{ 'Enabled' if enable_unattended_upgrades else 'Disabled' }}"
+              - "Timezone: {{ timezone }}"
 
         - name: "Log successful security hardening"
           ansible.builtin.lineinfile:
@@ -320,7 +470,9 @@
             group: root
             mode: '0600'
             line: >-
-              {{ ansible_date_time.iso8601 }} - SUCCESS: Security hardening completed on {{ inventory_hostname }}
+              {{ ansible_date_time.iso8601 }} - SUCCESS: Comprehensive security hardening completed on
+              {{ inventory_hostname }} ({{ ansible_distribution }})
+              with {{ whitelist_ips | length }} whitelisted IPs
 
       rescue:
         - name: "Log failed security hardening"
@@ -340,6 +492,7 @@
               - "Check individual service status manually"
               - "Backup files are available for restoration"
               - "Review logs for specific errors"
+              - "Test SSH access before logging out"
 
         - name: "Fail with security error info"
           ansible.builtin.fail:
@@ -360,11 +513,12 @@
         name: fail2ban
         state: restarted
 
+    - name: "Restart dnf-automatic"
+      ansible.builtin.systemd:
+        name: dnf-automatic.timer
+        enabled: true
+        state: restarted
+
     - name: "Reload sysctl"
       ansible.builtin.command: sysctl -p /etc/sysctl.d/99-security.conf
       changed_when: true
-
-    - name: "Restart rsyslog"
-      ansible.builtin.systemd:
-        name: rsyslog
-        state: restarted
