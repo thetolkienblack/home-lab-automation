@@ -3,7 +3,7 @@ all:
   children:
     debian:
       hosts:
-        ironwolf:
+        ironwolf.graylock.eu:
           timezone: "Europe/Sofia"
           ansible_host: "192.168.50.115"
           ansible_user: "sidney"
@@ -22,4 +22,4 @@ all:
             - "100.103.91.2"
             - "100.96.98.101"
             - "100.73.121.62"
-          tailscale_advertise_routes: ["192.168.50.0/24"] # e.g., ["10.0.0.0/8", "192.168.0.0/16"]
+          tailscale_advertise_routes: [] # e.g., ["10.0.0.0/8", "192.168.0.0/16"]

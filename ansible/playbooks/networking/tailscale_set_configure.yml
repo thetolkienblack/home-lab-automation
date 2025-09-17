@@ -1,0 +1,181 @@
+---
+- name: Configure Tailscale settings
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../group_vars/all/main.yml"
+    - "{{ playbook_dir }}/../../group_vars/all/vault.yml"
+
+  pre_tasks:
+    - name: "Load OS-specific variables"
+      ansible.builtin.include_vars: "{{ playbook_dir }}/../../group_vars/{{ ansible_os_family | lower }}/main.yml"
+      changed_when: false
+
+    - name: "Load OS-specific variables (Ubuntu)"
+      ansible.builtin.include_vars: "{{ playbook_dir }}/../../group_vars/debian/ubuntu.yml"
+      when: ansible_os_family == "Debian" and ansible_distribution == "Ubuntu"
+      changed_when: false
+
+    - name: Ensure required variables are defined
+      ansible.builtin.assert:
+        that:
+          - tailscale_tokens is defined
+          - tailscale_tokens[inventory_hostname] is defined
+        fail_msg: "Tailscale token for {{ inventory_hostname }} is not defined in vault"
+
+    - name: Set tailscale auth key for current host
+      ansible.builtin.set_fact:
+        current_tailscale_token: "{{ tailscale_tokens[inventory_hostname] }}"
+
+  tasks:
+    - name: Check if Tailscale package is installed
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Fail if Tailscale is not installed
+      ansible.builtin.fail:
+        msg: "Tailscale package is not installed. Please install it first."
+      when: "'tailscale' not in ansible_facts.packages"
+
+    - name: Check tailscaled service status
+      ansible.builtin.systemd:
+        name: tailscaled
+      register: tailscaled_service_status
+      failed_when: false
+
+    - name: Fail if tailscaled service does not exist or is not running
+      ansible.builtin.fail:
+        msg: |
+          tailscaled service issue:
+          {% if tailscaled_service_status.status is not defined %}
+          - Service does not exist. Please install Tailscale properly.
+          {% elif tailscaled_service_status.status.ActiveState != "active" %}
+          - Service is not running ({{ tailscaled_service_status.status.ActiveState }}). Please start the service first.
+          {% endif %}
+      when: >
+        tailscaled_service_status.status is not defined or
+        tailscaled_service_status.status.ActiveState != "active"
+
+    - name: Get current Tailscale status
+      ansible.builtin.command: tailscale status --json
+      register: current_tailscale_status
+      changed_when: false
+      failed_when: false
+
+    - name: Parse current Tailscale status
+      ansible.builtin.set_fact:
+        current_authenticated: "{{ (current_tailscale_status.stdout | from_json).BackendState == 'Running' if current_tailscale_status.rc == 0 else false }}"
+
+    - name: Build Tailscale set commands
+      ansible.builtin.set_fact:
+        tailscale_set_commands:
+          - "tailscale set --accept-dns={{ 'true' if tailscale_accept_dns else 'false' }}"
+          - "tailscale set --accept-routes={{ 'true' if tailscale_accept_routes else 'false' }}"
+          - "tailscale set --advertise-exit-node={{ 'true' if tailscale_advertise_exit_node else 'false' }}"
+          - "tailscale set --snat-subnet-routes={{ 'true' if tailscale_snat_subnet_routes else 'false' }}"
+          - "tailscale set --ssh={{ 'true' if tailscale_ssh else 'false' }}"
+
+    - name: Set advertise routes (if any)
+      ansible.builtin.command: "tailscale set --advertise-routes={{ tailscale_advertise_routes | join(',') }}"
+      register: set_routes_result
+      changed_when: set_routes_result.rc == 0
+      failed_when: false
+      when: tailscale_advertise_routes | length > 0
+
+    - name: Clear advertise routes (if empty)
+      ansible.builtin.command: "tailscale set --advertise-routes=''"
+      register: clear_routes_result
+      changed_when: clear_routes_result.rc == 0
+      failed_when: false
+      when: tailscale_advertise_routes | length == 0
+
+    - name: Enable IP forwarding for subnet routing (if needed)
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        state: present
+        reload: true
+      when: tailscale_advertise_routes | length > 0 or tailscale_advertise_exit_node
+
+    - name: Apply Tailscale configuration settings
+      ansible.builtin.command: "{{ item }}"
+      loop: "{{ tailscale_set_commands }}"
+      register: tailscale_set_results
+      changed_when: true
+      failed_when: false
+
+    - name: Authenticate with auth key if not authenticated
+      ansible.builtin.command: "tailscale up --auth-key={{ current_tailscale_token }} --timeout={{ tailscale_timeout | default(60) }}s"
+      when: not current_authenticated
+      no_log: true
+      register: tailscale_auth_result
+      changed_when: tailscale_auth_result.rc == 0
+      failed_when: false
+
+    - name: Handle configuration failures
+      ansible.builtin.debug:
+        msg: |
+          Configuration issues detected:
+          {% for result in tailscale_set_results.results %}
+          {% if result.rc != 0 %}
+          - Command "{{ result.item }}" failed: {{ result.stderr | default('Unknown error') }}
+          {% endif %}
+          {% endfor %}
+          {% if set_routes_result is defined and set_routes_result.rc != 0 %}
+          - Setting routes failed: {{ set_routes_result.stderr | default('Unknown error') }}
+          {% endif %}
+          {% if clear_routes_result is defined and clear_routes_result.rc != 0 %}
+          - Clearing routes failed: {{ clear_routes_result.stderr | default('Unknown error') }}
+          {% endif %}
+          {% if tailscale_auth_result is defined and tailscale_auth_result.rc != 0 %}
+          - Authentication failed: {{ tailscale_auth_result.stderr | default('Unknown error') }}
+          {% endif %}
+      when: >
+        (tailscale_set_results.results | selectattr('rc', 'ne', 0) | list | length > 0) or
+        (set_routes_result is defined and set_routes_result.rc is defined and set_routes_result.rc != 0) or
+        (clear_routes_result is defined and clear_routes_result.rc is defined and clear_routes_result.rc != 0) or
+        (tailscale_auth_result is defined and tailscale_auth_result.rc is defined and tailscale_auth_result.rc != 0)
+
+    - name: Restart tailscaled service if configuration changed
+      ansible.builtin.systemd:
+        name: tailscaled
+        state: restarted
+      when: >
+        (tailscale_set_results.results | selectattr('rc', 'eq', 0) | list | length > 0) or
+        (set_routes_result is defined and set_routes_result.rc is defined and set_routes_result.rc == 0) or
+        (clear_routes_result is defined and clear_routes_result.rc is defined and clear_routes_result.rc == 0) or
+        (tailscale_auth_result is defined and tailscale_auth_result.rc is defined and tailscale_auth_result.rc == 0)
+
+    - name: Wait for service to restart
+      ansible.builtin.pause:
+        seconds: 5
+      when: >
+        (tailscale_set_results.results | selectattr('rc', 'eq', 0) | list | length > 0) or
+        (set_routes_result is defined and set_routes_result.rc is defined and set_routes_result.rc == 0) or
+        (clear_routes_result is defined and clear_routes_result.rc is defined and clear_routes_result.rc == 0) or
+        (tailscale_auth_result is defined and tailscale_auth_result.rc is defined and tailscale_auth_result.rc == 0)
+
+    - name: Verify final Tailscale status
+      ansible.builtin.command: tailscale status
+      register: final_status
+      changed_when: false
+      failed_when: false
+
+    - name: Display final Tailscale status
+      ansible.builtin.debug:
+        msg: "{{ final_status.stdout_lines }}"
+      when: final_status.rc == 0
+
+    - name: Show configuration summary
+      ansible.builtin.debug:
+        msg: |
+          Tailscale Configuration Applied:
+          - Accept DNS: {{ tailscale_accept_dns }}
+          - Accept Routes: {{ tailscale_accept_routes }}
+          - Advertise Exit Node: {{ tailscale_advertise_exit_node }}
+          - Advertise Routes: {{ tailscale_advertise_routes | join(', ') if tailscale_advertise_routes | length > 0 else 'None' }}
+          - SNAT Subnet Routes: {{ tailscale_snat_subnet_routes }}
+          - SSH: {{ tailscale_ssh }}
+          - IP Forwarding: {{ 'Enabled' if (tailscale_advertise_routes | length > 0 or tailscale_advertise_exit_node) else 'Not changed' }}
