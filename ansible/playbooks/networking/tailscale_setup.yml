@@ -1,0 +1,191 @@
+---
+- name: Install and configure Tailscale
+  hosts: all
+  become: true
+  gather_facts: true
+  
+  vars_files:
+    - "{{ playbook_dir }}/../../group_vars/all/main.yml"
+    - "{{ playbook_dir }}/../../group_vars/all/vault.yml"
+    
+  pre_tasks:
+    - name: "Load OS-specific variables"
+      ansible.builtin.include_vars: "{{ playbook_dir }}/../../group_vars/{{ ansible_os_family | lower }}/main.yml"
+      changed_when: false
+
+    - name: "Load OS-specific variables (Ubuntu)"
+      ansible.builtin.include_vars: "{{ playbook_dir }}/../../group_vars/debian/ubuntu.yml"
+      when: ansible_os_family == "Debian" and ansible_distribution == "Ubuntu"
+      changed_when: false
+
+    - name: Ensure required variables are defined
+      ansible.builtin.assert:
+        that:
+          - tailscale_tokens is defined
+          - tailscale_tokens[inventory_hostname] is defined
+        fail_msg: "Tailscale token for {{ inventory_hostname }} is not defined in vault"
+        
+    - name: Set tailscale auth key for current host
+      ansible.builtin.set_fact:
+        current_tailscale_token: "{{ tailscale_tokens[inventory_hostname] }}"
+      
+    - name: Set OS-specific variables for Red Hat/CentOS/Fedora
+      ansible.builtin.set_fact:
+        tailscale_repo_baseurl: "{{ tailscale_redhat_repo_baseurl }}"
+        tailscale_repo_gpgkey: "{{ tailscale_redhat_repo_gpgkey }}"
+        tailscale_daemon_config_path: "{{ tailscale_redhat_daemon_config_path }}"
+      when: rhel_distro
+        
+  tasks:
+    # Debian/Ubuntu Installation Tasks
+    - name: Update package cache (Debian/Ubuntu)
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+      
+    - name: Create keyrings directory (Debian/Ubuntu)
+      ansible.builtin.file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      when: ansible_os_family == "Debian"
+        
+    - name: Download and add Tailscale GPG key (Debian/Ubuntu)
+      ansible.builtin.get_url:
+        url: "{{ tailscale_repo_key_url }}"
+        dest: "{{ tailscale_repo_keyring }}"
+        mode: '0644'
+        owner: root
+        group: root
+        timeout: 30
+      when: ansible_os_family == "Debian"
+
+    - name: Install required packages for Tailscale repository
+      ansible.builtin.package:
+        name: "{{ required_packages }}"
+        state: present
+        
+    - name: Download and add Tailscale repository list (Debian/Ubuntu)
+      ansible.builtin.get_url:
+        url: "{{ tailscale_repo_list_url }}"
+        dest: "{{ tailscale_repo_list_file }}"
+        mode: '0644'
+        owner: root
+        group: root
+        timeout: 30
+      when: ansible_os_family == "Debian"
+      notify: "Restart tailscaled"
+
+    - name: Add Tailscale repository (Red Hat/CentOS/Fedora)
+      ansible.builtin.dnf_repository:
+        name: tailscale-stable
+        description: "Tailscale stable"
+        baseurl: "{{ tailscale_repo_baseurl }}"
+        gpgkey: "{{ tailscale_repo_gpgkey }}"
+        gpgcheck: true
+        repo_gpgcheck: true
+        enabled: true
+      when: ansible_os_family == "RedHat"
+        
+    - name: Install Tailscale package
+      ansible.builtin.package:
+        name: "{{ tailscale_package_name }}"
+        state: present
+      
+    # Common Configuration Tasks
+    - name: Ensure tailscaled service exists
+      ansible.builtin.systemd:
+        name: tailscaled
+        enabled: false
+        masked: false
+        daemon_reload: true
+        
+    - name: Ensure Tailscale service is stopped before configuration
+      ansible.builtin.systemd:
+        name: tailscaled
+        state: stopped
+      
+    - name: Configure Tailscale daemon arguments
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/system/networking/tailscale_daemon.j2"
+        dest: "{{ tailscale_daemon_config_path }}"
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      notify: "Restart tailscaled"
+      
+    - name: Start and enable Tailscale daemon
+      ansible.builtin.systemd:
+        name: tailscaled
+        state: "{{ tailscale_service_state }}"
+        enabled: "{{ tailscale_service_enabled }}"
+        daemon_reload: true
+        
+    - name: Wait for Tailscale daemon to be ready
+      ansible.builtin.wait_for:
+        port: "{{ tailscale_daemon_port }}"
+        host: "127.0.0.1"
+        timeout: "{{ tailscale_timeout }}"
+        
+    - name: Check if Tailscale is already authenticated
+      ansible.builtin.command: tailscale status --json
+      register: tailscale_status
+      changed_when: false
+      failed_when: false
+      
+    - name: Parse Tailscale status
+      ansible.builtin.set_fact:
+        tailscale_authenticated: "{{ (tailscale_status.stdout | from_json).BackendState == 'Running' }}"
+      when: tailscale_status.rc == 0
+      
+    - name: Set default authentication status
+      ansible.builtin.set_fact:
+        tailscale_authenticated: false
+      when: tailscale_status.rc != 0
+      
+    - name: Build Tailscale up command arguments
+      ansible.builtin.set_fact:
+        tailscale_up_args: >-
+          {{ '--accept-dns' if tailscale_accept_dns else '--accept-dns=false' }}
+          {{ '--accept-routes' if tailscale_accept_routes else '--accept-routes=false' }}
+          {{ '--advertise-exit-node' if tailscale_advertise_exit_node else '' }}
+          {{ '--advertise-routes=' + (tailscale_advertise_routes | join(',')) if tailscale_advertise_routes | length > 0 else '' }}
+          {{ '--snat-subnet-routes' if tailscale_snat_subnet_routes else '--snat-subnet-routes=false' }}
+          {{ '--ssh' if tailscale_ssh else '--ssh=false' }}
+          --timeout="{{ tailscale_timeout }}s"
+      
+    - name: Authenticate Tailscale with auth key
+      ansible.builtin.command: >
+        tailscale up
+        {{ tailscale_up_args }}
+        --auth-key="{{ current_tailscale_token }}"
+      when: not tailscale_authenticated
+      no_log: true  # Prevents logging the auth key
+      register: tailscale_auth_result
+      
+    - name: Update Tailscale configuration if already authenticated
+      ansible.builtin.command: >
+        tailscale up
+        {{ tailscale_up_args }}
+      when: tailscale_authenticated
+      register: tailscale_update_result
+      
+    - name: Verify Tailscale status
+      ansible.builtin.command: tailscale status
+      register: final_tailscale_status
+      changed_when: false
+      
+    - name: Display Tailscale status
+      ansible.builtin.debug:
+        msg: "{{ final_tailscale_status.stdout_lines }}"
+        
+  handlers:
+    - name: Restart tailscaled
+      ansible.builtin.systemd:
+        name: tailscaled
+        state: restarted
+        daemon_reload: true

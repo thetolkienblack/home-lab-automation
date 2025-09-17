@@ -38,3 +38,11 @@ os_essential_packages:
 # Services
 ssh_service_name: sshd
 firewall_service_name: firewalld
+
+# Tailscale
+tailscale_repo_baseurl: "https://pkgs.tailscale.com/stable/rhel/$releasever/$basearch"
+tailscale_repo_gpgkey: "https://pkgs.tailscale.com/stable/rhel/repo.gpg"
+tailscale_daemon_config_path: "/etc/sysconfig/tailscaled"
+tailscale_required_packages:
+  - curl
+  - gnupg2

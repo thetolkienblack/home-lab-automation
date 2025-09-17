@@ -16,9 +16,8 @@
     - "{{ playbook_dir }}/../../group_vars/all/vault.yml"
 
   pre_tasks:
-    - name: "Load OS-specific variables (Debian)"
+    - name: "Load OS-specific variables"
       ansible.builtin.include_vars: "{{ playbook_dir }}/../../group_vars/{{ ansible_os_family | lower }}/main.yml"
-      when: ansible_os_family == "Debian"
       changed_when: false
 
     - name: "Check if running as root or with sudo"
