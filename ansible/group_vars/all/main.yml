@@ -55,17 +55,6 @@ firewall_default_outgoing: "allow"
 firewall_allow_ssh_from_anywhere: true
 firewall_allow_http: true
 firewall_allow_https: true
-whitelist_ips:
-  - "192.168.50.0/24"
-  - "10.10.10.0/24"
-  - "37.114.63.170"
-  - "91.216.57.29"
-  - "85.14.55.128"
-  - "100.67.7.113"
-  - "100.93.54.62"
-  - "100.103.91.2"
-  - "100.96.98.101"
-  - "100.73.121.62"
 
 # Fail2ban Configuration
 fail2ban_enabled: true
@@ -125,3 +114,21 @@ network_dns_servers:
   - "37.114.63.170"
 network_netmask: "24" #"255.255.255.0" # Subnet mask (CIDR or dotted decimal)
 network_ipv6_enabled: false
+
+# Tailscale configuration variables
+tailscale_accept_dns: true
+tailscale_accept_routes: true
+tailscale_advertise_exit_node: false
+tailscale_snat_subnet_routes: true
+tailscale_ssh: true
+    
+# Service configuration
+tailscale_service_enabled: true
+tailscale_service_state: started
+tailscale_log_level: "info"  # debug, info, warn, error
+tailscale_timeout: 60
+  
+    
+# Common variables
+tailscale_package_name: "tailscale"
+tailscale_daemon_port: 41641
