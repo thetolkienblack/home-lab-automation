@@ -9,9 +9,9 @@
   gather_facts: true
 
   vars_files:
-    - "{{ playbook_dir }}/../../group_vars/all/main.yml"
-    - "{{ playbook_dir }}/../../group_vars/all/vault.yml"
-    - "{{ playbook_dir }}/../../group_vars/bg/main.yml"
+    - "{{ inventory_dir }}/../group_vars/all/main.yml"
+    - "{{ inventory_dir }}/../group_vars/all/vault.yml"
+    - "{{ inventory_dir }}/../host_vars/{{ inventory_hostname }}.yml"
 
   pre_tasks:
     - name: "Display current time before configuration"

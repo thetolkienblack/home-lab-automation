@@ -5,16 +5,17 @@
   gather_facts: true
 
   vars_files:
-    - "{{ playbook_dir }}/../../group_vars/all/main.yml"
-    - "{{ playbook_dir }}/../../group_vars/all/vault.yml"
+    - "{{ inventory_dir }}/../group_vars/all/main.yml"
+    - "{{ inventory_dir }}/../group_vars/all/vault.yml"
+    - "{{ inventory_dir }}/../host_vars/{{ inventory_hostname }}.yml"
 
   pre_tasks:
     - name: "Load OS-specific variables"
-      ansible.builtin.include_vars: "{{ playbook_dir }}/../../group_vars/{{ ansible_os_family | lower }}/main.yml"
+      ansible.builtin.include_vars: "{{ inventory_dir }}/../group_vars/{{ ansible_os_family | lower }}/main.yml"
       changed_when: false
 
     - name: "Load OS-specific variables (Ubuntu)"
-      ansible.builtin.include_vars: "{{ playbook_dir }}/../../group_vars/debian/ubuntu.yml"
+      ansible.builtin.include_vars: "{{ inventory_dir }}/../group_vars/debian/ubuntu.yml"
       when: ansible_os_family == "Debian" and ansible_distribution == "Ubuntu"
       changed_when: false
 
@@ -103,7 +104,7 @@
 
     - name: Configure Tailscale daemon arguments
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/system/networking/tailscale_daemon.j2" # noqa no-relative-paths
+        src: "{{ inventory_dir }}/../templates/system/networking/tailscale_daemon.j2" # noqa no-relative-paths
         dest: "{{ tailscale_daemon_config_path }}"
         owner: root
         group: root
@@ -119,15 +120,6 @@
         daemon_reload: true
       retries: 3
       delay: 2
-
-    # - name: Wait for Tailscale daemon to be ready
-    #   ansible.builtin.command: tailscale status
-    #   register: tailscale_ready_check
-    #   until: tailscale_ready_check.rc is defined
-    #   retries: 10
-    #   delay: 3
-    #   changed_when: false
-    #   failed_when: false  # Don't fail on "Logged out" status
 
     - name: Wait for Tailscale daemon to be ready
       ansible.builtin.systemd:

@@ -10,8 +10,9 @@
   gather_facts: true
 
   vars_files:
-    - "{{ playbook_dir }}/../../group_vars/all/main.yml"
-    - "{{ playbook_dir }}/../../group_vars/all/vault.yml"
+    - "{{ inventory_dir }}/../group_vars/all/main.yml"
+    - "{{ inventory_dir }}/../group_vars/all/vault.yml"
+    - "{{ inventory_dir }}/../host_vars/{{ inventory_hostname }}.yml"
 
   # Default network configuration variables
   vars:
@@ -139,7 +140,7 @@
 
     - name: "Configure NetworkManager main config"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/system/networking/networkmanager.conf.j2" # noqa no-relative-paths
+        src: "{{ inventory_dir }}/../templates/system/networking/networkmanager.conf.j2" # noqa no-relative-paths
         dest: /etc/NetworkManager/NetworkManager.conf
         owner: root
         group: root
@@ -221,7 +222,10 @@
         ifname: "{{ actual_interface }}"
         type: ethernet
         method4: manual
-        ip4: "{{ network_static_ip }}/{{ network_netmask if network_netmask | string | regex_search('^\\d+$') else (network_netmask | ansible.utils.ipaddr('prefix')) }}"
+        ip4: >-
+         "{{ network_static_ip }}/
+          {{ network_netmask if network_netmask | string | regex_search('^\\d+$')
+           else (network_netmask | ansible.utils.ipaddr('prefix')) }}"
         gw4: "{{ network_gateway }}"
         dns4: "{{ network_dns_servers }}"
         autoconnect: true
@@ -261,6 +265,7 @@
     - name: "Rename new connection to final name"
       ansible.builtin.command: nmcli connection modify "{{ actual_interface }}-new" connection.id "{{ actual_interface }}"
       when: test_connectivity.status | default(0) == 200
+      changed_when: true
 
     # ===========================================
     # SECURITY HARDENING

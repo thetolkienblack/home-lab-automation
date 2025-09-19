@@ -1,0 +1,259 @@
+---
+- name: Install and Configure Docker on Debian and RHEL9
+  hosts: all
+  become: true
+  gather_facts: true
+  
+  tasks:
+    # Debian-specific tasks
+    - name: Update apt cache (Debian)
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Install required packages for Docker repository (Debian)
+      ansible.builtin.package:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - apt-transport-https
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install required packages for Docker repository (Ubuntu)
+      ansible.builtin.package:
+        name:
+          - software-properties-common
+        state: present
+      when: ansible_os_family == "Debian" and ansible_distribution == "Ubuntu"
+
+    - name: Create keyring directory (Debian)
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker GPG key (Debian)
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/debian/gpg
+        keyring: /etc/apt/keyrings/docker.gpg
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker repository (Debian)
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+        state: present
+        filename: docker
+      when: ansible_os_family == "Debian"
+
+    - name: Update apt cache after adding repository (Debian)
+      ansible.builtin.apt:
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Remove old Docker packages if present (Debian)
+      ansible.builtin.package:
+        name:
+          - docker
+          - docker-engine
+          - docker.io
+          - containerd
+          - runc
+        state: absent
+      when: ansible_os_family == "Debian"
+
+    - name: Hold Docker packages to prevent accidental upgrades (Debian)
+      ansible.builtin.dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
+        - docker-buildx-plugin
+        - docker-compose-plugin
+      when: ansible_os_family == "Debian"
+
+    # RHEL-specific tasks
+    - name: Install required packages (RHEL)
+      ansible.builtin.package:
+        name:
+          - dnf-plugins-core
+          - curl
+          - ca-certificates
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Remove old Docker packages if present (RHEL)
+      ansible.builtin.package:
+        name:
+          - docker
+          - docker-client
+          - docker-client-latest
+          - docker-common
+          - docker-latest
+          - docker-latest-logrotate
+          - docker-logrotate
+          - docker-engine
+          - podman
+          - buildah
+        state: absent
+      when: ansible_os_family == "RedHat"
+
+    - name: Add Docker repository (RHEL)
+      ansible.builtin.yum_repository:
+        name: docker-ce-stable
+        description: Docker CE Stable - $basearch
+        baseurl: https://download.docker.com/linux/rhel/9/$basearch/stable
+        gpgcheck: true
+        gpgkey: https://download.docker.com/linux/rhel/gpg
+        enabled: true
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Docker packages
+      ansible.builtin.package:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+    - name: Install dnf-plugin-versionlock for package locking (RHEL)
+      ansible.builtin.package:
+        name: python3-dnf-plugin-versionlock
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Lock Docker packages to prevent accidental upgrades (RHEL)
+      ansible.builtin.command:
+        cmd: dnf versionlock add docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      when: ansible_os_family == "RedHat"
+      register: versionlock_result
+      changed_when: versionlock_result.rc == 0
+      failed_when: versionlock_result.rc != 0 and "already locked" not in versionlock_result.stderr
+
+    # Common tasks for all distributions
+    - name: Create docker configuration directory
+      ansible.builtin.file:
+        path: /etc/docker
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Create docker daemon configuration from template
+      ansible.builtin.template:
+        src: "{{ inventory_dir }}/../templates/virt/containers/daemon.json.j2" # noqa no-relative-paths
+        dest: /etc/docker/daemon.json
+        owner: root
+        group: root
+        mode: "0644"
+        backup: true
+      notify: "Restart docker"
+
+    - name: Create docker seccomp profile from template
+      ansible.builtin.template:
+        src: "{{ inventory_dir }}/../templates/virt/containers/seccomp.json.j2" # noqa no-relative-paths
+        dest: /etc/docker/seccomp.json
+        owner: root
+        group: root
+        mode: "0644"
+      notify: "Restart docker"
+
+    - name: Create docker systemd override directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/docker.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Create docker systemd override configuration
+      ansible.builtin.template:
+        src: "{{ inventory_dir }}/../templates/virt/containers/docker-override.conf.j2" # noqa no-relative-paths
+        dest: /etc/systemd/system/docker.service.d/override.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify:
+        - "Reload systemd"
+        - "Restart docker"
+
+    - name: Enable and start docker service
+      ansible.builtin.systemd:
+        name: docker
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Add users to docker group
+      ansible.builtin.user:
+        name: "{{ item }}"
+        groups: docker
+        append: true
+      loop: "{{ docker_users }}"
+      when: docker_users is defined and docker_users | length > 0
+
+    - name: Set up log rotation for docker containers
+      ansible.builtin.template:
+        src: "{{ inventory_dir }}/../templates/virt/containers/docker-logrotate.j2" # noqa no-relative-paths
+        dest: /etc/logrotate.d/docker-containers
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Create docker compose completion script directory
+      ansible.builtin.file:
+        path: /etc/bash_completion.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Download docker compose bash completion
+      ansible.builtin.get_url:
+        url: "https://raw.githubusercontent.com/docker/compose/main/contrib/completion/bash/docker-compose"
+        dest: /etc/bash_completion.d/docker-compose
+        owner: root
+        group: root
+        mode: "0644"
+        timeout: 30
+      failed_when: false
+
+    - name: Verify docker installation
+      ansible.builtin.command:
+        cmd: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Verify docker compose installation
+      ansible.builtin.command:
+        cmd: docker compose version
+      register: docker_compose_version
+      changed_when: false
+
+    - name: Display installation results
+      ansible.builtin.debug:
+        msg: |
+          Docker installed successfully:
+          {{ docker_version.stdout }}
+          {{ docker_compose_version.stdout }}
+
+  handlers:
+    - name: "Reload systemd"
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: "Restart docker"
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted

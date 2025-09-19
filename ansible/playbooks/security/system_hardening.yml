@@ -12,12 +12,13 @@
     PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
   vars_files:
-    - "{{ playbook_dir }}/../../group_vars/all/main.yml"
-    - "{{ playbook_dir }}/../../group_vars/all/vault.yml"
+    - "{{ inventory_dir }}/../group_vars/all/main.yml"
+    - "{{ inventory_dir }}/../group_vars/all/vault.yml"
+    - "{{ inventory_dir }}/../host_vars/{{ inventory_hostname }}.yml"
 
   pre_tasks:
     - name: "Load OS-specific variables"
-      ansible.builtin.include_vars: "{{ playbook_dir }}/../../group_vars/{{ ansible_os_family | lower }}/main.yml"
+      ansible.builtin.include_vars: "{{ inventory_dir }}/../group_vars/{{ ansible_os_family | lower }}/main.yml"
       changed_when: false
 
     - name: "Check if running as root or with sudo"
@@ -88,7 +89,7 @@
 
     - name: "Configure SSH security settings"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/security/ssh/sshd_config.j2" # noqa no-relative-paths
+        src: "{{ inventory_dir }}/../templates/security/ssh/sshd_config.j2" # noqa no-relative-paths
         dest: /etc/ssh/sshd_config.d/99-custom-security.conf
         owner: root
         group: root
@@ -231,7 +232,7 @@
 
     - name: "Configure fail2ban jail settings"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/security/ssh/jail.local.j2" # noqa no-relative-paths
+        src: "{{ inventory_dir }}/../templates/security/ssh/jail.local.j2" # noqa no-relative-paths
         dest: /etc/fail2ban/jail.local
         owner: root
         group: root
@@ -261,7 +262,7 @@
 
     - name: "Configure automatic updates (Debian/Ubuntu)"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/security/system/20auto-upgrades.j2" # noqa no-relative-paths
+        src: "{{ inventory_dir }}/../templates/security/system/20auto-upgrades.j2" # noqa no-relative-paths
         dest: /etc/apt/apt.conf.d/20auto-upgrades
         owner: root
         group: root
@@ -273,7 +274,7 @@
 
     - name: "Configure unattended-upgrades settings (Debian/Ubuntu)"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/security/system/50unattended-upgrades.j2" # noqa no-relative-paths
+        src: "{{ inventory_dir }}/../templates/security/system/50unattended-upgrades.j2" # noqa no-relative-paths
         dest: /etc/apt/apt.conf.d/50unattended-upgrades
         owner: root
         group: root
@@ -293,7 +294,7 @@
 
     - name: "Configure dnf-automatic for security updates (RHEL/CentOS)"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/security/ssh/dnf-automatic.conf.j2" # noqa no-relative-paths
+        src: "{{ inventory_dir }}/../templates/security/ssh/dnf-automatic.conf.j2" # noqa no-relative-paths
         dest: /etc/dnf/automatic.conf
         owner: root
         group: root
@@ -310,7 +311,7 @@
 
     - name: "Configure kernel security parameters"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/security/system/99-security.conf.j2" # noqa no-relative-paths
+        src: "{{ inventory_dir }}/../templates/security/system/99-security.conf.j2" # noqa no-relative-paths
         dest: /etc/sysctl.d/99-security.conf
         owner: root
         group: root
@@ -325,7 +326,7 @@
 
     - name: "Configure hosts.allow with whitelist"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/security/ssh/hosts.allow.j2" # noqa no-relative-paths
+        src: "{{ inventory_dir }}/../templates/security/ssh/hosts.allow.j2" # noqa no-relative-paths
         dest: /etc/hosts.allow
         owner: root
         group: root
@@ -335,7 +336,7 @@
 
     - name: "Configure hosts.deny"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/security/ssh/hosts.deny.j2" # noqa no-relative-paths
+        src: "{{ inventory_dir }}/../templates/security/ssh/hosts.deny.j2" # noqa no-relative-paths
         dest: /etc/hosts.deny
         owner: root
         group: root
@@ -349,7 +350,7 @@
 
     - name: "Configure custom log rotation"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/security/logs/logrotate-custom.j2" # noqa no-relative-paths
+        src: "{{ inventory_dir }}/../templates/security/logs/logrotate-custom.j2" # noqa no-relative-paths
         dest: /etc/logrotate.d/custom
         owner: root
         group: root
@@ -363,7 +364,7 @@
 
     - name: "Configure system limits"
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../../templates/security/system/99-custom.conf.j2" # noqa no-relative-paths
+        src: "{{ inventory_dir }}/../templates/security/system/99-custom.conf.j2" # noqa no-relative-paths
         dest: /etc/security/limits.d/99-custom.conf
         owner: root
         group: root

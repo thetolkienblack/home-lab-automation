@@ -1,0 +1,361 @@
+# host_vars/docker-host-01/stacks/plex.yml
+---
+stack_name: plex
+
+# .env file variables for the entire stack
+env_variables:
+  # Global stack configuration
+  COMPOSE_PROJECT_NAME: "plex_{{ inventory_hostname_short }}"
+  TZ: "{{ timezone }}"
+  DOMAIN_NAME: "{{ domain_name }}"
+
+  # User/Group IDs for all media services
+  PUID: "{{ media_user_id }}"
+  PGID: "{{ media_group_id }}"
+
+  # Shared paths
+  MEDIA_ROOT: "{{ media_root_path }}"
+  CONFIG_ROOT: "{{ config_root_path }}"
+  LOGS_ROOT: "{{ logs_root_path }}"
+  TRANSCODE_TEMP: "/tmp/plex-transcode"
+
+  # Plex configuration
+  PLEX_CLAIM: "{{ vault_plex_claim }}"
+  PLEX_UID: "{{ media_user_id }}"
+  PLEX_GID: "{{ media_group_id }}"
+  ADVERTISE_IP: "http://{{ ansible_default_ipv4.address }}:32400/"
+  ALLOWED_NETWORKS: "{{ plex_allowed_networks | join(',') }}"
+  PLEX_PREFERENCE_1: "FriendlyName=Plex-{{ inventory_hostname }}"
+  PLEX_PREFERENCE_2: "EnableIPv6=0"
+  PLEX_PREFERENCE_3: "secureConnections=1"
+  PLEX_PREFERENCE_4: "DlnaEnabled=0"
+
+  # Tautulli configuration
+  TAUTULLI_DOCKER: "True"
+  TAUTULLI_CONFIG_DIR: "${CONFIG_ROOT}/tautulli"
+  TAUTULLI_LOGS_DIR: "${LOGS_ROOT}/tautulli"
+  TAUTULLI_PLEX_LOGS_DIR: "${CONFIG_ROOT}/plex/Library/Application Support/Plex Media Server/Logs"
+
+  # Plex-Rewind configuration
+  REWIND_PLEX_URL: "http://plex:32400"
+  REWIND_PLEX_TOKEN: "{{ vault_plex_token }}"
+  REWIND_DATA_DIR: "${CONFIG_ROOT}/plex-rewind"
+  REWIND_OUTPUT_DIR: "${MEDIA_ROOT}/Plex Rewind"
+  REWIND_YEAR: "{{ ansible_date_time.year }}"
+
+  # Network configuration
+  PLEX_NETWORK: plex-network
+  TRAEFIK_NETWORK: traefik-proxy
+
+  # Security
+  PLEX_SECURE_CONNECTIONS: 1
+  TAUTULLI_HTTP_USERNAME: "{{ vault_tautulli_username }}"
+  TAUTULLI_HTTP_PASSWORD: "{{ vault_tautulli_password }}"
+
+  # Performance tuning
+  PLEX_TRANSCODER_TEMP_DIRECTORY: "${TRANSCODE_TEMP}"
+  PLEX_MAX_TRANSCODING_SESSIONS: "{{ plex_max_transcode_sessions | default(3) }}"
+
+  # Feature flags
+  ENABLE_HARDWARE_TRANSCODING: "{{ enable_gpu_transcoding | string | lower }}"
+  ENABLE_DLNA: "false"
+  ENABLE_REMOTE_ACCESS: "true"
+
+# Service definitions
+services:
+  # Main Plex Media Server
+  - name: plex
+    image: plexinc/pms-docker:latest
+    container_name: "${COMPOSE_PROJECT_NAME}_plex"
+    hostname: plex-${HOSTNAME}
+
+    # Resource limits - Plex needs more resources
+    cpu_limit: "4.0"
+    memory_limit: "4G"
+    memory_reservation: "2G"
+
+    # GPU support for hardware transcoding
+    gpu_support: "{{ gpu_vendor }}" # nvidia, intel, or amd
+    runtime: "{{ 'nvidia' if gpu_vendor == 'nvidia' else omit }}"
+
+    # Security configuration
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+
+    # Network configuration
+    network_mode: host # Required for Plex auto-discovery
+    # Alternative: use bridge mode with port mapping
+    # ports:
+    #   - "32400:32400"   # Plex Web UI
+    #   - "3005:3005"     # Plex Home Theater
+    #   - "8324:8324"     # Roku companion
+    #   - "32469:32469"   # Plex DLNA
+    #   - "1900:1900/udp" # DLNA discovery
+    #   - "32410:32410/udp" # Network discovery
+    #   - "32412:32412/udp" # Network discovery
+    #   - "32413:32413/udp" # Network discovery
+    #   - "32414:32414/udp" # Network discovery
+
+    # Storage configuration
+    volumes:
+      - "${CONFIG_ROOT}/plex:/config"
+      - "${MEDIA_ROOT}/Movies:/media/movies:ro"
+      - "${MEDIA_ROOT}/TV Shows:/media/tv:ro"
+      - "${MEDIA_ROOT}/Music:/media/music:ro"
+      - "${MEDIA_ROOT}/Photos:/media/photos:ro"
+      - "${TRANSCODE_TEMP}:/transcode"
+      - "/etc/localtime:/etc/localtime:ro"
+
+    # GPU device access (for Intel QuickSync)
+    devices:
+      - "/dev/dri:/dev/dri"
+
+    # Environment variables from .env
+    environment:
+      TZ: "${TZ}"
+      PLEX_CLAIM: "${PLEX_CLAIM}"
+      PLEX_UID: "${PLEX_UID}"
+      PLEX_GID: "${PLEX_GID}"
+      ADVERTISE_IP: "${ADVERTISE_IP}"
+      ALLOWED_NETWORKS: "${ALLOWED_NETWORKS}"
+      PLEX_PREFERENCE_1: "${PLEX_PREFERENCE_1}"
+      PLEX_PREFERENCE_2: "${PLEX_PREFERENCE_2}"
+      PLEX_PREFERENCE_3: "${PLEX_PREFERENCE_3}"
+      PLEX_PREFERENCE_4: "${PLEX_PREFERENCE_4}"
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:32400/web"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+    # Labels for Traefik (if using bridge network)
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "${TRAEFIK_NETWORK}"
+      traefik.http.routers.plex.rule: "Host(`plex.${DOMAIN_NAME}`)"
+      traefik.http.routers.plex.entrypoints: "websecure"
+      traefik.http.routers.plex.tls.certresolver: "letsencrypt"
+      traefik.http.services.plex.loadbalancer.server.port: "32400"
+      # Plex-specific headers
+      traefik.http.middlewares.plex-headers.headers.customRequestHeaders.X-Forwarded-Proto: "https"
+      traefik.http.routers.plex.middlewares: "plex-headers"
+      # Metadata
+      com.example.service: "media-server"
+      com.example.component: "plex"
+      backup.include: "/config"
+
+  # Tautulli - Plex monitoring and statistics
+  - name: tautulli
+    image: ghcr.io/tautulli/tautulli:latest
+    container_name: "${COMPOSE_PROJECT_NAME}_tautulli"
+    hostname: tautulli-${HOSTNAME}
+
+    # Resource limits - Tautulli is lightweight
+    cpu_limit: "0.5"
+    memory_limit: "512M"
+    memory_reservation: "256M"
+
+    # Security configuration
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    user: "${PUID}:${PGID}"
+
+    # Network configuration
+    ports:
+      - "8181:8181"
+    networks:
+      - default
+
+    # Storage configuration
+    volumes:
+      - "${CONFIG_ROOT}/tautulli:/config"
+      - "${CONFIG_ROOT}/plex/Library/Application Support/Plex Media Server/Logs:/logs:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+
+    # Environment variables
+    environment:
+      TZ: "${TZ}"
+      PUID: "${PUID}"
+      PGID: "${PGID}"
+      TAUTULLI_DOCKER: "${TAUTULLI_DOCKER}"
+
+    # Dependencies
+    depends_on:
+      plex:
+        condition: service_healthy
+        restart: true
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+    restart: unless-stopped
+    stop_grace_period: 15s
+
+    # Labels
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "${TRAEFIK_NETWORK}"
+      traefik.http.routers.tautulli.rule: "Host(`tautulli.${DOMAIN_NAME}`)"
+      traefik.http.routers.tautulli.entrypoints: "websecure"
+      traefik.http.routers.tautulli.tls.certresolver: "letsencrypt"
+      traefik.http.services.tautulli.loadbalancer.server.port: "8181"
+      # Authentication middleware
+      traefik.http.routers.tautulli.middlewares: "authelia@docker"
+      # Metadata
+      com.example.service: "media-monitoring"
+      com.example.component: "tautulli"
+      backup.include: "/config"
+
+  # Plex-Rewind - Generate yearly recap videos
+  - name: plex-rewind
+    image: ghcr.io/zackelia/plex-rewind:latest
+    container_name: "${COMPOSE_PROJECT_NAME}_plex_rewind"
+    hostname: rewind-${HOSTNAME}
+
+    # Resource limits - CPU intensive during processing
+    cpu_limit: "2.0"
+    memory_limit: "1G"
+    memory_reservation: "512M"
+
+    # Security configuration
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    user: "${PUID}:${PGID}"
+
+    # Network configuration
+    ports:
+      - "8383:8080"
+    networks:
+      - default
+
+    # Storage configuration
+    volumes:
+      - "${CONFIG_ROOT}/plex-rewind:/config"
+      - "${MEDIA_ROOT}/Plex Rewind:/output"
+      - "/etc/localtime:/etc/localtime:ro"
+
+    # Environment variables
+    environment:
+      TZ: "${TZ}"
+      PUID: "${PUID}"
+      PGID: "${PGID}"
+      PLEX_URL: "${REWIND_PLEX_URL}"
+      PLEX_TOKEN: "${REWIND_PLEX_TOKEN}"
+      OUTPUT_DIR: "/output"
+      YEAR: "${REWIND_YEAR}"
+
+    # Dependencies - needs both Plex and Tautulli
+    depends_on:
+      plex:
+        condition: service_healthy
+      tautulli:
+        condition: service_healthy
+
+    # Health check
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/health",
+        ]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    restart: unless-stopped
+    stop_grace_period: 20s
+
+    # Labels
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "${TRAEFIK_NETWORK}"
+      traefik.http.routers.plex-rewind.rule: "Host(`rewind.${DOMAIN_NAME}`)"
+      traefik.http.routers.plex-rewind.entrypoints: "websecure"
+      traefik.http.routers.plex-rewind.tls.certresolver: "letsencrypt"
+      traefik.http.services.plex-rewind.loadbalancer.server.port: "8080"
+      # Authentication required
+      traefik.http.routers.plex-rewind.middlewares: "authelia@docker"
+      # Metadata
+      com.example.service: "media-tools"
+      com.example.component: "plex-rewind"
+      backup.exclude: "true" # Generated content, not config
+
+# Network definitions
+networks:
+  - name: default
+    driver: bridge
+    internal: false
+    ipam:
+      config:
+        - subnet: "172.30.0.0/16"
+          gateway: "172.30.0.1"
+    labels:
+      com.example.network: "plex-stack"
+
+# Volume definitions
+volumes:
+  - name: plex_config
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "{{ config_root_path }}/plex"
+    labels:
+      com.example.description: "Plex configuration data"
+      backup.include: "true"
+      backup.priority: "high"
+
+  - name: tautulli_config
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "{{ config_root_path }}/tautulli"
+    labels:
+      com.example.description: "Tautulli configuration data"
+      backup.include: "true"
+
+  - name: rewind_config
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "{{ config_root_path }}/plex-rewind"
+    labels:
+      com.example.description: "Plex Rewind configuration"
+      backup.include: "true"
