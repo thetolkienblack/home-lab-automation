@@ -40,15 +40,21 @@
       when: ansible_os_family == "Debian"
 
     - name: Add Docker GPG key (Debian)
-      ansible.builtin.apt_key:
-        url: https://download.docker.com/linux/debian/gpg
-        keyring: /etc/apt/keyrings/docker.gpg
-        state: present
+      ansible.builtin.get_url:
+        url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+        force: true
+      when: ansible_os_family == "Debian"
+
+    - name: Build Docker repository string
+      ansible.builtin.set_fact:
+        docker_repo_string: "https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
       when: ansible_os_family == "Debian"
 
     - name: Add Docker repository (Debian)
       ansible.builtin.apt_repository:
-        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] {{ docker_repo_string }}"
         state: present
         filename: docker
       when: ansible_os_family == "Debian"
@@ -67,18 +73,6 @@
           - containerd
           - runc
         state: absent
-      when: ansible_os_family == "Debian"
-
-    - name: Hold Docker packages to prevent accidental upgrades (Debian)
-      ansible.builtin.dpkg_selections:
-        name: "{{ item }}"
-        selection: hold
-      loop:
-        - docker-ce
-        - docker-ce-cli
-        - containerd.io
-        - docker-buildx-plugin
-        - docker-compose-plugin
       when: ansible_os_family == "Debian"
 
     # RHEL-specific tasks
@@ -132,6 +126,25 @@
         name: python3-dnf-plugin-versionlock
         state: present
       when: ansible_os_family == "RedHat"
+
+    - name: Check if Docker packages are installed
+      ansible.builtin.package_facts:
+        manager: apt
+      when: ansible_os_family == "Debian"
+
+    - name: Hold Docker packages to prevent accidental upgrades (Debian)
+      ansible.builtin.dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
+        - docker-buildx-plugin
+        - docker-compose-plugin
+      when:
+        - ansible_os_family == "Debian"
+        - item in ansible_facts.packages
 
     - name: Lock Docker packages to prevent accidental upgrades (RHEL)
       ansible.builtin.command:
