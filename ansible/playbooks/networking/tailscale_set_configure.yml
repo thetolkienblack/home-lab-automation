@@ -5,16 +5,17 @@
   gather_facts: true
 
   vars_files:
-    - "{{ playbook_dir }}/../../group_vars/all/main.yml"
-    - "{{ playbook_dir }}/../../group_vars/all/vault.yml"
+    - "{{ inventory_dir }}/../group_vars/all/main.yml"
+    - "{{ inventory_dir }}/../group_vars/all/vault.yml"
+    - "{{ inventory_dir }}/../host_vars/{{ inventory_hostname }}.yml"
 
   pre_tasks:
     - name: "Load OS-specific variables"
-      ansible.builtin.include_vars: "{{ playbook_dir }}/../../group_vars/{{ ansible_os_family | lower }}/main.yml"
+      ansible.builtin.include_vars: "{{ inventory_dir }}/../group_vars/{{ ansible_os_family | lower }}/main.yml"
       changed_when: false
 
     - name: "Load OS-specific variables (Ubuntu)"
-      ansible.builtin.include_vars: "{{ playbook_dir }}/../../group_vars/debian/ubuntu.yml"
+      ansible.builtin.include_vars: "{{ playbook_dir }}/../group_vars/debian/ubuntu.yml"
       when: ansible_os_family == "Debian" and ansible_distribution == "Ubuntu"
       changed_when: false
 

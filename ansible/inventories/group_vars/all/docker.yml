@@ -1,0 +1,18 @@
+docker_stacks_dir: "/opt/docker"
+docker_daemon_config:
+  log-driver: "json-file"
+  log-opts:
+    max-size: "10m"
+    max-file: "3"
+  storage-driver: "overlay2"
+  live-restore: true
+  userland-proxy: false
+  no-new-privileges: true
+  seccomp-profile: "/etc/docker/seccomp.json"
+  icc: false
+  userns-remap: "default"
+  default-ulimits:
+    nofile:
+      name: "nofile"
+      soft: 65536
+      hard: 65536

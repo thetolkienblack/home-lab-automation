@@ -1,0 +1,36 @@
+---
+# Encrypted variables (use ansible-vault encrypt to secure)
+# Example: ansible-vault encrypt group_vars/all/vault.yml
+
+# SSH Keys (for deployment)
+vault_deploy_ssh_private_key: |
+  -----BEGIN OPENSSH PRIVATE KEY-----
+  b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABDJgNgM02
+  aMoNjo+oyXDTCCAAAAGAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIG7uAogp/JSrOeke
+  CzIO9Jt/tzilP4XGB8KZGk4bj7D9AAAAoCoBAXtGjKPi7jyORZF/34pRITzoa5vMgI6SdI
+  dfMkb2xhmCsGUExqsATVtcLiX5TheKwNNmIjMesxBeDvMqj101UdO6yFrp4Etk3kgsoUm+
+  v4RfFi8/tzLS5UYH8mExOwAK+YyUAEKtEmHWfJY3xcwSwrHt6FV6deriHP5KuEvM3DT6Kp
+  wvkTfV630QmcYcs+nwrtwQ+35er+rhPm4X30k=
+  -----END OPENSSH PRIVATE KEY-----
+
+vault_deploy_ssh_public_key: |
+  ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG7uAogp/JSrOekeCzIO9Jt/tzilP4XGB8KZGk4bj7D9 sidney@Anhur.local
+
+ansible_become_password: n0tsh3ll2011
+ansible_su_password: "n0tsh3ll2011"
+
+ssh_users:
+  - name: "sidney"
+    authorized_keys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG7uAogp/JSrOekeCzIO9Jt/tzilP4XGB8KZGk4bj7D9 sidney@Anhur.local"
+      # - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB... sidney@laptop"
+    groups: ["sudo", "adm"]
+    shell: "/bin/bash"
+    ensure_user: true
+
+  - name: "root"
+    authorized_keys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG7uAogp/JSrOekeCzIO9Jt/tzilP4XGB8KZGk4bj7D9 sidney@Anhur.local"
+    remove_keys: []
+tailscale_tokens:
+  ironwolf.graylock.eu: tskey-auth-kBbjb3YMMb11CNTRL-14PaRQUf9HfGtvFWpeaJGfgHQzeATP6y

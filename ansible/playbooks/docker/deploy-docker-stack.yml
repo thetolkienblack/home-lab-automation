@@ -1,0 +1,251 @@
+# playbooks/deploy-stack.yml - THE ONLY PLAYBOOK YOU NEED
+---
+- name: Deploy Docker Stack
+  hosts: all
+  become: true
+
+  vars:
+    stack_name: "{{ stack | mandatory }}" # Pass via -e stack=media
+
+  vars_files:
+    - "{{ inventory_dir }}/../group_vars/all/main.yml"
+    - "{{ inventory_dir }}/../group_vars/all/vault.yml"
+    - "{{ inventory_dir }}/../group_vars/all/docker.yml"
+
+  pre_tasks:
+    - name: Verify docker_stacks_dir variable is defined
+      ansible.builtin.fail:
+        msg: "docker_stacks_dir variable is not defined. Please set it in your inventory or group_vars."
+      when: docker_stacks_dir is not defined
+      tags: [always]
+
+    - name: Check if Docker service exists and get status
+      ansible.builtin.systemd:
+        name: docker
+      register: docker_service_status
+      failed_when: false
+      tags: [always]
+
+    - name: Fail if Docker service is not installed
+      ansible.builtin.fail:
+        msg: |
+          Docker service is not installed on {{ inventory_hostname }}.
+          Service status: {{ docker_service_status.status.LoadState | default('not-found') }}
+
+          Please install Docker first before deploying stacks.
+
+          For Ubuntu/Debian:
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sudo sh get-docker.sh
+          sudo systemctl enable docker
+          sudo systemctl start docker
+          sudo usermod -aG docker {{ ansible_user }}
+
+          For RHEL/CentOS/Fedora:
+          sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+          sudo systemctl enable docker
+          sudo systemctl start docker
+          sudo usermod -aG docker {{ ansible_user }}
+      when:
+        - docker_service_status.status is defined
+        - docker_service_status.status.LoadState == "not-found"
+      tags: [always]
+
+    - name: Fail if Docker service is not running
+      ansible.builtin.fail:
+        msg: |
+          Docker service is installed but not running on {{ inventory_hostname }}.
+          Load State: {{ docker_service_status.status.LoadState }}
+          Active State: {{ docker_service_status.status.ActiveState }}
+          Sub State: {{ docker_service_status.status.SubState }}
+
+          To start Docker service:
+          sudo systemctl start docker
+          sudo systemctl enable docker
+
+          To check detailed status:
+          sudo systemctl status docker
+
+          To check logs if startup fails:
+          sudo journalctl -u docker.service --no-pager -l
+      when:
+        - docker_service_status.status is defined
+        - docker_service_status.status.LoadState == "loaded"
+        - docker_service_status.status.ActiveState != "active"
+      tags: [always]
+
+    - name: Get Docker version information
+      ansible.builtin.command: docker --version
+      register: docker_version_check
+      failed_when: false
+      changed_when: false
+      when:
+        - docker_service_status.status is defined
+        - docker_service_status.status.ActiveState == "active"
+      tags: [always]
+
+    - name: Check if Docker Compose plugin is available
+      ansible.builtin.command: docker compose version
+      register: docker_compose_check
+      failed_when: false
+      changed_when: false
+      tags: [always]
+
+    - name: Fail if Docker Compose is not available
+      ansible.builtin.fail:
+        msg: |
+          Docker Compose is not available on {{ inventory_hostname }}.
+          Docker version: {{ docker_version_check.stdout }}
+
+          For modern Docker installations, install the Compose plugin:
+          sudo apt-get update && sudo apt-get install docker-compose-plugin
+
+          Or for older systems, install docker-compose:
+          sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+      when: docker_compose_check.rc != 0
+      tags: [always]
+
+    - name: Verify Docker daemon is accessible
+      ansible.builtin.command: docker info
+      register: docker_info_check
+      failed_when: false
+      changed_when: false
+      tags: [always]
+
+    - name: Fail if Docker daemon is not accessible
+      ansible.builtin.fail:
+        msg: |
+          Docker daemon is not accessible on {{ inventory_hostname }}.
+          This usually means:
+          1. Docker service is not running properly
+          2. User {{ ansible_user }} is not in the docker group
+          3. Docker socket permissions are incorrect
+
+          To fix:
+          sudo systemctl restart docker
+          sudo usermod -aG docker {{ ansible_user }}
+
+          Then logout and login again, or run:
+          newgrp docker
+
+          Error details: {{ docker_info_check.stderr }}
+      when: docker_info_check.rc != 0
+      tags: [always]
+
+    - name: Display Docker environment information
+      ansible.builtin.debug:
+        msg: |
+          ✅ Docker verification successful
+          Service Load State: {{ docker_service_status.status.LoadState }}
+          Service Active State: {{ docker_service_status.status.ActiveState }}
+          Service Sub State: {{ docker_service_status.status.SubState }}
+          Docker version: {{ docker_version_check.stdout | default('N/A') }}
+          Docker Compose: {{ docker_compose_check.stdout | default('N/A') }}
+          Docker daemon accessible: {{ docker_info_check.rc == 0 }}
+      when:
+        - docker_service_status.status is defined
+        - docker_service_status.status.ActiveState == "active"
+        - docker_compose_check.rc == 0
+        - docker_info_check.rc == 0
+      tags: [always]
+
+    - name: Check if docker stacks directory exists
+      ansible.builtin.stat:
+        path: "{{ docker_stacks_dir }}"
+      register: stacks_dir_stat
+      tags: [always]
+
+    - name: Fail if docker stacks directory does not exist
+      ansible.builtin.fail:
+        msg: |
+          Docker stacks directory '{{ docker_stacks_dir }}' does not exist on {{ inventory_hostname }}.
+          Please create the directory first or verify the docker_stacks_dir variable is correct.
+
+          To create the directory, run:
+          sudo mkdir -p {{ docker_stacks_dir }}
+          sudo chown {{ ansible_user }}:docker {{ docker_stacks_dir }}
+          sudo chmod 755 {{ docker_stacks_dir }}
+      when: not stacks_dir_stat.stat.exists
+      tags: [always]
+
+    - name: Verify docker stacks directory is accessible
+      ansible.builtin.file:
+        path: "{{ docker_stacks_dir }}"
+        state: directory
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+        group: docker
+        modification_time: preserve
+        access_time: preserve
+      register: stacks_dir_access
+      failed_when: false
+      tags: [always]
+
+    - name: Fail if docker stacks directory is not writable
+      ansible.builtin.fail:
+        msg: |
+          Docker stacks directory '{{ docker_stacks_dir }}' exists but is not accessible.
+          Current permissions: {{ stacks_dir_stat.stat.mode }}
+          Current owner: {{ stacks_dir_stat.stat.pw_name }}:{{ stacks_dir_stat.stat.gr_name }}
+
+          Please fix permissions:
+          sudo chown {{ ansible_user }}:docker {{ docker_stacks_dir }}
+          sudo chmod 755 {{ docker_stacks_dir }}
+      when:
+        - stacks_dir_stat.stat.exists
+        - stacks_dir_access.failed
+      tags: [always]
+
+    - name: Display docker stacks directory information
+      ansible.builtin.debug:
+        msg: |
+          ✅ Docker stacks directory verification successful
+          Directory: {{ docker_stacks_dir }}
+          Owner: {{ stacks_dir_stat.stat.pw_name }}:{{ stacks_dir_stat.stat.gr_name }}
+          Permissions: {{ stacks_dir_stat.stat.mode }}
+          Size: {{ stacks_dir_stat.stat.size }} bytes
+      when: stacks_dir_stat.stat.exists and not stacks_dir_access.failed
+      tags: [always]
+
+  tasks:
+    - name: Load stack configuration
+      ansible.builtin.include_vars:
+        file: "{{ inventory_dir }}/../host_vars/{{ inventory_hostname }}/stacks/{{ stack_name }}.yml"
+
+    - name: Create stack directory
+      ansible.builtin.file:
+        path: "{{ docker_stacks_dir }}/{{ stack_name }}"
+        state: directory
+        mode: "0755"
+
+    - name: Generate environment file
+      ansible.builtin.template:
+        src: service.env.j2
+        dest: "{{ docker_stacks_dir }}/{{ stack_name }}/.env"
+        mode: "0600" # Secure permissions
+        owner: root
+        group: docker
+        backup: true
+      notify: "Restart stack"
+      when: env_variables is defined
+
+    - name: Generate docker-compose.yml from universal template
+      ansible.builtin.template:
+        src: docker-compose.yml.j2 # THE SAME TEMPLATE FOR EVERYTHING
+        dest: "/opt/stacks/{{ stack_name }}/docker-compose.yml"
+        mode: "0644"
+        backup: true
+      notify: "Restart stack"
+
+    - name: Deploy stack
+      community.docker.docker_compose_v2:
+        project_src: "/opt/stacks/{{ stack_name }}"
+        state: present
+        pull: always
+
+  handlers:
+    - name: "Restart stack"
+      community.docker.docker_compose_v2:
+        project_src: "/opt/stacks/{{ stack_name }}"
+        state: present

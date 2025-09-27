@@ -1,0 +1,191 @@
+---
+# SSH Key Management Playbook
+# Description: Updates SSH keys across multiple hosts securely
+# Supports adding/removing authorized keys and rotating host keys
+# Usage: ansible-playbook -i inventory ssh_key_management.yml
+
+- name: "Manage SSH Keys"
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/all/main.yml"
+    - "{{ inventory_dir }}/../group_vars/all/vault.yml"
+    - "{{ inventory_dir }}/../host_vars/{{ inventory_hostname }}.yml"
+
+  pre_tasks:
+    - name: "Check if SSH daemon is available"
+      ansible.builtin.systemd:
+        name: "{{ 'sshd' if ansible_os_family == 'RedHat' else 'ssh' }}"
+      register: ssh_service_status
+      failed_when: ssh_service_status.status.LoadState == "not-found"
+
+    - name: "Validate required variables"
+      ansible.builtin.assert:
+        that:
+          - ssh_users is defined
+          - ssh_users | length > 0
+        fail_msg: "ssh_users must be defined with at least one user"
+        success_msg: "SSH users configuration validated"
+
+    - name: "Display SSH key management summary"
+      ansible.builtin.debug:
+        msg:
+          - "=== SSH KEY MANAGEMENT SUMMARY ==="
+          - "Host: {{ inventory_hostname }}"
+          - "Users to manage: {{ ssh_users | length }}"
+          - "Exclusive mode: {{ authorized_keys_exclusive }}"
+          - "Backup enabled: {{ backup_keys }}"
+
+  tasks:
+    # ===========================================
+    # USER AND KEY MANAGEMENT
+    # ===========================================
+
+    - name: "Backup existing authorized_keys files"
+      ansible.builtin.copy:
+        src: "{{ ssh_keys_path }}"
+        dest: "{{ ssh_keys_backup_path }}"
+        remote_src: true
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+        mode: '0600'
+      vars:
+        ssh_keys_path: "{{ '/root/.ssh/authorized_keys' if item.name == 'root' else '/home/' + item.name + '/.ssh/authorized_keys' }}"
+        ssh_keys_backup_path: "{{ ssh_keys_path }}.backup.{{ ansible_date_time.epoch }}"
+      loop: "{{ ssh_users }}"
+      failed_when: false
+      when: backup_keys
+
+    - name: "Ensure SSH users exist"
+      ansible.builtin.user:
+        name: "{{ item.name }}"
+        shell: "{{ item.shell | default('/bin/bash') }}"
+        groups: "{{ item.groups | default([]) }}"
+        append: true
+        create_home: true
+        state: present
+      loop: "{{ ssh_users }}"
+      when: item.ensure_user | default(true)
+
+    - name: "Create .ssh directory for users"
+      ansible.builtin.file:
+        path: "/home/{{ item.name }}/.ssh"
+        state: directory
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+        mode: '0700'
+      loop: "{{ ssh_users }}"
+      when: item.name != 'root'
+
+    - name: "Create .ssh directory for root"
+      ansible.builtin.file:
+        path: "/root/.ssh"
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+      when: ssh_users | selectattr('name', 'equalto', 'root') | list | length > 0
+
+    - name: "Manage authorized_keys (non-exclusive mode)"
+      ansible.posix.authorized_key:
+        user: "{{ item.0.name }}"
+        key: "{{ item.1 }}"
+        state: present
+        manage_dir: true
+      loop: "{{ ssh_users | subelements('authorized_keys', skip_missing=True) }}"
+      when: not authorized_keys_exclusive
+
+    - name: "Manage authorized_keys (exclusive mode)"
+      ansible.posix.authorized_key:
+        user: "{{ item.name }}"
+        key: "{{ item.authorized_keys | join('\\n') }}"
+        state: present
+        exclusive: true
+        manage_dir: true
+      loop: "{{ ssh_users }}"
+      when:
+        - authorized_keys_exclusive
+        - item.authorized_keys is defined
+
+    - name: "Remove specified keys"
+      ansible.posix.authorized_key:
+        user: "{{ item.0.name }}"
+        key: "{{ item.1 }}"
+        state: absent
+      loop: "{{ ssh_users | subelements('remove_keys', skip_missing=True) }}"
+
+    - name: "Set proper permissions on authorized_keys files"
+      ansible.builtin.file:
+        path: "{{ ssh_keys_file }}"
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+        mode: '0600'
+      vars:
+        ssh_keys_file: "{{ '/root/.ssh/authorized_keys' if item.name == 'root' else '/home/' + item.name + '/.ssh/authorized_keys' }}"
+      loop: "{{ ssh_users }}"
+
+  post_tasks:
+    - name: "Verify SSH configuration"
+      block:
+        - name: "Test SSH daemon configuration"
+          ansible.builtin.command: "{{ '/usr/sbin/sshd' if ansible_os_family == 'Debian' else 'sshd' }} -t"
+          changed_when: false
+
+        - name: "Get SSH daemon status"
+          ansible.builtin.systemd:
+            name: "{{ 'sshd' if ansible_os_family == 'RedHat' else 'ssh' }}"
+          register: sshd_status
+
+        - name: "Display SSH service status"
+          ansible.builtin.debug:
+            msg:
+              - "=== SSH CONFIGURATION COMPLETED ==="
+              - "SSH daemon status: {{ sshd_status.status.ActiveState }}"
+              - "SSH port: {{ ssh_port }}"
+              - "Users managed: {{ ssh_users | map(attribute='name') | list | join(', ') }}"
+
+        - name: "Log successful SSH key management"
+          ansible.builtin.lineinfile:
+            path: /var/log/ssh-key-management.log
+            create: true
+            owner: root
+            group: root
+            mode: '0600'
+            line: >-
+              {{ ansible_date_time.iso8601 }} - SUCCESS: SSH keys updated on {{ inventory_hostname }}
+              for users: {{ ssh_users | map(attribute='name') | list | join(', ') }}
+
+      rescue:
+        - name: "Log failed SSH configuration"
+          ansible.builtin.lineinfile:
+            path: /var/log/ssh-key-management.log
+            create: true
+            owner: root
+            group: root
+            mode: '0600'
+            line: >-
+              {{ ansible_date_time.iso8601 }} - FAILED: SSH configuration failed on {{ inventory_hostname }}
+
+        - name: "Display rollback information"
+          ansible.builtin.debug:
+            msg:
+              - "=== SSH CONFIGURATION FAILED ==="
+              - "Backup files are available in /etc/ssh/backup/"
+              - "To restore: cp /etc/ssh/backup/sshd_config.backup.* /etc/ssh/sshd_config"
+              - "Then: systemctl restart sshd"
+
+        - name: "Fail with SSH error info"
+          ansible.builtin.fail:
+            msg: "SSH configuration failed. Check logs and restore from backup if needed."
+
+  # ===========================================
+  # HANDLERS
+  # ===========================================
+
+  handlers:
+    - name: "Restart sshd"
+      ansible.builtin.systemd:
+        name: "{{ 'sshd' if ansible_os_family == 'RedHat' else 'ssh' }}"
+        state: restarted

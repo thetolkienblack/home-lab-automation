@@ -1,0 +1,40 @@
+# Logs
+**/*.log
+
+# Temp files
+**/*.tmp
+**/*.temp
+
+# Node modules (Node.js)
+**/node_modules/
+
+# Build output
+**/dist/
+**/build/
+
+# OS files
+**/.DS_Store
+**/Thumbs.db
+
+# Editor files
+**/.vscode/
+**/.idea/
+
+# Environment files
+**/.env
+
+# Temp and cache folders anywhere in the repo
+**/temp/
+**/.cache/
+**/.facts_cache/
+**/.ansible/
+
+# Python cache
+**/__pycache__/
+**/*.py[cod]
+
+# Other common ignores
+**/*.bak
+**/*.swp
+**/*.swo
+

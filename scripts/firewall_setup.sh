@@ -123,21 +123,6 @@ ufw --force enable
 log "Configuring fail2ban..."
 cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
 
-cat > /etc/fail2ban/jail.d/custom.conf << 'EOF'
-[DEFAULT]
-bantime = 3600
-findtime = 600
-maxretry = 3
-backend = systemd
-
-[sshd]
-enabled = true
-port = ssh
-filter = sshd
-logpath = /var/log/auth.log
-maxretry = 3
-bantime = 3600
-EOF
 
 # 8. Configure automatic security updates
 log "Configuring automatic security updates..."
@@ -312,17 +297,7 @@ warn "IMPORTANT: Test SSH access before logging out!"
 warn "Reboot recommended to ensure all changes take effect."
 
 log "Setup script completed. Logs available in /var/log/syslog"
-starlink:~/scripts# ls
-docker_setup.sh  firewall_setup.sh  init_setup.sh  k3s  k3s_setup.sh  mysql_complete_migration_script.sh  pg_complete_migration_script.sh
-starlink:~/scripts#
-starlink:~/scripts#
-starlink:~/scripts#
-starlink:~/scripts#
-starlink:~/scripts#
-starlink:~/scripts#
-starlink:~/scripts#
-starlink:~/scripts#
-starlink:~/scripts#
+
 starlink:~/scripts# cat firewall_setup.sh
 #!/bin/bash
 

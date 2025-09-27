@@ -1,0 +1,648 @@
+---
+{% if services is defined %}
+services:
+{% for service in services %}
+  {{ service.name }}:
+    image: {{ service.image }}
+{% if service.build is defined %}
+    build:
+{% if service.build.context is defined %}
+      context: {{ service.build.context }}
+{% endif %}
+{% if service.build.dockerfile is defined %}
+      dockerfile: {{ service.build.dockerfile }}
+{% endif %}
+{% if service.build.args is defined %}
+      args:
+{% for arg_key, arg_value in service.build.args.items() %}
+        {{ arg_key }}: {{ arg_value }}
+{% endfor %}
+{% endif %}
+{% if service.build.target is defined %}
+      target: {{ service.build.target }}
+{% endif %}
+{% endif %}
+    container_name: {{ service.container_name | default(service.name) }}
+{% if service.hostname is defined %}
+    hostname: {{ service.hostname }}
+{% endif %}
+{% if service.domainname is defined %}
+    domainname: {{ service.domainname }}
+{% endif %}
+
+    # Resource limits and reservations
+{% if service.deploy is defined or service.cpu_limit is defined or service.memory_limit is defined or service.gpu_support is defined %}
+    deploy:
+      resources:
+{% if service.cpu_limit is defined or service.memory_limit is defined or service.memory_reservation is defined %}
+        limits:
+{% if service.cpu_limit is defined %}
+          cpus: '{{ service.cpu_limit }}'
+{% endif %}
+{% if service.memory_limit is defined %}
+          memory: {{ service.memory_limit }}
+{% endif %}
+{% if service.pids_limit is defined %}
+          pids: {{ service.pids_limit }}
+{% endif %}
+{% endif %}
+{% if service.memory_reservation is defined or service.cpu_reservation is defined %}
+        reservations:
+{% if service.cpu_reservation is defined %}
+          cpus: '{{ service.cpu_reservation }}'
+{% endif %}
+{% if service.memory_reservation is defined %}
+          memory: {{ service.memory_reservation }}
+{% endif %}
+{% endif %}
+{% if service.gpu_support is defined %}
+          devices:
+            - driver: {{ service.gpu_support }}
+              count: {{ service.gpu_count | default('all') }}
+              capabilities: {{ service.gpu_capabilities | default(['gpu']) | to_json }}
+{% endif %}
+{% if service.deploy is defined %}
+{% if service.deploy.replicas is defined %}
+      replicas: {{ service.deploy.replicas }}
+{% endif %}
+{% if service.deploy.placement is defined %}
+      placement:
+{% if service.deploy.placement.constraints is defined %}
+        constraints:
+{% for constraint in service.deploy.placement.constraints %}
+          - {{ constraint }}
+{% endfor %}
+{% endif %}
+{% if service.deploy.placement.preferences is defined %}
+        preferences:
+{% for preference in service.deploy.placement.preferences %}
+          - {{ preference }}
+{% endfor %}
+{% endif %}
+{% endif %}
+{% if service.deploy.restart_policy is defined %}
+      restart_policy:
+        condition: {{ service.deploy.restart_policy.condition | default('any') }}
+        delay: {{ service.deploy.restart_policy.delay | default('5s') }}
+        max_attempts: {{ service.deploy.restart_policy.max_attempts | default(3) }}
+        window: {{ service.deploy.restart_policy.window | default('120s') }}
+{% endif %}
+{% if service.deploy.update_config is defined %}
+      update_config:
+        parallelism: {{ service.deploy.update_config.parallelism | default(1) }}
+        delay: {{ service.deploy.update_config.delay | default('10s') }}
+        failure_action: {{ service.deploy.update_config.failure_action | default('pause') }}
+        monitor: {{ service.deploy.update_config.monitor | default('5s') }}
+        max_failure_ratio: {{ service.deploy.update_config.max_failure_ratio | default(0) }}
+        order: {{ service.deploy.update_config.order | default('stop-first') }}
+{% endif %}
+{% endif %}
+
+    # Security configuration
+{% if service.security_opt is defined %}
+    security_opt:
+{% for opt in service.security_opt %}
+      - {{ opt }}
+{% endfor %}
+{% endif %}
+
+{% if service.cap_add is defined %}
+    cap_add:
+{% for cap in service.cap_add %}
+      - {{ cap }}
+{% endfor %}
+{% endif %}
+
+{% if service.cap_drop is defined %}
+    cap_drop:
+{% for cap in service.cap_drop %}
+      - {{ cap }}
+{% endfor %}
+{% endif %}
+
+{% if service.privileged is defined %}
+    privileged: {{ service.privileged | bool }}
+{% endif %}
+
+{% if service.read_only is defined %}
+    read_only: {{ service.read_only | bool }}
+{% endif %}
+
+{% if service.user is defined %}
+    user: "{{ service.user }}"
+{% endif %}
+
+{% if service.group_add is defined %}
+    group_add:
+{% for group in service.group_add %}
+      - {{ group }}
+{% endfor %}
+{% endif %}
+
+    # Runtime and system configuration
+{% if service.runtime is defined %}
+    runtime: {{ service.runtime }}
+{% endif %}
+
+{% if service.init is defined %}
+    init: {{ service.init | bool }}
+{% endif %}
+
+{% if service.pid is defined %}
+    pid: "{{ service.pid }}"
+{% endif %}
+
+{% if service.ipc is defined %}
+    ipc: "{{ service.ipc }}"
+{% endif %}
+
+{% if service.uts is defined %}
+    uts: "{{ service.uts }}"
+{% endif %}
+
+{% if service.userns_mode is defined %}
+    userns_mode: "{{ service.userns_mode }}"
+{% endif %}
+
+{% if service.sysctls is defined %}
+    sysctls:
+{% if service.sysctls is mapping %}
+{% for key, value in service.sysctls.items() %}
+      {{ key }}: {{ value }}
+{% endfor %}
+{% else %}
+{% for sysctl in service.sysctls %}
+      - {{ sysctl }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if service.ulimits is defined %}
+    ulimits:
+{% for ulimit_type, ulimit_value in service.ulimits.items() %}
+{% if ulimit_value is mapping %}
+      {{ ulimit_type }}:
+        soft: {{ ulimit_value.soft }}
+        hard: {{ ulimit_value.hard }}
+{% else %}
+      {{ ulimit_type }}: {{ ulimit_value }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if service.shm_size is defined %}
+    shm_size: {{ service.shm_size }}
+{% endif %}
+
+{% if service.stdin_open is defined %}
+    stdin_open: {{ service.stdin_open | bool }}
+{% endif %}
+
+{% if service.tty is defined %}
+    tty: {{ service.tty | bool }}
+{% endif %}
+
+    # Network configuration
+{% if service.ports is defined %}
+    ports:
+{% for port in service.ports %}
+      - "{{ port }}"
+{% endfor %}
+{% endif %}
+
+{% if service.expose is defined %}
+    expose:
+{% for port in service.expose %}
+      - "{{ port }}"
+{% endfor %}
+{% endif %}
+
+{% if service.networks is defined %}
+    networks:
+{% if service.networks is sequence %}
+{% for network in service.networks %}
+      - {{ network }}
+{% endfor %}
+{% else %}
+{% for network_name, network_config in service.networks.items() %}
+      {{ network_name }}:
+{% if network_config.aliases is defined %}
+        aliases:
+{% for alias in network_config.aliases %}
+          - {{ alias }}
+{% endfor %}
+{% endif %}
+{% if network_config.ipv4_address is defined %}
+        ipv4_address: {{ network_config.ipv4_address }}
+{% endif %}
+{% if network_config.ipv6_address is defined %}
+        ipv6_address: {{ network_config.ipv6_address }}
+{% endif %}
+{% if network_config.link_local_ips is defined %}
+        link_local_ips:
+{% for ip in network_config.link_local_ips %}
+          - {{ ip }}
+{% endfor %}
+{% endif %}
+{% if network_config.priority is defined %}
+        priority: {{ network_config.priority }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if service.network_mode is defined %}
+    network_mode: "{{ service.network_mode }}"
+{% endif %}
+
+{% if service.mac_address is defined %}
+    mac_address: {{ service.mac_address }}
+{% endif %}
+
+    # Storage configuration
+{% if service.volumes is defined %}
+    volumes:
+{% for volume in service.volumes %}
+      - {{ volume }}
+{% endfor %}
+{% endif %}
+
+{% if service.tmpfs is defined %}
+    tmpfs:
+{% if service.tmpfs is sequence %}
+{% for tmpfs_mount in service.tmpfs %}
+      - {{ tmpfs_mount }}
+{% endfor %}
+{% else %}
+{% for tmpfs_path, tmpfs_opts in service.tmpfs.items() %}
+      {{ tmpfs_path }}: {{ tmpfs_opts }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if service.devices is defined %}
+    devices:
+{% for device in service.devices %}
+      - {{ device }}
+{% endfor %}
+{% endif %}
+
+{% if service.device_cgroup_rules is defined %}
+    device_cgroup_rules:
+{% for rule in service.device_cgroup_rules %}
+      - {{ rule }}
+{% endfor %}
+{% endif %}
+
+    # Environment and configuration
+{% if service.environment is defined %}
+    environment:
+{% if service.environment is mapping %}
+{% for key, value in service.environment.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+{% else %}
+{% for env_var in service.environment %}
+      - {{ env_var }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if service.env_file is defined %}
+    env_file:
+{% if service.env_file is sequence %}
+{% for file in service.env_file %}
+      - {{ file }}
+{% endfor %}
+{% else %}
+      - {{ service.env_file }}
+{% endif %}
+{% endif %}
+
+{% if service.working_dir is defined %}
+    working_dir: {{ service.working_dir }}
+{% endif %}
+
+{% if service.command is defined %}
+    command: {{ service.command | to_json }}
+{% endif %}
+
+{% if service.entrypoint is defined %}
+    entrypoint: {{ service.entrypoint | to_json }}
+{% endif %}
+
+    # Dependencies and ordering
+{% if service.depends_on is defined %}
+    depends_on:
+{% if service.depends_on is sequence %}
+{% for dependency in service.depends_on %}
+      - {{ dependency }}
+{% endfor %}
+{% else %}
+{% for dep_service, dep_config in service.depends_on.items() %}
+      {{ dep_service }}:
+        condition: {{ dep_config.condition | default('service_started') }}
+        restart: {{ dep_config.restart | default(false) | bool }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if service.links is defined %}
+    links:
+{% for link in service.links %}
+      - {{ link }}
+{% endfor %}
+{% endif %}
+
+{% if service.external_links is defined %}
+    external_links:
+{% for link in service.external_links %}
+      - {{ link }}
+{% endfor %}
+{% endif %}
+
+    # Health checks
+{% if service.healthcheck is defined %}
+    healthcheck:
+{% if service.healthcheck.disable is defined and service.healthcheck.disable %}
+      disable: true
+{% else %}
+      test: {{ service.healthcheck.test | to_json }}
+      interval: {{ service.healthcheck.interval | default('30s') }}
+      timeout: {{ service.healthcheck.timeout | default('30s') }}
+      retries: {{ service.healthcheck.retries | default(3) }}
+      start_period: {{ service.healthcheck.start_period | default('0s') }}
+      start_interval: {{ service.healthcheck.start_interval | default('5s') }}
+{% endif %}
+{% endif %}
+
+    # Restart and stop configuration
+    restart: {{ service.restart | default(docker_defaults.restart_policy | default('unless-stopped')) }}
+{% if service.stop_grace_period is defined %}
+    stop_grace_period: {{ service.stop_grace_period }}
+{% endif %}
+{% if service.stop_signal is defined %}
+    stop_signal: {{ service.stop_signal }}
+{% endif %}
+
+    # Labels and metadata
+{% if service.labels is defined %}
+    labels:
+{% if service.labels is mapping %}
+{% for key, value in service.labels.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+{% else %}
+{% for label in service.labels %}
+      - {{ label }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+    # Logging configuration
+{% if service.logging is defined %}
+    logging:
+      driver: {{ service.logging.driver | default('json-file') }}
+{% if service.logging.options is defined %}
+      options:
+{% for key, value in service.logging.options.items() %}
+        {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+{% endif %}
+
+    # Extensions and custom configuration
+{% if service.extends is defined %}
+    extends:
+      file: {{ service.extends.file }}
+      service: {{ service.extends.service }}
+{% endif %}
+
+{% if service.extra_hosts is defined %}
+    extra_hosts:
+{% for host in service.extra_hosts %}
+      - {{ host }}
+{% endfor %}
+{% endif %}
+
+{% if service.dns is defined %}
+    dns:
+{% if service.dns is sequence %}
+{% for dns_server in service.dns %}
+      - {{ dns_server }}
+{% endfor %}
+{% else %}
+      - {{ service.dns }}
+{% endif %}
+{% endif %}
+
+{% if service.dns_search is defined %}
+    dns_search:
+{% for domain in service.dns_search %}
+      - {{ domain }}
+{% endfor %}
+{% endif %}
+
+{% if service.dns_opt is defined %}
+    dns_opt:
+{% for opt in service.dns_opt %}
+      - {{ opt }}
+{% endfor %}
+{% endif %}
+
+{% if service.cgroup_parent is defined %}
+    cgroup_parent: {{ service.cgroup_parent }}
+{% endif %}
+
+{% if service.isolation is defined %}
+    isolation: {{ service.isolation }}
+{% endif %}
+
+{% if service.scale is defined %}
+    scale: {{ service.scale }}
+{% endif %}
+
+{% if service.profiles is defined %}
+    profiles:
+{% for profile in service.profiles %}
+      - {{ profile }}
+{% endfor %}
+{% endif %}
+
+{% if service.platform is defined %}
+    platform: {{ service.platform }}
+{% endif %}
+
+{% if service.pull_policy is defined %}
+    pull_policy: {{ service.pull_policy }}
+{% endif %}
+
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}
+{% endif %}
+
+# Networks configuration
+{% if networks is defined %}
+networks:
+{% for network in networks %}
+  {{ network.name }}:
+{% if network.driver is defined %}
+    driver: {{ network.driver }}
+{% endif %}
+{% if network.driver_opts is defined %}
+    driver_opts:
+{% for key, value in network.driver_opts.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+{% if network.attachable is defined %}
+    attachable: {{ network.attachable | bool }}
+{% endif %}
+{% if network.enable_ipv6 is defined %}
+    enable_ipv6: {{ network.enable_ipv6 | bool }}
+{% endif %}
+{% if network.ipam is defined %}
+    ipam:
+      driver: {{ network.ipam.driver | default('default') }}
+{% if network.ipam.config is defined %}
+      config:
+{% for config in network.ipam.config %}
+        - subnet: {{ config.subnet }}
+{% if config.ip_range is defined %}
+          ip_range: {{ config.ip_range }}
+{% endif %}
+{% if config.gateway is defined %}
+          gateway: {{ config.gateway }}
+{% endif %}
+{% if config.aux_addresses is defined %}
+          aux_addresses:
+{% for key, value in config.aux_addresses.items() %}
+            {{ key }}: {{ value }}
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if network.ipam.options is defined %}
+      options:
+{% for key, value in network.ipam.options.items() %}
+        {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+{% endif %}
+{% if network.internal is defined %}
+    internal: {{ network.internal | bool }}
+{% endif %}
+{% if network.external is defined %}
+{% if network.external is boolean %}
+    external: {{ network.external | bool }}
+{% else %}
+    external:
+      name: {{ network.external.name }}
+{% endif %}
+{% endif %}
+{% if network.labels is defined %}
+    labels:
+{% for key, value in network.labels.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+# Volumes configuration
+{% if volumes is defined %}
+volumes:
+{% for volume in volumes %}
+  {{ volume.name }}:
+{% if volume.driver is defined %}
+    driver: {{ volume.driver }}
+{% endif %}
+{% if volume.driver_opts is defined %}
+    driver_opts:
+{% for key, value in volume.driver_opts.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+{% if volume.external is defined %}
+{% if volume.external is boolean %}
+    external: {{ volume.external | bool }}
+{% else %}
+    external:
+      name: {{ volume.external.name }}
+{% endif %}
+{% endif %}
+{% if volume.labels is defined %}
+    labels:
+{% for key, value in volume.labels.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+# Secrets configuration
+{% if secrets is defined %}
+secrets:
+{% for secret in secrets %}
+  {{ secret.name }}:
+{% if secret.file is defined %}
+    file: {{ secret.file }}
+{% endif %}
+{% if secret.external is defined %}
+{% if secret.external is boolean %}
+    external: {{ secret.external | bool }}
+{% else %}
+    external:
+      name: {{ secret.external.name }}
+{% endif %}
+{% endif %}
+{% if secret.labels is defined %}
+    labels:
+{% for key, value in secret.labels.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+{% if secret.driver is defined %}
+    driver: {{ secret.driver }}
+{% endif %}
+{% if secret.driver_opts is defined %}
+    driver_opts:
+{% for key, value in secret.driver_opts.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+{% if secret.template_driver is defined %}
+    template_driver: {{ secret.template_driver }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+# Configs configuration
+{% if configs is defined %}
+configs:
+{% for config in configs %}
+  {{ config.name }}:
+{% if config.file is defined %}
+    file: {{ config.file }}
+{% endif %}
+{% if config.external is defined %}
+{% if config.external is boolean %}
+    external: {{ config.external | bool }}
+{% else %}
+    external:
+      name: {{ config.external.name }}
+{% endif %}
+{% endif %}
+{% if config.labels is defined %}
+    labels:
+{% for key, value in config.labels.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+{% if config.template_driver is defined %}
+    template_driver: {{ config.template_driver }}
+{% endif %}
+{% endfor %}
+{% endif %}
