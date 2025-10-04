@@ -1,40 +1,31 @@
-[Unit]
-Description=Docker Application Container Engine
-Documentation=https://docs.docker.com
-After=network-online.target firewalld.service containerd.service time-set.target
-Wants=network-online.target containerd.service
-Requires=docker.socket containerd.service
-
 [Service]
-Type=notify
-# Security settings
-NoNewPrivileges=yes
-PrivateTmp=yes
-ProtectSystem=yes
-ProtectHome=yes
-ReadWritePaths=/var/lib/docker /var/run/docker /var/log/docker
-RestrictSUIDSGID=yes
+# Resource limits only
 LimitNOFILE=1048576
 LimitNPROC=infinity
-LimitCORE=infinity
+LimitCORE=0
 TasksMax=infinity
+
+# Accounting
+MemoryAccounting=true
+CPUAccounting=true
+IOAccounting=true
+
+# Restart policy
 TimeoutStartSec=0
-Delegate=yes
-KillMode=process
+TimeoutStopSec=120s
 Restart=on-failure
 StartLimitBurst=3
 StartLimitInterval=60s
 
-# Remove -H fd:// from ExecStart if present to avoid conflicts with daemon.json
+# Process management
+Delegate=yes
+KillMode=process
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+# Docker daemon
 ExecStart=
 ExecStart=/usr/bin/dockerd --containerd=/run/containerd/containerd.sock
 ExecReload=/bin/kill -s HUP $MAINPID
-
-# Resource limits
-MemoryAccounting=yes
-CPUAccounting=yes
-IOAccounting=yes
-BlockIOAccounting=yes
-
-[Install]
-WantedBy=multi-user.target
