@@ -1,0 +1,16 @@
+---
+# Debian-specific variables for Trivy
+
+# APT repository configuration
+trivy_apt_key_url: "https://aquasecurity.github.io/trivy-repo/deb/public.key"
+trivy_apt_repository: "deb https://aquasecurity.github.io/trivy-repo/deb {{ ansible_distribution_release }} main"
+
+# Required packages
+trivy_required_packages:
+  - wget
+  - apt-transport-https
+  - gnupg
+  - lsb-release
+
+# Package name
+trivy_package_name: trivy

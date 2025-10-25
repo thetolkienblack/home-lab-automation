@@ -1,0 +1,88 @@
+---
+# Trivy role default variables
+
+# Trivy version (leave empty for latest)
+trivy_version: ""
+
+# Installation method: 'repository' (recommended) or 'binary'
+trivy_install_method: repository
+
+# Binary installation settings
+trivy_binary_url: "https://github.com/aquasecurity/trivy/releases/download/{{ trivy_version }}/trivy_{{ trivy_version | regex_replace('^v', '') }}_Linux-64bit.tar.gz"
+trivy_install_dir: /usr/local/bin
+trivy_binary_path: "{{ trivy_install_dir }}/trivy"
+
+# Trivy cache and data directories
+trivy_cache_dir: /var/lib/trivy/cache
+trivy_data_dir: /var/lib/trivy/db
+
+# Report configuration
+trivy_reports_dir: /var/log/trivy
+trivy_report_format: json  # json, table, sarif, cyclonedx, spdx
+trivy_report_retention_days: 30
+
+# Scan configuration
+trivy_enable_daily_scans: true
+trivy_scan_schedule: "0 2 * * *"  # Daily at 2 AM
+trivy_scan_timeout: 600  # 10 minutes
+
+# Scan targets
+trivy_scan_docker_images: true
+trivy_scan_filesystem: false
+trivy_filesystem_paths: []
+
+# Docker image scanning configuration
+trivy_docker_images_to_scan: []
+# Example:
+# trivy_docker_images_to_scan:
+#   - nginx:latest
+#   - alpine:latest
+
+# Scan all running containers
+trivy_scan_running_containers: true
+
+# Severity levels to report
+trivy_severity_levels:
+  - CRITICAL
+  - HIGH
+  - MEDIUM
+  - LOW
+
+# Vulnerability types to scan
+trivy_vuln_types:
+  - os
+  - library
+
+# Trivy configuration file
+trivy_config_file: /etc/trivy/trivy.yaml
+trivy_config_dir: /etc/trivy
+
+# Database update
+trivy_skip_db_update: false
+trivy_db_repository: "ghcr.io/aquasecurity/trivy-db"
+
+# Scan script location
+trivy_scan_script: /usr/local/bin/trivy-scan.sh
+
+# User to run scans as
+trivy_user: root
+trivy_group: root
+
+# Notification settings (for future use)
+trivy_enable_notifications: false
+trivy_notification_email: ""
+
+# Exit code configuration
+trivy_exit_code: 0  # Set to 1 to exit with error if vulnerabilities found
+
+# Ignore unfixed vulnerabilities
+trivy_ignore_unfixed: false
+
+# Offline mode
+trivy_offline_mode: false
+
+# Docker socket path
+trivy_docker_socket: /var/run/docker.sock
+
+# Required for Docker scanning
+trivy_require_docker: true

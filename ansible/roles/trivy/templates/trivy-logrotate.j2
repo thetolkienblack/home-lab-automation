@@ -1,0 +1,9 @@
+{{ trivy_reports_dir }}/*.log {
+    daily
+    rotate {{ trivy_report_retention_days }}
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 {{ trivy_user }} {{ trivy_group }}
+}

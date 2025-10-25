@@ -1,0 +1,31 @@
+---
+# Configure Trivy
+
+- name: Create Trivy configuration file
+  ansible.builtin.template:
+    src: trivy.yaml.j2
+    dest: "{{ trivy_config_file }}"
+    owner: "{{ trivy_user }}"
+    group: "{{ trivy_group }}"
+    mode: "0644"
+  tags: [trivy, configure]
+
+- name: Update Trivy database
+  ansible.builtin.command:
+    cmd: trivy image --download-db-only
+  environment:
+    TRIVY_CACHE_DIR: "{{ trivy_cache_dir }}"
+  register: trivy_db_update
+  changed_when: "'Downloading DB' in trivy_db_update.stdout"
+  failed_when: false
+  when: not trivy_skip_db_update | bool
+  tags: [trivy, configure, db-update]
+
+- name: Display database update result
+  ansible.builtin.debug:
+    msg: "Trivy database updated successfully"
+  when:
+    - not trivy_skip_db_update | bool
+    - trivy_db_update is defined
+    - trivy_db_update.rc == 0
+  tags: [trivy, configure, db-update]

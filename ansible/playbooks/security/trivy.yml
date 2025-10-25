@@ -1,0 +1,110 @@
+---
+# Trivy Vulnerability Scanner Deployment Playbook
+# This playbook deploys Trivy for container vulnerability scanning
+- name: Deploy Trivy Vulnerability Scanner
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg: |
+          === Deploying Trivy to {{ inventory_hostname }} ===
+          OS Family: {{ ansible_os_family }}
+          Distribution: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Installation Method: {{ trivy_install_method | default('repository') }}
+
+          Note: Docker will be automatically installed via role dependency
+
+  roles:
+    - trivy
+
+  post_tasks:
+    - name: Display Trivy installation summary
+      ansible.builtin.debug:
+        msg: |
+          === Trivy Successfully Deployed ===
+
+          Installation Details:
+          Binary: /usr/local/bin/trivy
+          Configuration: {{ trivy_config_file | default('/etc/trivy/trivy.yaml') }}
+          Reports Directory: {{ trivy_reports_dir | default('/var/log/trivy') }}
+          Cache Directory: {{ trivy_cache_dir | default('/var/lib/trivy/cache') }}
+
+          Scan Configuration:
+          Daily Scans: {{ 'ENABLED' if trivy_enable_daily_scans | default(true) else 'DISABLED' }}
+          Schedule: {{ trivy_scan_schedule | default('0 2 * * *') }} (cron format)
+          Report Format: {{ trivy_report_format | default('json') }}
+          Severity Levels: {{ trivy_severity_levels | default(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']) | join(', ') }}
+
+          Scan Targets:
+          Running Containers: {{ 'YES' if trivy_scan_running_containers | default(true) else 'NO' }}
+          {% if trivy_docker_images_to_scan is defined and trivy_docker_images_to_scan | length > 0 %}
+          Docker Images: {{ trivy_docker_images_to_scan | join(', ') }}
+          {% endif %}
+          {% if trivy_scan_filesystem | default(false) and trivy_filesystem_paths is defined %}
+          Filesystem Paths: {{ trivy_filesystem_paths | join(', ') }}
+          {% endif %}
+
+          Manual Commands:
+          Scan an image:    trivy image nginx:latest
+          Scan filesystem:  trivy fs /path/to/dir
+          Run daily scan:   /usr/local/bin/trivy-scan.sh
+          View reports:     ls -lh {{ trivy_reports_dir | default('/var/log/trivy') }}
+
+          === Available Tags ===
+          --tags prerequisites - Only system prerequisites
+          --tags install       - Only installation tasks
+          --tags configure     - Only configuration tasks
+          --tags scan          - Only scan configuration
+          --tags verify        - Only verification tasks
+      tags: [trivy, always]
+
+    - name: Run initial test scan
+      ansible.builtin.command:
+        cmd: trivy image --severity HIGH,CRITICAL alpine:latest
+      environment:
+        TRIVY_CACHE_DIR: "{{ trivy_cache_dir | default('/var/lib/trivy/cache') }}"
+      register: initial_scan
+      changed_when: false
+      failed_when: false
+      tags: [trivy, test-scan]
+
+    - name: Display test scan summary
+      ansible.builtin.debug:
+        msg: |
+          === Initial Test Scan ===
+          Target: alpine:latest
+          Status: {{ 'COMPLETED' if initial_scan.rc == 0 else 'FAILED' }}
+
+          {% if initial_scan.rc == 0 %}
+          Trivy is working correctly and can scan Docker images.
+          {% else %}
+          Test scan failed. Check Trivy installation and Docker access.
+          {% endif %}
+      when: initial_scan is defined
+      tags: [trivy, test-scan]
+
+    - name: Display next steps
+      ansible.builtin.debug:
+        msg: |
+          === Next Steps ===
+
+          1. View scan reports:
+             ls -lh {{ trivy_reports_dir | default('/var/log/trivy') }}
+
+          2. Check scan logs:
+             tail -f {{ trivy_reports_dir | default('/var/log/trivy') }}/scan.log
+
+          3. Verify cron jobs:
+             crontab -l
+
+          4. Run a manual scan:
+             /usr/local/bin/trivy-scan.sh
+
+          5. Scan a specific image:
+             trivy image your-image:tag
+
+          Daily scans will run automatically at {{ trivy_scan_schedule | default('0 2 * * *') }}
+      tags: [trivy, always]

@@ -5,6 +5,7 @@ Ansible automation for homelab infrastructure management with security hardening
 ## Features
 
 - **Security Hardening**: SSH, firewall (UFW/firewalld), fail2ban, automatic updates
+- **Vulnerability Scanning**: Trivy automated container and image vulnerability scanning
 - **Docker Management**: Installation, configuration, and stack deployment
 - **Kubernetes**: k3s lightweight Kubernetes with Calico CNI support
 - **Container Monitoring**: cAdvisor for container resource monitoring and metrics
@@ -63,6 +64,9 @@ ansible-playbook playbooks/monitoring/cadvisor.yml
 # Deploy k3s Kubernetes
 ansible-playbook playbooks/kubernetes/k3s-server.yml
 
+# Deploy Trivy vulnerability scanner
+ansible-playbook playbooks/security/trivy.yml
+
 # Configure NTP
 ansible-playbook playbooks/system/ntp_timezone_config.yml
 
@@ -97,6 +101,7 @@ ansible-playbook playbooks/maintenance/system_maintenance.yml
 │   ├── docker/                 # Docker installation
 │   ├── k3s/                    # Kubernetes (k3s) with Calico CNI
 │   ├── cadvisor/               # Container monitoring
+│   ├── trivy/                  # Vulnerability scanning
 │   ├── security_hardening/     # Security configuration
 │   ├── tailscale/              # Tailscale VPN
 │   ├── ntp/                    # Time synchronization
@@ -196,6 +201,21 @@ Lightweight Kubernetes with Calico CNI support for container orchestration.
     k3s_server_token: "your-token"
 ```
 
+### trivy
+Automated vulnerability scanner for containers and filesystems with daily scanning.
+
+```yaml
+- hosts: docker_hosts
+  roles:
+    - trivy
+  vars:
+    trivy_enable_daily_scans: true
+    trivy_scan_running_containers: true
+    trivy_docker_images_to_scan:
+      - nginx:latest
+      - postgres:15
+```
+
 ## Testing with Molecule
 
 ```bash
@@ -285,6 +305,15 @@ ansible-playbook playbooks/kubernetes/k3s-server.yml
 
 # Multi-node cluster
 ansible-playbook playbooks/kubernetes/k3s-cluster.yml -i inventories/k3s-cluster.yml
+```
+
+### Deploy Vulnerability Scanning
+```bash
+# Deploy Trivy with default settings
+ansible-playbook playbooks/security/trivy.yml
+
+# View scan reports
+ssh host "ls -lh /var/log/trivy/"
 ```
 
 ### Update SSH Keys

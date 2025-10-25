@@ -1,0 +1,68 @@
+---
+# Verify Trivy installation
+
+- name: Check Trivy binary exists
+  ansible.builtin.stat:
+    path: "{{ trivy_binary_path }}"
+  register: trivy_binary_check
+  tags: [trivy, verify]
+
+- name: Verify Trivy binary is installed
+  ansible.builtin.assert:
+    that:
+      - trivy_binary_check.stat.exists
+      - trivy_binary_check.stat.executable
+    fail_msg: "Trivy binary not found or not executable"
+    success_msg: "Trivy binary is installed and executable"
+  tags: [trivy, verify]
+
+- name: Get Trivy version
+  ansible.builtin.command:
+    cmd: trivy --version
+  register: trivy_version_output
+  changed_when: false
+  tags: [trivy, verify]
+
+- name: Display Trivy version
+  ansible.builtin.debug:
+    msg: "{{ trivy_version_output.stdout_lines }}"
+  tags: [trivy, verify]
+
+- name: Check Trivy configuration file exists
+  ansible.builtin.stat:
+    path: "{{ trivy_config_file }}"
+  register: trivy_config_check
+  tags: [trivy, verify]
+
+- name: Verify directories exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: trivy_dir_checks
+  loop:
+    - "{{ trivy_cache_dir }}"
+    - "{{ trivy_data_dir }}"
+    - "{{ trivy_reports_dir }}"
+  tags: [trivy, verify]
+
+- name: Run a test scan
+  ansible.builtin.command:
+    cmd: trivy image --severity HIGH,CRITICAL alpine:latest
+  environment:
+    TRIVY_CACHE_DIR: "{{ trivy_cache_dir }}"
+  register: trivy_test_scan
+  changed_when: false
+  failed_when: false
+  tags: [trivy, verify, test-scan]
+
+- name: Display test scan result
+  ansible.builtin.debug:
+    msg: |
+      === Trivy Installation Verification ===
+      Version: {{ trivy_version_output.stdout_lines[0] if trivy_version_output.stdout_lines else 'Unknown' }}
+      Binary Path: {{ trivy_binary_path }}
+      Config File: {{ trivy_config_file }}
+      Cache Dir: {{ trivy_cache_dir }}
+      Reports Dir: {{ trivy_reports_dir }}
+      Test Scan: {{ 'PASSED' if trivy_test_scan.rc == 0 else 'FAILED' }}
+      Daily Scans: {{ 'ENABLED' if trivy_enable_daily_scans else 'DISABLED' }}
+  tags: [trivy, verify]

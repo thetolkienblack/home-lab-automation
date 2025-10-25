@@ -1,0 +1,39 @@
+---
+# Prerequisites for Trivy installation
+
+- name: Install required packages
+  ansible.builtin.package:
+    name: "{{ trivy_required_packages }}"
+    state: present
+  tags: [trivy, prerequisites]
+
+- name: Create Trivy directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ trivy_user }}"
+    group: "{{ trivy_group }}"
+    mode: "0755"
+  loop:
+    - "{{ trivy_cache_dir }}"
+    - "{{ trivy_data_dir }}"
+    - "{{ trivy_reports_dir }}"
+    - "{{ trivy_config_dir }}"
+  tags: [trivy, prerequisites]
+
+- name: Check Docker socket permissions
+  ansible.builtin.stat:
+    path: "{{ trivy_docker_socket }}"
+  register: trivy_docker_socket_stat
+  when: trivy_require_docker | bool
+  tags: [trivy, prerequisites]
+
+- name: Verify Docker socket is accessible
+  ansible.builtin.assert:
+    that:
+      - trivy_docker_socket_stat.stat.exists
+      - trivy_docker_socket_stat.stat.issock
+    fail_msg: "Docker socket not found or not accessible at {{ trivy_docker_socket }}"
+    success_msg: "Docker socket is accessible"
+  when: trivy_require_docker | bool
+  tags: [trivy, prerequisites]

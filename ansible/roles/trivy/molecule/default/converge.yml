@@ -1,0 +1,58 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Update apt cache (Debian)
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+      changed_when: false
+
+    - name: Install Docker dependencies (Debian)
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - docker.io
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker dependencies (RHEL)
+      ansible.builtin.dnf:
+        name:
+          - docker
+          - curl
+          - tar
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Start Docker service
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Pull test Docker image
+      ansible.builtin.command:
+        cmd: docker pull alpine:latest
+      changed_when: false
+      failed_when: false
+
+  roles:
+    - role: trivy
+      vars:
+        trivy_install_method: repository
+        trivy_enable_daily_scans: true
+        trivy_scan_running_containers: true
+        trivy_docker_images_to_scan:
+          - alpine:latest
+        trivy_severity_levels:
+          - CRITICAL
+          - HIGH

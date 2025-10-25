@@ -1,0 +1,55 @@
+---
+# Configure daily Trivy scans
+
+- name: Create Trivy scan script
+  ansible.builtin.template:
+    src: trivy-scan.sh.j2
+    dest: "{{ trivy_scan_script }}"
+    owner: "{{ trivy_user }}"
+    group: "{{ trivy_group }}"
+    mode: "0755"
+  tags: [trivy, scan, configure]
+
+- name: Create cron job for daily Trivy scans
+  ansible.builtin.cron:
+    name: "Trivy daily vulnerability scan"
+    minute: "{{ trivy_scan_schedule.split()[0] }}"
+    hour: "{{ trivy_scan_schedule.split()[1] }}"
+    day: "{{ trivy_scan_schedule.split()[2] }}"
+    month: "{{ trivy_scan_schedule.split()[3] }}"
+    weekday: "{{ trivy_scan_schedule.split()[4] }}"
+    user: "{{ trivy_user }}"
+    job: "{{ trivy_scan_script }} >> {{ trivy_reports_dir }}/scan.log 2>&1"
+    state: present
+  tags: [trivy, scan, cron]
+
+- name: Create logrotate configuration for Trivy reports
+  ansible.builtin.template:
+    src: trivy-logrotate.j2
+    dest: /etc/logrotate.d/trivy
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [trivy, scan, logrotate]
+
+- name: Create cleanup script for old reports
+  ansible.builtin.template:
+    src: trivy-cleanup.sh.j2
+    dest: /usr/local/bin/trivy-cleanup.sh
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [trivy, scan, cleanup]
+
+- name: Create cron job for report cleanup
+  ansible.builtin.cron:
+    name: "Trivy report cleanup"
+    minute: "0"
+    hour: "3"
+    day: "*"
+    month: "*"
+    weekday: "*"
+    user: root
+    job: "/usr/local/bin/trivy-cleanup.sh"
+    state: present
+  tags: [trivy, scan, cleanup]

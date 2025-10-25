@@ -1,0 +1,44 @@
+---
+# Trivy role - Main tasks orchestration
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family | lower }}.yml"
+  tags: [trivy, always]
+
+- name: Check if Docker is installed
+  ansible.builtin.command:
+    cmd: docker --version
+  register: trivy_docker_check
+  changed_when: false
+  failed_when: false
+  tags: [trivy, validate]
+
+- name: Validate Docker installation
+  ansible.builtin.assert:
+    that:
+      - trivy_docker_check.rc == 0
+    fail_msg: "Docker is required for Trivy but is not installed"
+    success_msg: "Docker is installed"
+  when: trivy_require_docker | bool
+  tags: [trivy, validate]
+
+- name: Include prerequisite tasks
+  ansible.builtin.include_tasks: prerequisites.yml
+  tags: [trivy, prerequisites]
+
+- name: Include Trivy installation tasks
+  ansible.builtin.include_tasks: "install-{{ trivy_install_method }}.yml"
+  tags: [trivy, install]
+
+- name: Include configuration tasks
+  ansible.builtin.include_tasks: configure.yml
+  tags: [trivy, configure]
+
+- name: Include daily scan setup
+  ansible.builtin.include_tasks: daily-scan.yml
+  when: trivy_enable_daily_scans | bool
+  tags: [trivy, scan, cron]
+
+- name: Include verification tasks
+  ansible.builtin.include_tasks: verify.yml
+  tags: [trivy, verify]

@@ -38,3 +38,4 @@ mock_roles:
   - maintenance
   - cadvisor
   - k3s
+  - trivy
