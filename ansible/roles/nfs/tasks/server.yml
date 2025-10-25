@@ -1,0 +1,82 @@
+---
+# NFS Server tasks
+
+- name: Install NFS server packages (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ nfs_server_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == 'Debian'
+
+- name: Install NFS server packages (RedHat/Rocky)
+  ansible.builtin.dnf:
+    name: "{{ nfs_server_packages }}"
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Ensure rpcbind service is started (RedHat/Rocky)
+  ansible.builtin.service:
+    name: "{{ nfs_rpcbind_service }}"
+    state: started
+    enabled: true
+  when: ansible_os_family == 'RedHat'
+
+- name: Create NFS export directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop: "{{ nfs_exports }}"
+  when:
+    - nfs_exports | length > 0
+    - item.create | default(true)
+
+- name: Configure NFS exports
+  ansible.builtin.template:
+    src: exports.j2
+    dest: "{{ nfs_exports_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+    validate: 'exportfs -ra'
+  notify:
+    - Export nfs shares
+    - Restart nfs server
+  when: nfs_exports | length > 0
+
+- name: Ensure NFS server service is started and enabled
+  ansible.builtin.service:
+    name: "{{ nfs_server_service }}"
+    state: "{{ nfs_service_state }}"
+    enabled: "{{ nfs_service_enabled }}"
+
+- name: Configure firewall for NFS (UFW - Debian/Ubuntu)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "2049"  # NFS
+    - "111"   # rpcbind
+  when:
+    - ansible_os_family == 'Debian'
+    - nfs_configure_firewall | bool
+
+- name: Configure firewall for NFS (firewalld - RedHat/Rocky)
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    permanent: true
+    state: enabled
+    zone: "{{ nfs_firewall_zones | first | default('public') }}"
+    immediate: true
+  loop:
+    - nfs
+    - rpc-bind
+    - mountd
+  when:
+    - ansible_os_family == 'RedHat'
+    - nfs_configure_firewall | bool
+  notify: Reload systemd

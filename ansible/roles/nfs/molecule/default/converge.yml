@@ -1,0 +1,21 @@
+---
+- name: Converge NFS servers
+  hosts: nfs_servers
+  become: true
+  tasks:
+    - name: Include nfs role
+      ansible.builtin.include_role:
+        name: nfs
+
+- name: Converge NFS clients
+  hosts: nfs_clients
+  become: true
+  tasks:
+    - name: Wait for NFS servers to be ready
+      ansible.builtin.wait_for:
+        timeout: 10
+      delegate_to: localhost
+
+    - name: Include nfs role
+      ansible.builtin.include_role:
+        name: nfs

@@ -1,0 +1,24 @@
+---
+# RHEL/Rocky/CentOS specific variables
+
+# NFS Server packages
+nfs_server_packages:
+  - nfs-utils
+  - rpcbind
+
+# NFS Client packages
+nfs_client_packages:
+  - nfs-utils
+  - rpcbind
+
+# Service names
+nfs_server_service: nfs-server
+nfs_idmapd_service: nfs-idmapd
+nfs_rpcbind_service: rpcbind
+
+# Configuration files
+nfs_server_config_file: /etc/nfs.conf
+nfs_idmapd_config_file: /etc/idmapd.conf
+
+# Firewall command
+nfs_firewall_backend: firewalld
