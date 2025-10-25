@@ -246,6 +246,44 @@ Comprehensive SIEM (Security Information and Event Management) with Manager, Ind
     wazuh_monitor_docker: true
 ```
 
+### nfs
+NFS (Network File System) server and client configuration with support for NFSv3 and NFSv4. Configure systems as server, client, or both with flexible export and mount options.
+
+```yaml
+# NFS Server
+- hosts: nfs_servers
+  roles:
+    - nfs
+  vars:
+    nfs_mode: server
+    nfs_exports:
+      - path: /srv/nfs/shared
+        clients:
+          - host: "192.168.1.0/24"
+            options: "rw,sync,no_subtree_check"
+        create: true
+
+# NFS Client
+- hosts: nfs_clients
+  roles:
+    - nfs
+  vars:
+    nfs_mode: client
+    nfs_mounts:
+      - path: /mnt/nfs/shared
+        src: "nfs-server.example.com:/srv/nfs/shared"
+        fstype: nfs4
+        opts: "rw,sync,hard,intr"
+        state: mounted
+
+# Both server and client
+- hosts: nfs_hybrid
+  roles:
+    - nfs
+  vars:
+    nfs_mode: both
+```
+
 ## Testing with Molecule
 
 ```bash

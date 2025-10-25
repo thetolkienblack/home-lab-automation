@@ -1,0 +1,21 @@
+---
+- name: Test NFS role
+  hosts: localhost
+  remote_user: root
+  become: true
+  vars:
+    nfs_mode: both
+    nfs_exports:
+      - path: /srv/nfs/test
+        clients:
+          - host: "127.0.0.1"
+            options: "rw,sync,no_subtree_check"
+        create: true
+    nfs_mounts:
+      - path: /mnt/nfs/test
+        src: "127.0.0.1:/srv/nfs/test"
+        fstype: nfs4
+        opts: "rw,sync"
+        state: mounted
+  roles:
+    - nfs
