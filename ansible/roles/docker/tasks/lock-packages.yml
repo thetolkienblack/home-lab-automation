@@ -1,0 +1,33 @@
+---
+# Lock Docker packages to prevent accidental upgrades
+- name: Check if Docker packages are installed (Debian)
+  ansible.builtin.package_facts:
+    manager: apt
+  when: ansible_os_family == "Debian"
+  tags: [docker, install]
+
+- name: Hold Docker packages to prevent accidental upgrades (Debian)
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ docker_packages }}"
+  when:
+    - ansible_os_family == "Debian"
+    - item in ansible_facts.packages
+  tags: [docker, install]
+
+- name: Install dnf-plugin-versionlock for package locking (RHEL)
+  ansible.builtin.package:
+    name: python3-dnf-plugin-versionlock
+    state: present
+  when: ansible_os_family == "RedHat"
+  tags: [docker, install]
+
+- name: Lock Docker packages to prevent accidental upgrades (RHEL)
+  ansible.builtin.command:
+    cmd: "dnf versionlock add {{ docker_packages | join(' ') }}"
+  when: ansible_os_family == "RedHat"
+  register: versionlock_result
+  changed_when: versionlock_result.rc == 0
+  failed_when: versionlock_result.rc != 0 and "already locked" not in versionlock_result.stderr
+  tags: [docker, install]

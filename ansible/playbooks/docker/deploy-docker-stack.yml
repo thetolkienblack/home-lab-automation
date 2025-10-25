@@ -5,19 +5,27 @@
   become: true
 
   vars:
-    stack_name: "{{ stack | mandatory }}" # Pass via -e stack=media
+    stack_name: "{{ stack | default('') }}" # Pass via -e stack=media
 
   vars_files:
-    - "{{ inventory_dir }}/../group_vars/all/main.yml"
-    - "{{ inventory_dir }}/../group_vars/all/vault.yml"
-    - "{{ inventory_dir }}/../group_vars/all/docker.yml"
+    - "{{ playbook_dir }}/../inventories/group_vars/all/main.yml"
+    - "{{ playbook_dir }}/../inventories/group_vars/all/docker.yml"
+    - "{{ playbook_dir }}/../inventories/group_vars/all/stacks/{{ stack_name }}.yml"
 
   pre_tasks:
-    - name: Verify docker_stacks_dir variable is defined
-      ansible.builtin.fail:
-        msg: "docker_stacks_dir variable is not defined. Please set it in your inventory or group_vars."
-      when: docker_stacks_dir is not defined
-      tags: [always]
+    - name: Validate required variables
+      block:
+        - name: Verify stack variable is provided
+          ansible.builtin.fail:
+            msg: "Stack name is required. Use: ansible-playbook playbook.yml -e stack=<stack_name>"
+          when: stack_name == '' or stack_name is not defined
+          tags: [always]
+
+        - name: Verify docker_stacks_dir variable is defined
+          ansible.builtin.fail:
+            msg: "docker_stacks_dir variable is not defined. Please set it in your inventory or group_vars."
+          when: docker_stacks_dir is not defined
+          tags: [always]
 
     - name: Check if Docker service exists and get status
       ansible.builtin.systemd:
@@ -209,10 +217,6 @@
       tags: [always]
 
   tasks:
-    - name: Load stack configuration
-      ansible.builtin.include_vars:
-        file: "{{ inventory_dir }}/../host_vars/{{ inventory_hostname }}/stacks/{{ stack_name }}.yml"
-
     - name: Create stack directory
       ansible.builtin.file:
         path: "{{ docker_stacks_dir }}/{{ stack_name }}"
@@ -227,25 +231,32 @@
         owner: root
         group: docker
         backup: true
-      notify: "Restart stack"
       when: env_variables is defined
 
     - name: Generate docker-compose.yml from universal template
       ansible.builtin.template:
-        src: docker-compose.yml.j2 # THE SAME TEMPLATE FOR EVERYTHING
-        dest: "/opt/stacks/{{ stack_name }}/docker-compose.yml"
+        src: virt/containers/docker-compose.yml.j2 # THE SAME TEMPLATE FOR EVERYTHING
+        dest: "{{ docker_stacks_dir }}/{{ stack_name }}/docker-compose.yml"
         mode: "0644"
         backup: true
-      notify: "Restart stack"
 
+    - name: Execute setup tasks
+      ansible.builtin.include_tasks: "process-setup-tasks.yml"
+      when: setup_tasks is defined
+
+  post_tasks:
     - name: Deploy stack
       community.docker.docker_compose_v2:
-        project_src: "/opt/stacks/{{ stack_name }}"
+        project_src: "{{ docker_stacks_dir }}/{{ stack_name }}"
         state: present
         pull: always
+
+    - name: Execute post-deployment tasks
+      ansible.builtin.include_tasks: "process-post-tasks.yml"
+      when: post_tasks is defined
 
   handlers:
     - name: "Restart stack"
       community.docker.docker_compose_v2:
-        project_src: "/opt/stacks/{{ stack_name }}"
+        project_src: "{{ docker_stacks_dir }}/{{ stack_name }}"
         state: present

@@ -1,0 +1,35 @@
+---
+# NTP role - Time synchronization configuration
+- name: Configure system timezone
+  community.general.timezone:
+    name: "{{ timezone }}"
+  notify:
+    - Restart chronyd
+    - Restart systemd-timesyncd
+  tags: [ntp, timezone]
+
+- name: Verify timezone configuration
+  ansible.builtin.command: timedatectl show --property=Timezone --value
+  register: current_timezone
+  changed_when: false
+  failed_when: current_timezone.stdout != timezone
+  tags: [ntp, timezone, verify]
+
+- name: Include Debian NTP tasks
+  ansible.builtin.include_tasks: debian.yml
+  when:
+    - ansible_os_family == "Debian"
+    - ntp_enabled | default(true)
+  tags: [ntp, debian]
+
+- name: Include RHEL NTP tasks
+  ansible.builtin.include_tasks: rhel.yml
+  when:
+    - ansible_os_family == "RedHat"
+    - ntp_enabled | default(true)
+  tags: [ntp, rhel]
+
+- name: Include verification tasks
+  ansible.builtin.include_tasks: verify.yml
+  when: ntp_enabled | default(true)
+  tags: [ntp, verify]

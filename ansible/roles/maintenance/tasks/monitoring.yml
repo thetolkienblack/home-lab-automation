@@ -1,0 +1,49 @@
+---
+# System monitoring and reporting tasks
+- name: Check disk space
+  ansible.builtin.command: df -h
+  register: disk_usage
+  changed_when: false
+  tags: [maintenance, monitoring]
+
+- name: Display disk usage
+  ansible.builtin.debug:
+    msg: "{{ disk_usage.stdout_lines }}"
+  when: maintenance_show_disk_usage | bool
+  tags: [maintenance, monitoring]
+
+- name: Show memory usage
+  ansible.builtin.debug:
+    msg: >
+      Total: {{ ansible_facts.memtotal_mb }} MB,
+      Free: {{ ansible_facts.memfree_mb }} MB,
+      Used: {{ ansible_facts.memtotal_mb - ansible_facts.memfree_mb }} MB
+  when: maintenance_show_memory_usage | bool
+  tags: [maintenance, monitoring]
+
+- name: Show CPU count
+  ansible.builtin.debug:
+    msg: "CPU cores: {{ ansible_facts.processor_cores }}"
+  when: maintenance_show_cpu_info | bool
+  tags: [maintenance, monitoring]
+
+- name: Show system load
+  ansible.builtin.debug:
+    msg: "Load average: {{ ansible_facts.loadavg }}"
+  when: maintenance_show_system_load | bool
+  tags: [maintenance, monitoring]
+
+- name: Check for high disk usage
+  ansible.builtin.set_fact:
+    high_disk_usage: "{{ item }}"
+  when:
+    - item.size_available is defined
+    - (item.size_total - item.size_available) / item.size_total * 100 > maintenance_disk_usage_threshold
+  loop: "{{ ansible_mounts }}"
+  tags: [maintenance, monitoring]
+
+- name: Warn about high disk usage
+  ansible.builtin.debug:
+    msg: "WARNING: {{ high_disk_usage.mount }} is using more than {{ maintenance_disk_usage_threshold }}% disk space"
+  when: high_disk_usage is defined
+  tags: [maintenance, monitoring]

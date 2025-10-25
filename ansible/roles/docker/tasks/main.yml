@@ -1,0 +1,150 @@
+---
+# Docker role - Main tasks orchestration
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family | lower }}.yml"
+  tags: [docker, always]
+
+- name: Remove old Docker packages if present
+  ansible.builtin.package:
+    name: "{{ docker_old_packages }}"
+    state: absent
+  tags: [docker, install]
+
+- name: Include Debian installation tasks
+  ansible.builtin.include_tasks: debian.yml
+  when: ansible_os_family == "Debian"
+  tags: [docker, install]
+
+- name: Include RHEL installation tasks
+  ansible.builtin.include_tasks: rhel.yml
+  when: ansible_os_family == "RedHat"
+  tags: [docker, install]
+
+- name: Install Docker packages
+  ansible.builtin.package:
+    name: "{{ docker_packages }}"
+    state: present
+  tags: [docker, install]
+
+- name: Hold/Lock Docker packages to prevent accidental upgrades
+  ansible.builtin.include_tasks: lock-packages.yml
+  tags: [docker, install]
+
+- name: Create docker configuration directory
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [docker, configure]
+
+- name: Create docker daemon configuration from template
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  notify: Restart docker
+  tags: [docker, configure]
+
+- name: Create docker seccomp profile from template
+  ansible.builtin.template:
+    src: seccomp.json.j2
+    dest: /etc/docker/seccomp.json
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart docker
+  tags: [docker, configure]
+
+- name: Create docker systemd override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [docker, configure]
+
+- name: Create docker systemd override configuration
+  ansible.builtin.template:
+    src: docker-override.conf.j2
+    dest: /etc/systemd/system/docker.service.d/override.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart docker
+  tags: [docker, configure]
+
+- name: Enable and start docker service
+  ansible.builtin.systemd:
+    name: docker
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [docker, service]
+
+- name: Add users to docker group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_users }}"
+  when: docker_users is defined and docker_users | length > 0
+  tags: [docker, users]
+
+- name: Set up log rotation for docker containers
+  ansible.builtin.template:
+    src: docker-logrotate.j2
+    dest: /etc/logrotate.d/docker-containers
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [docker, configure]
+
+- name: Create docker compose completion script directory
+  ansible.builtin.file:
+    path: /etc/bash_completion.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [docker, configure]
+
+- name: Download docker compose bash completion
+  ansible.builtin.get_url:
+    url: "{{ docker_compose_completion_url }}"
+    dest: /etc/bash_completion.d/docker-compose
+    owner: root
+    group: root
+    mode: "0644"
+    timeout: 30
+  failed_when: false
+  tags: [docker, configure]
+
+- name: Verify docker installation
+  ansible.builtin.command:
+    cmd: docker --version
+  register: docker_version
+  changed_when: false
+  tags: [docker, verify]
+
+- name: Verify docker compose installation
+  ansible.builtin.command:
+    cmd: docker compose version
+  register: docker_compose_version
+  changed_when: false
+  tags: [docker, verify]
+
+- name: Display installation results
+  ansible.builtin.debug:
+    msg: |
+      Docker installed successfully:
+      {{ docker_version.stdout }}
+      {{ docker_compose_version.stdout }}
+  tags: [docker, verify]

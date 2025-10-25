@@ -1,0 +1,73 @@
+---
+- name: "Process setup tasks for {{ stack_name }}"
+  block:
+    - name: "Execute directory creation tasks"
+      ansible.builtin.file:
+        path: "{{ item_path }}"
+        state: directory
+        mode: "{{ item.mode | default('0755') }}"
+        owner: "{{ item.owner | default('root') }}"
+        group: "{{ item.group | default('root') }}"
+        recurse: true
+      loop: "{{ setup_tasks | selectattr('type', 'equalto', 'directory') | list }}"
+      loop_control:
+        loop_var: item
+      vars:
+        item_path: "{{ item.paths if item.paths is string else item.paths | join('/') }}"
+      when: item.paths is defined
+
+    - name: "Process template tasks"
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "{{ item.mode | default('0644') }}"
+        owner: "{{ item.owner | default('root') }}"
+        group: "{{ item.group | default('root') }}"
+        backup: "{{ item.backup | default(false) }}"
+      loop: "{{ setup_tasks | selectattr('type', 'equalto', 'template') | list }}"
+      loop_control:
+        loop_var: item
+
+    - name: "Process download tasks"
+      ansible.builtin.get_url:
+        url: "{{ item.url }}"
+        dest: "{{ item.dest }}"
+        mode: "{{ item.mode | default('0644') }}"
+        owner: "{{ item.owner | default('root') }}"
+        group: "{{ item.group | default('root') }}"
+        timeout: "{{ item.timeout | default(30) }}"
+        backup: "{{ item.backup | default(false) }}"
+      loop: "{{ setup_tasks | selectattr('type', 'equalto', 'download') | list }}"
+      loop_control:
+        loop_var: item
+
+    - name: "Process certificate generation tasks"
+      block:
+        - name: "Generate private key"
+          community.crypto.openssl_privatekey:
+            path: "{{ item.private_key_path }}"
+            size: "{{ item.key_size | default(2048) }}"
+            mode: "{{ item.key_mode | default('0600') }}"
+            owner: "{{ item.owner | default('root') }}"
+            group: "{{ item.group | default('root') }}"
+
+        - name: "Generate certificate signing request"
+          community.crypto.openssl_csr:
+            path: "{{ item.private_key_path | regex_replace('\\.key$', '.csr') }}"
+            privatekey_path: "{{ item.private_key_path }}"
+            common_name: "{{ item.common_name }}"
+            subject_alt_name: "{{ item.subject_alt_names | default([]) }}"
+
+        - name: "Generate self-signed certificate"
+          community.crypto.x509_certificate:
+            path: "{{ item.certificate_path }}"
+            privatekey_path: "{{ item.private_key_path }}"
+            csr_path: "{{ item.private_key_path | regex_replace('\\.key$', '.csr') }}"
+            provider: selfsigned
+            selfsigned_not_after: "+{{ item.valid_days | default(365) }}d"
+            mode: "{{ item.mode | default('0644') }}"
+            owner: "{{ item.owner | default('root') }}"
+            group: "{{ item.group | default('root') }}"
+      loop: "{{ setup_tasks | selectattr('type', 'equalto', 'certificate') | list }}"
+      loop_control:
+        loop_var: item

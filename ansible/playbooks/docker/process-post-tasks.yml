@@ -1,0 +1,24 @@
+---
+- name: "Process post-deployment tasks for {{ stack_name }}"
+  block:
+    - name: "Execute wait_for tasks"
+      ansible.builtin.wait_for:
+        host: "{{ item.host }}"
+        port: "{{ item.port }}"
+        timeout: "{{ item.timeout | default(60) }}"
+        delay: "{{ item.delay | default(0) }}"
+      loop: "{{ post_tasks | selectattr('type', 'equalto', 'wait_for') | list }}"
+      loop_control:
+        loop_var: item
+
+    - name: "Execute URI tasks"
+      ansible.builtin.uri:
+        url: "{{ item.url }}"
+        method: "{{ item.method | default('GET') }}"
+        body_format: "{{ item.body_format | default('json') }}"
+        body: "{{ item.body | default(omit) }}"
+        headers: "{{ item.headers | default(omit) }}"
+        status_code: "{{ item.status_code | default([200]) }}"
+      loop: "{{ post_tasks | selectattr('type', 'equalto', 'uri') | list }}"
+      loop_control:
+        loop_var: item

@@ -5,8 +5,6 @@ all:
       hosts:
         ironwolf:
           ansible_host: 100.84.189.46
-        skynet:
-          ansible_host: 100.102.80.89
         loki:
           ansible_host: 100.84.189.46
         ark:

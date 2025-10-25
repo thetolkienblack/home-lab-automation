@@ -1,0 +1,21 @@
+---
+# Handlers for security_hardening role
+- name: Restart ssh
+  ansible.builtin.systemd:
+    name: "{{ 'sshd' if ansible_os_family == 'RedHat' else 'ssh' }}"
+    state: restarted
+
+- name: Restart fail2ban
+  ansible.builtin.systemd:
+    name: fail2ban
+    state: restarted
+
+- name: Restart dnf-automatic
+  ansible.builtin.systemd:
+    name: dnf-automatic.timer
+    enabled: true
+    state: restarted
+
+- name: Reload sysctl
+  ansible.builtin.command: sysctl -p /etc/sysctl.d/99-security.conf
+  changed_when: true

@@ -1,0 +1,167 @@
+server:
+    # Basic configuration
+    do-daemonize: yes
+    pidfile: ""
+    num-threads: 2
+    verbosity: 1
+    log-queries: no
+    log-replies: no
+    #logfile: "/var/log/unbound.log"
+    logfile: ""
+
+    # Network configuration
+    interface: 0.0.0.0
+    port: 53
+    https-port: 8843
+
+    # Access control - allow private networks only
+    access-control: 0.0.0.0/0 refuse
+    access-control: 10.0.0.0/8 allow
+    access-control: 127.0.0.1/8 allow
+    access-control: 172.16.0.0/12 allow
+    access-control: 192.168.0.0/16 allow
+    access-control: ::/0 refuse
+    access-control: ::1/128 allow
+    access-control: fd00::/8 allow
+    access-control: fe80::/10 allow
+    access-control: 100.64.0.0/10 allow
+
+    # Private IP ranges
+    private-address: 10.0.0.0/8
+    private-address: 172.16.0.0/12
+    private-address: 192.168.0.0/16
+    private-address: 169.254.0.0/16
+    private-address: fd00::/8
+    private-address: fe80::/10
+
+    # Protocol configuration
+    do-udp: yes
+    do-tcp: yes
+    do-ip4: yes
+    do-ip6: no
+
+    # DNS root server information
+    root-hints: "/opt/unbound/etc/unbound/root.hints"
+
+    # Performance and security
+    ratelimit: 1000
+    unwanted-reply-threshold: 10000
+    edns-buffer-size: 1232
+    module-config: "validator iterator"
+    #so-rcvbuf: 4m
+    #so-sndbuf: 4m
+
+    # Hardening
+    harden-glue: yes
+    harden-dnssec-stripped: yes
+    harden-algo-downgrade: yes
+    harden-large-queries: yes
+    harden-short-bufsize: yes
+    tls-cert-bundle: /etc/ssl/certs/ca-certificates.crt
+    val-clean-additional: yes
+
+    # Privacy
+    use-caps-for-id: yes
+    rrset-roundrobin: yes
+    qname-minimisation: yes
+    minimal-responses: yes
+    hide-identity: yes
+    identity: "Server"
+    hide-version: yes
+    aggressive-nsec: yes
+    delay-close: 10000
+    do-not-query-localhost: no
+    http-user-agent: "DNS"
+
+    # Caching
+    cache-min-ttl: 300
+    cache-max-ttl: 86400
+    serve-expired: yes
+    neg-cache-size: 4M
+    prefetch: yes
+    prefetch-key: yes
+    msg-cache-size: 50m
+    rrset-cache-size: 100m
+
+    # Performance tuning
+    infra-cache-slabs: 4
+    incoming-num-tcp: 10
+    key-cache-slabs: 4
+    msg-cache-slabs: 4
+    num-queries-per-thread: 4096
+
+    # DNSSEC validation
+    #auto-trust-anchor-file: "/var/lib/unbound/root.key"
+
+    # Local DNS records - A records for your domains
+    local-data: "74software.eu. A 192.168.50.213"
+    local-data: "74software.net. A 192.168.50.213"
+    local-data: "sidney.bg. A 192.168.50.213"
+    local-data: "graylock.eu. A 192.168.50.213"
+
+    # Wildcard subdomains
+    local-data: "*.74software.eu. A 192.168.50.213"
+    local-data: "*.74software.net. A 192.168.50.213"
+    local-data: "*.sidney.bg. A 192.168.50.213"
+    local-data: "*.graylock.eu. A 192.168.50.213"
+
+    # Local hostnames
+    local-data: "ironwolf.local. A 192.168.50.54"
+    local-data: "outpost.local. A 192.168.50.213"
+    local-data: "asgard.local. A 192.168.50.1"
+
+    # SRV records
+    local-data: "_http._tcp.74software.eu. 3600 IN SRV 10 5 80 74software.eu."
+    local-data: "_https._tcp.74software.eu. 3600 IN SRV 10 5 80 74software.eu."
+    local-data: "_http._tcp.graylock.eu. 3600 IN SRV 10 5 80 graylock.eu."
+    local-data: "_https._tcp.graylock.eu. 3600 IN SRV 10 5 80 graylock.eu."
+    local-data: "_http._tcp.sidney.bg. 3600 IN SRV 10 5 80 sidney.bg."
+    local-data: "_https._tcp.sidney.bg. 3600 IN SRV 10 5 80 sidney.bg."
+    local-data: "_ssh._tcp.outpost.local. 3600 IN SRV 10 5 22 outpost.local."
+
+remote-control:
+    control-enable: yes
+    control-interface: /opt/unbound/etc/unbound/unbound.ctl
+
+forward-zone:
+    name: "."
+    forward-tls-upstream: yes
+
+    # Cloudflare
+    forward-addr: 1.1.1.1@853#cloudflare-dns.com
+    forward-addr: 1.0.0.1@853#cloudflare-dns.com
+
+    # Cloudflare Malware Protection
+    forward-addr: 1.1.1.2@853#security.cloudflare-dns.com
+    forward-addr: 1.0.0.2@853#security.cloudflare-dns.com
+
+    # CleanBrowsing Security Filter
+    forward-addr: 185.228.168.9@853#security-filter-dns.cleanbrowsing.org
+    forward-addr: 185.228.169.9@853#security-filter-dns.cleanbrowsing.org
+
+    # Quad9
+    forward-addr: 9.9.9.9@853#dns.quad9.net
+    forward-addr: 149.112.112.112@853#dns.quad9.net
+
+    # NextDNS (your custom ID)
+    forward-addr: 45.90.28.252@853#33414e.dns.nextdns.io
+    forward-addr: 45.90.30.252@853#33414e.dns.nextdns.io
+
+    # OpenDNS (fallback to port 53)
+    forward-addr: 208.67.222.222@53
+    forward-addr: 208.67.220.220@53
+
+    # Mullvad DNS
+    forward-addr: 193.138.218.74@853#dns.mullvad.net
+    forward-addr: 185.213.154.76@853#dns.mullvad.net
+
+    # FreeDNS
+    forward-addr: 45.77.165.194@853#dot.freedns.zone
+    forward-addr: 37.235.1.174@853#dot.freedns.zone
+
+    # DNS.WATCH
+    forward-addr: 84.200.69.80@853#resolver1.dns.watch
+    forward-addr: 84.200.70.40@853#resolver2.dns.watch
+
+    # Censurfridns.dk
+    forward-addr: 91.239.100.100@853#anycast.censurfridns.dk

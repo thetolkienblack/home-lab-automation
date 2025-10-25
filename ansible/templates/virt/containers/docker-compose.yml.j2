@@ -24,23 +24,23 @@ services:
 {% endif %}
     container_name: {{ service.container_name | default(service.name) }}
 {% if service.hostname is defined %}
-    hostname: {{ service.hostname }}
+    hostname: {{ service.hostname | default(service.name) }}
 {% endif %}
 {% if service.domainname is defined %}
     domainname: {{ service.domainname }}
 {% endif %}
 
     # Resource limits and reservations
-{% if service.deploy is defined or service.cpu_limit is defined or service.memory_limit is defined or service.gpu_support is defined %}
+{% if service.deploy is defined or service.cpu_limit is defined or service.memory_limit is defined or service.gpu_support is defined or service.limits is defined %}
     deploy:
       resources:
 {% if service.cpu_limit is defined or service.memory_limit is defined or service.memory_reservation is defined %}
         limits:
 {% if service.cpu_limit is defined %}
-          cpus: '{{ service.cpu_limit }}'
+          cpus: '{{ service.cpu_limit | default('0.5') }}'
 {% endif %}
 {% if service.memory_limit is defined %}
-          memory: {{ service.memory_limit }}
+          memory: {{ service.memory_limit | default('512M') }}
 {% endif %}
 {% if service.pids_limit is defined %}
           pids: {{ service.pids_limit }}
@@ -220,7 +220,7 @@ services:
 {% if service.networks is defined %}
     networks:
 {% if service.networks is sequence %}
-{% for network in service.networks %}
+{% for network in service.networks %}  
       - {{ network }}
 {% endfor %}
 {% else %}

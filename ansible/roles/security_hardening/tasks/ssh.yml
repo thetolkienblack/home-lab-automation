@@ -1,0 +1,83 @@
+---
+# SSH hardening tasks - User and key management
+
+# Create users if they don't exist
+- name: Ensure SSH users exist
+  ansible.builtin.user:
+    name: "{{ item.user }}"
+    shell: "{{ item.shell | default('/bin/bash') }}"
+    groups: "{{ item.groups | default([]) }}"
+    append: true
+    create_home: true
+    state: present
+  loop: "{{ ssh_users | default([]) }}"
+  when:
+    - ssh_users is defined
+    - item.ensure_user | default(true)
+    - item.user != 'root'
+  tags: [security, ssh, ssh_keys, ssh_users]
+
+# Backup existing authorized_keys files
+- name: Backup existing authorized_keys files
+  ansible.builtin.copy:
+    src: "{{ item.home | default('/home/' + item.user if item.user != 'root' else '/root') }}/.ssh/authorized_keys"
+    dest: "{{ item.home | default('/home/' + item.user if item.user != 'root' else '/root') }}/.ssh/authorized_keys.backup.{{ ansible_date_time.epoch }}"
+    remote_src: true
+    owner: "{{ item.user }}"
+    group: "{{ item.user }}"
+    mode: '0600'
+  loop: "{{ ssh_users | default([]) }}"
+  failed_when: false
+  when:
+    - ssh_users is defined
+    - ssh_backup_keys | default(false)
+  tags: [security, ssh, ssh_keys, ssh_backup]
+
+# Ensure .ssh directory exists for all users
+- name: Ensure .ssh directory exists
+  ansible.builtin.file:
+    path: "{{ item.home | default('/home/' + item.user if item.user != 'root' else '/root') }}/.ssh"
+    state: directory
+    owner: "{{ item.user }}"
+    group: "{{ item.user }}"
+    mode: '0700'
+  loop: "{{ ssh_users | default([]) }}"
+  when: ssh_users is defined
+  tags: [security, ssh, ssh_keys]
+
+# Deploy SSH keys for all users
+- name: Deploy SSH authorized keys
+  ansible.posix.authorized_key:
+    user: "{{ item.user }}"
+    key: "{{ item.authorized_keys | join('\n') }}"
+    state: present
+    exclusive: "{{ item.exclusive | default(false) }}"
+    manage_dir: true
+  loop: "{{ ssh_users | default([]) }}"
+  when:
+    - ssh_users is defined
+    - item.authorized_keys is defined
+    - item.authorized_keys | length > 0
+  tags: [security, ssh, ssh_keys]
+
+# Remove specific SSH keys if requested
+- name: Remove specified SSH keys
+  ansible.posix.authorized_key:
+    user: "{{ item.0.user }}"
+    key: "{{ item.1 }}"
+    state: absent
+  loop: "{{ ssh_users | default([]) | subelements('remove_keys', skip_missing=True) }}"
+  when: ssh_users is defined
+  tags: [security, ssh, ssh_keys, ssh_remove]
+
+# SSH daemon configuration
+- name: Configure SSH security settings
+  ansible.builtin.template:
+    src: sshd_config.j2
+    dest: /etc/ssh/sshd_config.d/99-custom-security.conf
+    owner: root
+    group: root
+    mode: '0644'
+    validate: '/usr/sbin/sshd -t -f %s'
+  notify: Restart ssh
+  tags: [security, ssh]

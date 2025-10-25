@@ -1,0 +1,171 @@
+# ===========================================
+# templates/system/ntp/chrony.conf.j2
+# Chrony configuration for RHEL 10
+# ===========================================
+
+# Chrony configuration for RHEL 10
+# Managed by Ansible - {{ ansible_managed }}
+# Generated on: {{ ansible_date_time.iso8601 }}
+
+# ===========================================
+# NTP SERVERS CONFIGURATION
+# ===========================================
+
+{% if ntp_servers is defined and ntp_servers | length > 0 %}
+# Primary NTP servers
+{% for server in ntp_servers %}
+server {{ server }} iburst{% if ntp_prefer_server is defined and server == ntp_prefer_server %} prefer{% endif %}
+{% endfor %}
+{% else %}
+# Default NTP servers
+server pool.ntp.org iburst
+server time.google.com iburst
+{% endif %}
+
+{% if ntp_pool_servers is defined and ntp_pool_servers | length > 0 %}
+# Pool configuration
+{% for pool in ntp_pool_servers %}
+pool {{ pool }} iburst maxsources {{ ntp_pool_maxsources | default(4) }}{% if ntp_pool_prefer is defined and pool == ntp_pool_prefer %} prefer{% endif %}
+{% endfor %}
+{% endif %}
+
+# ===========================================
+# CHRONY CORE SETTINGS
+# ===========================================
+
+# Drift file location
+driftfile /var/lib/chrony/drift
+
+# Make steps larger than threshold
+makestep {{ ntp_makestep_threshold | default(1.0) }} {{ ntp_makestep_limit | default(3) }}
+
+# Enable kernel synchronization of system clock
+rtcsync
+
+{% if ntp_hardware_timestamping | default(false) %}
+# Enable hardware timestamping (if supported)
+hwtimestamp *
+{% endif %}
+
+# ===========================================
+# LOGGING CONFIGURATION
+# ===========================================
+
+# Log directory
+logdir /var/log/chrony
+
+{% if ntp_log_level is defined %}
+# Custom log settings
+log {{ ntp_log_level }}
+{% else %}
+# Default logging
+log measurements statistics tracking
+{% endif %}
+
+{% if ntp_log_change_threshold is defined %}
+# Log changes larger than threshold
+logchange {{ ntp_log_change_threshold }}
+{% endif %}
+
+# ===========================================
+# STATISTICS AND MONITORING
+# ===========================================
+
+{% if ntp_statistics_enabled | default(false) %}
+# Enable statistics
+logbanner 50
+logchange 0.5
+{% endif %}
+
+{% if ntp_dump_on_exit | default(false) %}
+# Dump measurements on exit (for debugging)
+dumponexit
+dumpdir /var/log/chrony
+{% endif %}
+
+# ===========================================
+# SERVER CONFIGURATION
+# ===========================================
+
+{% if ntp_server_enabled | default(false) %}
+# Allow chronyd to serve time to clients
+# Allow NTP client access from local network
+allow {{ ansible_default_ipv4.network }}/{{ ansible_default_ipv4.netmask }}
+{% if ntp_server_additional_networks is defined %}
+{% for network in ntp_server_additional_networks %}
+allow {{ network }}
+{% endfor %}
+{% endif %}
+
+# Stratum level when serving time
+local stratum {{ ntp_local_stratum | default(10) }}
+{% else %}
+# Server mode disabled - client only
+{% endif %}
+
+# ===========================================
+# SECURITY CONFIGURATION
+# ===========================================
+
+{% if ntp_disable_cmdport | default(true) %}
+# Disable command port for security
+cmdport 0
+{% endif %}
+
+{% if ntp_rate_limit is defined %}
+# Rate limiting for client requests
+ratelimit interval {{ ntp_rate_limit.interval | default(3) }} burst {{ ntp_rate_limit.burst | default(8) }}
+{% endif %}
+
+{% if ntp_security_hardening | default(true) %}
+# Security hardening - disable client logging
+noclientlog
+noserverstats
+{% endif %}
+
+{% if ntp_bind_address is defined %}
+# Bind to specific interface
+bindaddress {{ ntp_bind_address }}
+{% endif %}
+
+# ===========================================
+# ADVANCED SETTINGS
+# ===========================================
+
+{% if ntp_smoothtime is defined %}
+# Smoothing of time adjustments
+smoothtime {{ ntp_smoothtime.max_freq }} {{ ntp_smoothtime.max_wander }}
+{% endif %}
+
+{% if ntp_max_distance is defined %}
+# Maximum distance from reference clock
+maxdistance {{ ntp_max_distance }}
+{% endif %}
+
+{% if ntp_max_drift is defined %}
+# Maximum drift rate
+maxdrift {{ ntp_max_drift }}
+{% endif %}
+
+{% if ntp_correction_settings is defined %}
+# Correction of systematic errors
+{% for setting in ntp_correction_settings %}
+{{ setting }}
+{% endfor %}
+{% endif %}
+
+# ===========================================
+# MONITORING KEYS (Optional)
+# ===========================================
+
+{% if ntp_monitoring_keys is defined %}
+# Monitoring authentication keys
+keyfile {{ ntp_key_file | default('/etc/chrony.keys') }}
+{% for key in ntp_monitoring_keys %}
+commandkey {{ key.id }}
+{% endfor %}
+{% endif %}
+
+# ===========================================
+# END OF CONFIGURATION
+# ===========================================

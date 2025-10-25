@@ -1,0 +1,21 @@
+---
+# System Maintenance Playbook (Using Role)
+# This playbook uses the maintenance role for system maintenance tasks
+- name: System Maintenance
+  hosts: all
+  become: true
+  gather_facts: true
+
+  roles:
+    - common
+    - maintenance
+
+  post_tasks:
+    - name: Display maintenance completion
+      ansible.builtin.debug:
+        msg: |
+          System maintenance complete!
+          Use tags to run specific tasks:
+          --tags updates   - Only run package updates
+          --tags cleanup   - Only run cleanup tasks
+          --tags monitoring - Only run monitoring tasks

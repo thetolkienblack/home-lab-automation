@@ -1,0 +1,11 @@
+---
+# Automatic updates configuration tasks
+- name: Include Debian/Ubuntu auto-updates
+  ansible.builtin.include_tasks: auto_updates_debian.yml
+  when: ansible_os_family == "Debian"
+  tags: [security, auto_updates, debian]
+
+- name: Include RHEL/CentOS auto-updates
+  ansible.builtin.include_tasks: auto_updates_rhel.yml
+  when: ansible_os_family == "RedHat"
+  tags: [security, auto_updates, rhel]

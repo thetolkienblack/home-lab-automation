@@ -1,0 +1,36 @@
+# Ansible
+*.retry
+.facts_cache/
+*.backup
+
+# Vault password files (should be stored securely outside repo)
+.vault_pass
+vault_pass.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv
+
+# Molecule
+.molecule/
+.cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

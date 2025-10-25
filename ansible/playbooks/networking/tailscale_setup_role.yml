@@ -1,0 +1,33 @@
+---
+# Tailscale Setup Playbook (Using Role)
+# This playbook uses the tailscale role for VPN mesh network configuration
+- name: Install and Configure Tailscale
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Load host-specific Tailscale token from vault
+      ansible.builtin.set_fact:
+        tailscale_auth_key: "{{ tailscale_tokens[inventory_hostname] }}"
+      when:
+        - tailscale_tokens is defined
+        - tailscale_tokens[inventory_hostname] is defined
+      no_log: true
+
+  roles:
+    - common
+    - tailscale
+
+  post_tasks:
+    - name: Display Tailscale completion message
+      ansible.builtin.debug:
+        msg: |
+          Tailscale configuration complete!
+
+          Use tags to run specific tasks:
+          --tags install    - Only install Tailscale
+          --tags configure  - Only configure daemon
+          --tags auth       - Only handle authentication
+
+          Check status with: tailscale status

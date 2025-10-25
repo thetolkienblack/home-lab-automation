@@ -1,0 +1,173 @@
+---
+docker_appdata_dir: "{{ docker_stacks_dir }}/adguardhome/appdata"
+# Environment variables for .env file
+env_variables:
+  TZ: "{{ timezone }}"
+  PUID: "{{ docker_puid }}"
+  PGID: "{{ docker_pgid }}"
+  APPDATA_DIR: "{{ docker_appdata_dir }}"
+  IP4: "{{ ansible_facts['default_ipv4']['address'] }}"
+
+# Services configuration
+services:
+  - name: "adguardhome"
+    image: "adguard/adguardhome:latest"
+    
+    # Security settings
+    security_opt: "{{ docker_sec_opts }}"
+    cap_drop:
+      - "ALL"
+    cap_add:
+      - "NET_BIND_SERVICE"
+      - "CHOWN"
+      - "SETGID"
+      - "SETUID"
+    
+    # Resource limits
+    limits: true
+    
+    # Environment
+    environment:
+      TZ: "${TZ}"
+      PUID: "${PUID}"
+      PGID: "${PGID}"
+    
+    # Network configuration
+    ports:
+      - "${IP4}:53:53/tcp"
+      - "${IP4}:53:53/udp"
+      - "3000:3000/tcp"
+      - "6060:6060/tcp"
+      - "6061:6061/tcp"
+      - "853:853/tcp"
+      - "784:784/udp"
+      - "8853:8853/udp"
+      - "5444:5443/tcp"
+      - "5444:5443/udp"
+    
+    networks:
+      - "default"
+      - "{{ docker_ext_network }}"
+    
+    # Storage
+    volumes:
+      - "${APPDATA_DIR}/adguardhome/work:/opt/adguardhome/work"
+      - "${APPDATA_DIR}/adguardhome/conf:/opt/adguardhome/conf"
+    
+    # Dependencies
+    depends_on:
+      unbound:
+        condition: "service_healthy"
+    external_links:
+      - "unbound:unbound"
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "nslookup google.com unbound || exit 1"]
+
+  - name: unbound
+    image: "mvance/unbound:latest"
+    
+    # Security settings
+    security_opt: {{ docker_sec_opts }}
+    cap_drop:
+      - "ALL"
+    cap_add:
+      - "NET_BIND_SERVICE"
+      - "CHOWN"
+      - "SETGID"
+      - "SETUID"
+    
+    # Resource limits
+    limits: true
+    
+    # Environment
+    environment:
+      TZ: "${TZ}"
+      PUID: "${PUID}"
+      PGID: "${PGID}"
+    
+    # Network configuration
+    ports:
+      - "5533:53/tcp"
+      - "5533:53/udp"
+    
+    networks:
+      - "default"
+    
+    # Storage
+    volumes:
+      - "${APPDATA_DIR}/unbound/unbound.conf:/opt/unbound/etc/unbound/unbound.conf:ro"
+      - "${APPDATA_DIR}/unbound/root.hints:/opt/unbound/etc/unbound/root.hints:ro"
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "dig @127.0.0.1 cloudflare.com || exit 1"]
+
+# Networks configuration
+networks:
+  - name: "{{ docker_ext_network }}"
+    external: true
+
+setup_tasks:
+  - name: "Create appdata directories"
+    type: "directory"
+    paths:
+      - "{{ docker_appdata_dir }}/adguardhome/work"
+      - "{{ docker_appdata_dir }}/adguardhome/conf"
+      - "{{ docker_appdata_dir }}/adguardhome/conf/certs"
+      - "{{ docker_appdata_dir }}/unbound"
+    mode: "0755"
+    owner: "{{ docker_puid }}"
+    group: "{{ docker_pgid }}"
+
+  - name: "Generate adguardhome configuration"
+    type: "template"
+    src: "virt/containers/stacks/adguardhome/AdGuardHome.yaml.j2"
+    dest: "{{ docker_appdata_dir }}/adguardhome/conf/AdGuardHome.yaml"
+    mode: "0644"
+    backup: true
+
+  - name: "Generate self-signed certificate for AdGuard Home"
+    type: "certificate"
+    certificate_path: "{{ docker_appdata_dir }}/adguardhome/conf/certs/adguardhome.crt"
+    private_key_path: "{{ docker_appdata_dir }}/adguardhome/conf/certs/adguardhome.key"
+    common_name: "{{ ansible_fqdn | default(ansible_hostname) }}"
+    subject_alt_names:
+      - "DNS: {{ ansible_fqdn | default(ansible_hostname) }}"
+      - "DNS: {{ ansible_hostname }}"
+      - "DNS: {{ ansible_hostname }}.local"
+      - "DNS: {{ ansible_hostname }}.graylock.eu"
+      - "IP: {{ ansible_default_ipv4.address }}"
+      - "IP: 127.0.0.1"
+      - "IP: ::1"
+    key_size: 2048
+    valid_days: 3650
+    mode: "0644"
+    key_mode: "0600"
+
+  - name: "Generate unbound configuration"
+    type: "template"
+    src: "virt/containers/stacks/adguardhome/unbound.conf.j2"
+    dest: "{{ docker_appdata_dir }}/unbound/unbound.conf"
+    mode: "0644"
+    backup: true
+
+  - name: "Download root hints file"
+    type: "download"
+    url: "https://www.internic.net/domain/named.cache"
+    dest: "{{ docker_appdata_dir }}/unbound/root.hints"
+    mode: "0644"
+    timeout: 30
+
+post_tasks:
+  - name: "Wait for AdGuard Home to be ready"
+    type: "wait_for"
+    host: "{{ ansible_default_ipv4.address }}"
+    port: 6060
+    timeout: 60
+  - name: "Wait for Unbound Home to be ready"
+    type: "wait_for"
+    host: "{{ ansible_default_ipv4.address }}"
+    port: 5353
+    timeout: 60

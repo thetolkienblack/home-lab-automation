@@ -1,0 +1,12 @@
+---
+# Sysctl security hardening tasks
+- name: Configure kernel security parameters
+  ansible.builtin.template:
+    src: 99-security.conf.j2
+    dest: /etc/sysctl.d/99-security.conf
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  notify: Reload sysctl
+  tags: [security, sysctl]

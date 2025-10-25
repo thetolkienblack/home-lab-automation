@@ -1,0 +1,14 @@
+---
+# Default variables for common role
+common_packages:
+  - curl
+  - wget
+  - vim
+  - htop
+  - tree
+  - unzip
+  - git
+  - jq
+  - btop
+
+timezone: "UTC"

@@ -1,0 +1,38 @@
+---
+# Security Hardening role - System security configuration
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - whitelist_ips is defined
+      - whitelist_ips | length > 0
+    fail_msg: "whitelist_ips must be defined with at least one IP/CIDR"
+  tags: [security, always]
+
+- name: Include SSH hardening tasks
+  ansible.builtin.include_tasks: ssh.yml
+  tags: [security, ssh]
+
+- name: Include firewall configuration tasks
+  ansible.builtin.include_tasks: firewall.yml
+  when: firewall_enabled | default(true)
+  tags: [security, firewall]
+
+- name: Include fail2ban configuration tasks
+  ansible.builtin.include_tasks: fail2ban.yml
+  when: fail2ban_enabled | default(true)
+  tags: [security, fail2ban]
+
+- name: Include sysctl security hardening tasks
+  ansible.builtin.include_tasks: sysctl.yml
+  when: configure_sysctl_security | default(true)
+  tags: [security, sysctl]
+
+- name: Include TCP wrappers configuration tasks
+  ansible.builtin.include_tasks: tcp_wrappers.yml
+  when: tcp_wrappers_enabled | default(true)
+  tags: [security, tcp_wrappers]
+
+- name: Include unattended upgrades configuration
+  ansible.builtin.include_tasks: auto_updates.yml
+  when: enable_unattended_upgrades | default(true)
+  tags: [security, auto_updates]

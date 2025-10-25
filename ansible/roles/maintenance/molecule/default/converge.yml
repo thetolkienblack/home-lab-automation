@@ -1,0 +1,21 @@
+---
+# Molecule converge playbook for maintenance role
+- name: Converge
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Update apt cache (Debian)
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+  roles:
+    - role: maintenance
+      vars:
+        maintenance_show_disk_usage: true
+        maintenance_show_memory_usage: true
+        maintenance_show_cpu_info: true
+        maintenance_show_system_load: true

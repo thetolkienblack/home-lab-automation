@@ -117,9 +117,9 @@
         group: root
         mode: '0600'
       loop:
-        - { src: "/etc/netplan/", name: "netplan" }
-        - { src: "/etc/network/interfaces", name: "interfaces" }
-        - { src: "/etc/NetworkManager/system-connections/", name: "networkmanager" }
+        - {src: "/etc/netplan/", name: "netplan"}
+        - {src: "/etc/network/interfaces", name: "interfaces"}
+        - {src: "/etc/NetworkManager/system-connections/", name: "networkmanager"}
       failed_when: false
 
     # ===========================================
@@ -292,19 +292,19 @@
         reload: true
         sysctl_file: /etc/sysctl.d/99-network-security.conf
       loop:
-        - { name: 'net.ipv4.conf.all.send_redirects', value: '0' }
-        - { name: 'net.ipv4.conf.default.send_redirects', value: '0' }
-        - { name: 'net.ipv4.conf.all.accept_redirects', value: '0' }
-        - { name: 'net.ipv4.conf.default.accept_redirects', value: '0' }
-        - { name: 'net.ipv4.conf.all.secure_redirects', value: '0' }
-        - { name: 'net.ipv4.conf.default.secure_redirects', value: '0' }
-        - { name: 'net.ipv4.ip_forward', value: '0' }
-        - { name: 'net.ipv4.conf.all.log_martians', value: '1' }
-        - { name: 'net.ipv4.conf.default.log_martians', value: '1' }
-        - { name: 'net.ipv4.icmp_ignore_bogus_error_responses', value: '1' }
-        - { name: 'net.ipv4.icmp_echo_ignore_broadcasts', value: '1' }
-        - { name: 'net.ipv4.conf.all.rp_filter', value: '1' }
-        - { name: 'net.ipv4.conf.default.rp_filter', value: '1' }
+        - {name: 'net.ipv4.conf.all.send_redirects', value: '0'}
+        - {name: 'net.ipv4.conf.default.send_redirects', value: '0'}
+        - {name: 'net.ipv4.conf.all.accept_redirects', value: '0'}
+        - {name: 'net.ipv4.conf.default.accept_redirects', value: '0'}
+        - {name: 'net.ipv4.conf.all.secure_redirects', value: '0'}
+        - {name: 'net.ipv4.conf.default.secure_redirects', value: '0'}
+        - {name: 'net.ipv4.ip_forward', value: '0'}
+        - {name: 'net.ipv4.conf.all.log_martians', value: '1'}
+        - {name: 'net.ipv4.conf.default.log_martians', value: '1'}
+        - {name: 'net.ipv4.icmp_ignore_bogus_error_responses', value: '1'}
+        - {name: 'net.ipv4.icmp_echo_ignore_broadcasts', value: '1'}
+        - {name: 'net.ipv4.conf.all.rp_filter', value: '1'}
+        - {name: 'net.ipv4.conf.default.rp_filter', value: '1'}
 
   post_tasks:
     - name: "Verify network configuration"

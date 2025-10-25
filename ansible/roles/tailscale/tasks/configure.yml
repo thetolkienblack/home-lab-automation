@@ -1,0 +1,55 @@
+---
+# Tailscale configuration tasks
+- name: Ensure tailscaled service exists
+  ansible.builtin.systemd:
+    name: tailscaled
+    enabled: false
+    masked: false
+    daemon_reload: true
+  tags: [tailscale, configure]
+
+- name: Ensure Tailscale service is stopped before configuration
+  ansible.builtin.systemd:
+    name: tailscaled
+    state: stopped
+  tags: [tailscale, configure]
+
+- name: Configure Tailscale daemon arguments
+  ansible.builtin.template:
+    src: tailscale_daemon.j2
+    dest: "{{ tailscale_daemon_config_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  notify: Restart tailscaled
+  tags: [tailscale, configure]
+
+- name: Start and enable Tailscale daemon
+  ansible.builtin.systemd:
+    name: tailscaled
+    state: "{{ tailscale_service_state }}"
+    enabled: "{{ tailscale_service_enabled }}"
+    daemon_reload: true
+  retries: 3
+  delay: 2
+  tags: [tailscale, configure, service]
+
+- name: Wait for Tailscale daemon to be ready
+  ansible.builtin.systemd:
+    name: tailscaled
+  register: tailscale_service_check
+  until: tailscale_service_check.status.ActiveState == "active"
+  retries: 10
+  delay: 3
+  changed_when: false
+  tags: [tailscale, configure, service]
+
+- name: Enable IP forwarding for subnet routing
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    reload: true
+  when: tailscale_advertise_routes | length > 0 or tailscale_advertise_exit_node
+  tags: [tailscale, configure, routing]

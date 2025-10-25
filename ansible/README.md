@@ -1,51 +1,274 @@
-# Ansible Infrastructure Project
+# Homelab Ansible Automation
 
-This Ansible project provides a comprehensive framework for managing infrastructure with security-first approach.
+Ansible automation for homelab infrastructure management with security hardening, Docker deployments, and system configuration.
+
+## Features
+
+- **Security Hardening**: SSH, firewall (UFW/firewalld), fail2ban, automatic updates
+- **Docker Management**: Installation, configuration, and stack deployment
+- **Network Configuration**: Tailscale VPN setup and management
+- **System Management**: NTP/timezone, package updates, maintenance tasks
+- **Modular Roles**: Reusable roles with Molecule testing
+
+## Prerequisites
+
+- Ansible 2.15+
+- Python 3.9+
+- Molecule (for testing)
+- SSH access to target hosts
 
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. Setup SSH Agent
+
 ```bash
-ansible-galaxy install -r requirements.yml
+# Use the helper script
+./scripts/setup-ssh-agent.sh
+
+# Or manually
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_graylock
 ```
 
-### 2. Configure Ansible Vault
-```bash
-# Create vault password file
-echo "your-vault-password" > ~/.ansible_vault_pass
-chmod 600 ~/.ansible_vault_pass
+### 2. Configure Inventory
 
-# Encrypt sensitive variables
-ansible-vault encrypt group_vars/all/vault.yml
+Edit `inventories/production.yml` or `inventories/development.yml` with your hosts.
+
+### 3. Configure Variables
+
+Encrypted vault file: `inventories/group_vars/all/vault.yml`
+
+```bash
+# Edit vault
+ansible-vault edit inventories/group_vars/all/vault.yml
+
+# View vault
+ansible-vault view inventories/group_vars/all/vault.yml
 ```
 
-### 3. Update Inventory
-Edit the inventory files in `inventories/` to match your infrastructure.
+### 4. Run Playbooks
 
-### 4. Deploy
 ```bash
-# Run the main site playbook
-ansible-playbook site.yml
+# System hardening
+ansible-playbook playbooks/security/system_hardening.yml --ask-vault-pass
 
-# Test connectivity first
-ansible all -m ping
+# Install Docker
+ansible-playbook playbooks/docker/install_docker.yml
+
+# Configure NTP
+ansible-playbook playbooks/system/ntp_timezone_config.yml
+
+# System maintenance
+ansible-playbook playbooks/maintenance/system_maintenance.yml
 ```
 
 ## Project Structure
 
-- `inventories/` - Environment-specific host definitions
-- `group_vars/` - Group-specific variables
-- `host_vars/` - Host-specific variables  
-- `playbooks/` - Organized playbooks and runbooks
-- `templates/` - Jinja2 configuration templates
-- `roles/` - Custom Ansible roles
-- `vault/` - Encrypted secrets management
+```
+.
+├── ansible.cfg                 # Ansible configuration
+├── inventories/
+│   ├── production.yml          # Production inventory
+│   ├── development.yml         # Development inventory
+│   ├── group_vars/
+│   │   └── all/
+│   │       ├── main.yml        # Global variables
+│   │       ├── docker.yml      # Docker configuration
+│   │       └── vault.yml       # Encrypted secrets
+│   └── host_vars/              # Host-specific variables
+├── playbooks/
+│   ├── docker/                 # Docker playbooks
+│   ├── security/               # Security playbooks
+│   ├── networking/             # Network playbooks
+│   ├── system/                 # System playbooks
+│   └── maintenance/            # Maintenance playbooks
+├── roles/
+│   ├── common/                 # Common system setup
+│   ├── docker/                 # Docker installation
+│   ├── security_hardening/     # Security configuration
+│   ├── tailscale/              # Tailscale VPN
+│   ├── ntp/                    # Time synchronization
+│   └── maintenance/            # System maintenance
+├── templates/                  # Jinja2 templates
+└── scripts/                    # Helper scripts
 
-## Security Features
+```
 
-- SSH key authentication only
-- Ansible Vault for secrets
-- Security hardening playbooks
-- Firewall configuration
-- Fail2ban integration
-- Automatic security updates
+## Roles
+
+### common
+Basic system setup: package installation, timezone configuration, hostname setup.
+
+```yaml
+- hosts: all
+  roles:
+    - common
+```
+
+### docker
+Docker and Docker Compose installation with security hardening.
+
+```yaml
+- hosts: docker_hosts
+  roles:
+    - docker
+```
+
+### security_hardening
+Comprehensive security: SSH hardening, firewall, fail2ban, automatic updates.
+
+```yaml
+- hosts: all
+  roles:
+    - security_hardening
+```
+
+### tailscale
+Tailscale VPN installation and configuration.
+
+```yaml
+- hosts: all
+  roles:
+    - tailscale
+```
+
+### ntp
+NTP/chronyd configuration for time synchronization.
+
+```yaml
+- hosts: all
+  roles:
+    - ntp
+```
+
+### maintenance
+System maintenance tasks: updates, cleanup, monitoring.
+
+```yaml
+- hosts: all
+  roles:
+    - maintenance
+```
+
+## Testing with Molecule
+
+```bash
+# Test a specific role
+cd roles/docker
+molecule test
+
+# Create and converge test instance
+molecule create
+molecule converge
+
+# Run verification tests
+molecule verify
+
+# Cleanup
+molecule destroy
+```
+
+## Variables
+
+### Global Variables (group_vars/all/main.yml)
+
+```yaml
+timezone: "Europe/Sofia"
+common_packages:
+  - curl
+  - wget
+  - vim
+  - htop
+firewall_enabled: true
+ssh_port: 22
+```
+
+### Vault Variables (group_vars/all/vault.yml)
+
+Encrypt sensitive data:
+
+```yaml
+ansible_become_password: "secure_password"
+ssh_users:
+  - name: "sidney"
+    authorized_keys:
+      - "ssh-ed25519 AAAA..."
+tailscale_tokens:
+  hostname: "tskey-..."
+```
+
+## Security Best Practices
+
+1. **Always encrypt the vault file:**
+   ```bash
+   ansible-vault encrypt inventories/group_vars/all/vault.yml
+   ```
+
+2. **Use SSH agent instead of storing keys:**
+   ```bash
+   ./scripts/setup-ssh-agent.sh
+   ```
+
+3. **Enable host key checking for production** (edit `ansible.cfg:44`)
+
+4. **Review firewall rules** before applying security playbook
+
+5. **Test playbooks in development environment first**
+
+## Common Tasks
+
+### Update All Systems
+```bash
+ansible-playbook playbooks/maintenance/system_maintenance.yml
+```
+
+### Deploy Docker Stack
+```bash
+ansible-playbook playbooks/docker/deploy-docker-stack.yml -e stack=adguardhome
+```
+
+### Update SSH Keys
+```bash
+ansible-playbook playbooks/maintenance/update_ssh_keys.yml
+```
+
+## Troubleshooting
+
+### Vault Password Issues
+```bash
+# Set vault password file path
+export ANSIBLE_VAULT_PASSWORD_FILE=~/.ansible/ansible_vault_pass
+
+# Or use --ask-vault-pass flag
+ansible-playbook playbook.yml --ask-vault-pass
+```
+
+### SSH Connection Issues
+```bash
+# Test connectivity
+ansible all -m ping
+
+# Check SSH agent
+ssh-add -l
+
+# Test with verbose output
+ansible-playbook playbook.yml -vvv
+```
+
+### Permission Denied
+Ensure your user has sudo/su privileges and the become password is correct in the vault.
+
+## Contributing
+
+1. Test changes with Molecule
+2. Run ansible-lint before committing
+3. Update documentation
+4. Follow existing code style
+
+## License
+
+MIT
+
+## Author
+
+Sidney - Homelab Infrastructure Automation
