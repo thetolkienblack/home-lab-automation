@@ -1,0 +1,48 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: ubuntu-trivy
+    image: geerlingguy/docker-ubuntu2204-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+  - name: debian-trivy
+    image: geerlingguy/docker-debian12-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+  - name: rockylinux-trivy
+    image: geerlingguy/docker-rockylinux9-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+provisioner:
+  name: ansible
+  playbooks:
+    converge: converge.yml
+    verify: verify.yml
+  inventory:
+    host_vars:
+      ubuntu-trivy:
+        ansible_python_interpreter: /usr/bin/python3
+      debian-trivy:
+        ansible_python_interpreter: /usr/bin/python3
+      rockylinux-trivy:
+        ansible_python_interpreter: /usr/bin/python3
+verifier:
+  name: ansible

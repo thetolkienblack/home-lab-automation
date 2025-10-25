@@ -1,0 +1,45 @@
+---
+# Install Trivy from official repository (Debian)
+
+- name: Add Trivy APT key (Debian)
+  ansible.builtin.get_url:
+    url: "{{ trivy_apt_key_url }}"
+    dest: /etc/apt/trusted.gpg.d/trivy.asc
+    mode: "0644"
+  when: ansible_os_family == "Debian"
+  tags: [trivy, install, repository]
+
+- name: Add Trivy APT repository (Debian)
+  ansible.builtin.apt_repository:
+    repo: "{{ trivy_apt_repository }}"
+    state: present
+    filename: trivy
+    update_cache: true
+  when: ansible_os_family == "Debian"
+  tags: [trivy, install, repository]
+
+- name: Install Trivy from APT (Debian)
+  ansible.builtin.apt:
+    name: "{{ trivy_package_name }}"
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+  tags: [trivy, install, repository]
+
+- name: Add Trivy YUM repository (RHEL)
+  ansible.builtin.yum_repository:
+    name: trivy
+    description: Trivy repository
+    baseurl: "{{ trivy_yum_repository_url }}"
+    gpgcheck: true
+    enabled: true
+    gpgkey: "{{ trivy_rpm_key_url }}"
+  when: ansible_os_family == "RedHat"
+  tags: [trivy, install, repository]
+
+- name: Install Trivy from YUM (RHEL)
+  ansible.builtin.dnf:
+    name: "{{ trivy_package_name }}"
+    state: present
+  when: ansible_os_family == "RedHat"
+  tags: [trivy, install, repository]

@@ -1,0 +1,30 @@
+---
+galaxy_info:
+  author: Sidney
+  description: Install and configure Trivy vulnerability scanner
+  company: Home Lab
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+  galaxy_tags:
+    - security
+    - trivy
+    - vulnerability
+    - scanner
+    - docker
+    - containers
+
+dependencies:
+  - role: docker

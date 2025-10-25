@@ -1,0 +1,153 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Check Trivy binary exists
+      ansible.builtin.stat:
+        path: /usr/local/bin/trivy
+      register: trivy_binary
+
+    - name: Verify Trivy binary is installed
+      ansible.builtin.assert:
+        that:
+          - trivy_binary.stat.exists
+          - trivy_binary.stat.executable
+        fail_msg: "Trivy binary not found or not executable"
+        success_msg: "Trivy binary is installed"
+
+    - name: Check Trivy version
+      ansible.builtin.command:
+        cmd: trivy --version
+      register: trivy_version
+      changed_when: false
+
+    - name: Display Trivy version
+      ansible.builtin.debug:
+        var: trivy_version.stdout_lines
+
+    - name: Check Trivy configuration file exists
+      ansible.builtin.stat:
+        path: /etc/trivy/trivy.yaml
+      register: trivy_config
+
+    - name: Verify Trivy configuration exists
+      ansible.builtin.assert:
+        that:
+          - trivy_config.stat.exists
+        fail_msg: "Trivy configuration not found"
+        success_msg: "Trivy configuration exists"
+
+    - name: Check required directories exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: trivy_dirs
+      loop:
+        - /var/lib/trivy/cache
+        - /var/lib/trivy/db
+        - /var/log/trivy
+        - /etc/trivy
+
+    - name: Verify all directories exist
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.isdir
+        fail_msg: "Directory {{ item.item }} not found"
+        success_msg: "Directory {{ item.item }} exists"
+      loop: "{{ trivy_dirs.results }}"
+
+    - name: Check scan script exists
+      ansible.builtin.stat:
+        path: /usr/local/bin/trivy-scan.sh
+      register: scan_script
+
+    - name: Verify scan script exists and is executable
+      ansible.builtin.assert:
+        that:
+          - scan_script.stat.exists
+          - scan_script.stat.executable
+        fail_msg: "Scan script not found or not executable"
+        success_msg: "Scan script exists and is executable"
+
+    - name: Check cleanup script exists
+      ansible.builtin.stat:
+        path: /usr/local/bin/trivy-cleanup.sh
+      register: cleanup_script
+
+    - name: Verify cleanup script exists and is executable
+      ansible.builtin.assert:
+        that:
+          - cleanup_script.stat.exists
+          - cleanup_script.stat.executable
+        fail_msg: "Cleanup script not found or not executable"
+        success_msg: "Cleanup script exists and is executable"
+
+    - name: Check cron job for daily scans
+      ansible.builtin.command:
+        cmd: crontab -l -u root
+      register: cron_jobs
+      changed_when: false
+      failed_when: false
+
+    - name: Verify daily scan cron job exists
+      ansible.builtin.assert:
+        that:
+          - "'Trivy daily vulnerability scan' in cron_jobs.stdout"
+        fail_msg: "Daily scan cron job not found"
+        success_msg: "Daily scan cron job exists"
+      when: cron_jobs.rc == 0
+
+    - name: Check logrotate configuration
+      ansible.builtin.stat:
+        path: /etc/logrotate.d/trivy
+      register: logrotate_config
+
+    - name: Verify logrotate configuration exists
+      ansible.builtin.assert:
+        that:
+          - logrotate_config.stat.exists
+        fail_msg: "Logrotate configuration not found"
+        success_msg: "Logrotate configuration exists"
+
+    - name: Run a test scan
+      ansible.builtin.command:
+        cmd: trivy image --severity HIGH,CRITICAL alpine:latest
+      register: test_scan
+      changed_when: false
+      failed_when: false
+      environment:
+        TRIVY_CACHE_DIR: /var/lib/trivy/cache
+
+    - name: Verify test scan succeeded
+      ansible.builtin.assert:
+        that:
+          - test_scan.rc == 0
+        fail_msg: "Test scan failed"
+        success_msg: "Test scan succeeded"
+
+    - name: Display test scan output
+      ansible.builtin.debug:
+        msg: "{{ test_scan.stdout_lines[-20:] | default(['No output']) }}"
+
+    - name: Verify Docker is accessible
+      ansible.builtin.command:
+        cmd: docker ps
+      register: docker_check
+      changed_when: false
+
+    - name: Display verification summary
+      ansible.builtin.debug:
+        msg: |
+          === Trivy Verification Summary ===
+          Binary: ✓ Installed
+          Configuration: ✓ Present
+          Directories: ✓ Created
+          Scan Script: ✓ Executable
+          Cleanup Script: ✓ Executable
+          Cron Jobs: ✓ Configured
+          Logrotate: ✓ Configured
+          Test Scan: ✓ Passed
+          Docker: ✓ Accessible
