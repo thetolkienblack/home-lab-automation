@@ -1,0 +1,104 @@
+---
+# k3s Cluster Deployment Playbook
+# This playbook deploys a complete k3s cluster with server and agent nodes
+- name: Deploy k3s Kubernetes Cluster - Server Nodes
+  hosts: k3s_servers
+  become: true
+  gather_facts: true
+  serial: 1
+
+  pre_tasks:
+    - name: Display server deployment information
+      ansible.builtin.debug:
+        msg: |
+          === Deploying k3s Server to {{ inventory_hostname }} ===
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          CNI: {{ k3s_cni | default('calico') }}
+
+  roles:
+    - role: k3s
+      vars:
+        k3s_mode: server
+        k3s_cni: "{{ k3s_cni | default('calico') }}"
+
+  post_tasks:
+    - name: Store server token for agents
+      ansible.builtin.set_fact:
+        k3s_master_token: "{{ k3s_server_token }}"
+      run_once: true
+      delegate_to: localhost
+      delegate_facts: true
+
+    - name: Display server information
+      ansible.builtin.debug:
+        msg: |
+          Server {{ inventory_hostname }} deployed successfully
+          API: https://{{ ansible_default_ipv4.address }}:6443
+
+- name: Deploy k3s Kubernetes Cluster - Agent Nodes
+  hosts: k3s_agents
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Retrieve server information
+      ansible.builtin.set_fact:
+        k3s_server_url: "https://{{ hostvars[groups['k3s_servers'][0]]['ansible_default_ipv4']['address'] }}:6443"
+        k3s_server_token: "{{ hostvars[groups['k3s_servers'][0]]['k3s_server_token'] }}"
+      when:
+        - groups['k3s_servers'] is defined
+        - groups['k3s_servers'] | length > 0
+
+    - name: Display agent deployment information
+      ansible.builtin.debug:
+        msg: |
+          === Deploying k3s Agent to {{ inventory_hostname }} ===
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Server: {{ k3s_server_url }}
+
+  roles:
+    - role: k3s
+      vars:
+        k3s_mode: agent
+
+  post_tasks:
+    - name: Display agent deployment status
+      ansible.builtin.debug:
+        msg: "Agent {{ inventory_hostname }} deployed successfully"
+
+- name: Verify k3s Cluster
+  hosts: k3s_servers[0]
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Wait for all nodes to join
+      ansible.builtin.command:
+        cmd: /usr/local/bin/k3s kubectl get nodes
+      register: all_nodes
+      until: all_nodes.stdout_lines | length >= (groups['k3s_servers'] | length + groups['k3s_agents'] | default([]) | length)
+      retries: 30
+      delay: 10
+      changed_when: false
+
+    - name: Display cluster status
+      ansible.builtin.debug:
+        msg: |
+          === k3s Cluster Deployment Complete ===
+
+          Total Nodes: {{ all_nodes.stdout_lines | length - 1 }}
+          Servers: {{ groups['k3s_servers'] | length }}
+          Agents: {{ groups['k3s_agents'] | default([]) | length }}
+
+          Cluster Nodes:
+          {{ all_nodes.stdout }}
+
+    - name: Get all pods
+      ansible.builtin.command:
+        cmd: /usr/local/bin/k3s kubectl get pods -A
+      register: all_pods
+      changed_when: false
+
+    - name: Display pod status
+      ansible.builtin.debug:
+        var: all_pods.stdout_lines

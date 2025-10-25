@@ -1,0 +1,75 @@
+---
+# cAdvisor Container Monitoring Playbook
+# This playbook deploys cAdvisor for container resource monitoring and metrics collection
+- name: Deploy cAdvisor Container Monitoring
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Display target hosts
+      ansible.builtin.debug:
+        msg: |
+          === Deploying cAdvisor to {{ inventory_hostname }} ===
+          OS Family: {{ ansible_os_family }}
+          Distribution: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Installation Method: {{ cadvisor_install_method | default('docker') }}
+          Port: {{ cadvisor_port | default(8080) }}
+
+    - name: Check if Docker is required
+      ansible.builtin.fail:
+        msg: "Docker is required for cAdvisor installation but not installed"
+      when:
+        - cadvisor_install_method | default('docker') == 'docker'
+        - ansible_facts.packages is defined
+        - "'docker' not in ansible_facts.packages"
+        - "'docker-ce' not in ansible_facts.packages"
+        - "'docker.io' not in ansible_facts.packages"
+      failed_when: false
+      tags: [cadvisor, validate]
+
+  roles:
+    - cadvisor
+
+  post_tasks:
+    - name: Display cAdvisor access information
+      ansible.builtin.debug:
+        msg: |
+          === cAdvisor Successfully Deployed ===
+
+          Web UI: http://{{ ansible_default_ipv4.address }}:{{ cadvisor_port }}/
+          Metrics: http://{{ ansible_default_ipv4.address }}:{{ cadvisor_port }}/metrics
+          API: http://{{ ansible_default_ipv4.address }}:{{ cadvisor_port }}/api/v1.3/machine
+          Health: http://{{ ansible_default_ipv4.address }}:{{ cadvisor_port }}/healthz
+
+          Installation Method: {{ cadvisor_install_method | default('docker') }}
+          Version: {{ cadvisor_version | default('v0.47.0') }}
+
+          === Available Tags ===
+          --tags install    - Only installation tasks
+          --tags configure  - Only configuration tasks
+          --tags verify     - Only verification tasks
+          --tags docker     - Only Docker installation method
+          --tags binary     - Only binary installation method
+          --tags firewall   - Only firewall configuration
+      tags: [cadvisor, always]
+
+    - name: Verify cAdvisor is accessible
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ cadvisor_port | default(8080) }}/healthz"
+        status_code: 200
+        timeout: 5
+      register: final_health_check
+      failed_when: false
+      changed_when: false
+      tags: [cadvisor, verify]
+
+    - name: Display final verification status
+      ansible.builtin.debug:
+        msg: |
+          Final Health Check: {{ 'PASSED' if final_health_check.status == 200 else 'FAILED' }}
+          {% if final_health_check.status != 200 %}
+          Note: cAdvisor may need a few more seconds to fully start.
+          Try accessing: http://{{ ansible_default_ipv4.address }}:{{ cadvisor_port | default(8080) }}/
+          {% endif %}
+      tags: [cadvisor, verify]

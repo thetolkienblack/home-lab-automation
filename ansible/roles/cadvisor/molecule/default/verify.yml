@@ -1,0 +1,91 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Check if cAdvisor container is running
+      ansible.builtin.command:
+        cmd: docker inspect -f '{{ "{{.State.Running}}" }}' cadvisor
+      register: cadvisor_container
+      failed_when: false
+      changed_when: false
+
+    - name: Verify cAdvisor container exists
+      ansible.builtin.assert:
+        that:
+          - cadvisor_container.rc == 0
+          - cadvisor_container.stdout == "true"
+        fail_msg: "cAdvisor container is not running"
+        success_msg: "cAdvisor container is running"
+
+    - name: Check cAdvisor health endpoint
+      ansible.builtin.uri:
+        url: http://localhost:8080/healthz
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: health_check
+      retries: 5
+      delay: 3
+      until: health_check.status == 200
+
+    - name: Verify health check passed
+      ansible.builtin.assert:
+        that:
+          - health_check.status == 200
+        fail_msg: "cAdvisor health check failed"
+        success_msg: "cAdvisor health check passed"
+
+    - name: Check cAdvisor metrics endpoint
+      ansible.builtin.uri:
+        url: http://localhost:8080/metrics
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: metrics_check
+
+    - name: Verify metrics endpoint is accessible
+      ansible.builtin.assert:
+        that:
+          - metrics_check.status == 200
+          - "'container_' in metrics_check.content"
+        fail_msg: "cAdvisor metrics endpoint is not working correctly"
+        success_msg: "cAdvisor metrics endpoint is working"
+
+    - name: Check cAdvisor API endpoint
+      ansible.builtin.uri:
+        url: http://localhost:8080/api/v1.3/machine
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: api_check
+
+    - name: Verify API endpoint is accessible
+      ansible.builtin.assert:
+        that:
+          - api_check.status == 200
+        fail_msg: "cAdvisor API endpoint is not accessible"
+        success_msg: "cAdvisor API endpoint is accessible"
+
+    - name: Check cAdvisor container logs
+      ansible.builtin.command:
+        cmd: docker logs cadvisor
+      register: cadvisor_logs
+      changed_when: false
+      failed_when: false
+
+    - name: Display cAdvisor logs (for debugging)
+      ansible.builtin.debug:
+        var: cadvisor_logs.stdout_lines
+      when: cadvisor_logs.rc == 0
+
+    - name: Verify no critical errors in logs
+      ansible.builtin.assert:
+        that:
+          - "'panic' not in cadvisor_logs.stdout | lower"
+          - "'fatal' not in cadvisor_logs.stdout | lower"
+        fail_msg: "Critical errors found in cAdvisor logs"
+        success_msg: "No critical errors in cAdvisor logs"
+      when: cadvisor_logs.rc == 0

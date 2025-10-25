@@ -1,0 +1,39 @@
+---
+# Verify cAdvisor installation
+
+- name: Check cAdvisor health endpoint
+  ansible.builtin.uri:
+    url: "http://{{ cadvisor_bind_address }}:{{ cadvisor_port }}/healthz"
+    method: GET
+    status_code: 200
+    timeout: 5
+  register: cadvisor_health_check
+  failed_when: false
+  changed_when: false
+  tags: [cadvisor, verify]
+
+- name: Check cAdvisor metrics endpoint
+  ansible.builtin.uri:
+    url: "http://{{ cadvisor_bind_address }}:{{ cadvisor_port }}/metrics"
+    method: GET
+    status_code: 200
+    timeout: 5
+  register: cadvisor_metrics_check
+  failed_when: false
+  changed_when: false
+  tags: [cadvisor, verify]
+
+- name: Display verification results
+  ansible.builtin.debug:
+    msg: |
+      cAdvisor installation verification:
+      Health check: {{ 'PASSED' if cadvisor_health_check.status == 200 else 'FAILED' }}
+      Metrics endpoint: {{ 'PASSED' if cadvisor_metrics_check.status == 200 else 'FAILED' }}
+      Access URL: http://{{ ansible_default_ipv4.address | default(ansible_all_ipv4_addresses[0]) }}:{{ cadvisor_port }}
+  tags: [cadvisor, verify]
+
+- name: Fail if cAdvisor is not healthy
+  ansible.builtin.fail:
+    msg: "cAdvisor health check failed. Please check the installation."
+  when: cadvisor_health_check.status != 200
+  tags: [cadvisor, verify]

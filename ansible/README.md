@@ -6,6 +6,8 @@ Ansible automation for homelab infrastructure management with security hardening
 
 - **Security Hardening**: SSH, firewall (UFW/firewalld), fail2ban, automatic updates
 - **Docker Management**: Installation, configuration, and stack deployment
+- **Kubernetes**: k3s lightweight Kubernetes with Calico CNI support
+- **Container Monitoring**: cAdvisor for container resource monitoring and metrics
 - **Network Configuration**: Tailscale VPN setup and management
 - **System Management**: NTP/timezone, package updates, maintenance tasks
 - **Modular Roles**: Reusable roles with Molecule testing
@@ -55,6 +57,12 @@ ansible-playbook playbooks/security/system_hardening.yml --ask-vault-pass
 # Install Docker
 ansible-playbook playbooks/docker/install_docker.yml
 
+# Deploy cAdvisor monitoring
+ansible-playbook playbooks/monitoring/cadvisor.yml
+
+# Deploy k3s Kubernetes
+ansible-playbook playbooks/kubernetes/k3s-server.yml
+
 # Configure NTP
 ansible-playbook playbooks/system/ntp_timezone_config.yml
 
@@ -78,6 +86,8 @@ ansible-playbook playbooks/maintenance/system_maintenance.yml
 │   └── host_vars/              # Host-specific variables
 ├── playbooks/
 │   ├── docker/                 # Docker playbooks
+│   ├── kubernetes/             # Kubernetes (k3s) playbooks
+│   ├── monitoring/             # Monitoring playbooks
 │   ├── security/               # Security playbooks
 │   ├── networking/             # Network playbooks
 │   ├── system/                 # System playbooks
@@ -85,6 +95,8 @@ ansible-playbook playbooks/maintenance/system_maintenance.yml
 ├── roles/
 │   ├── common/                 # Common system setup
 │   ├── docker/                 # Docker installation
+│   ├── k3s/                    # Kubernetes (k3s) with Calico CNI
+│   ├── cadvisor/               # Container monitoring
 │   ├── security_hardening/     # Security configuration
 │   ├── tailscale/              # Tailscale VPN
 │   ├── ntp/                    # Time synchronization
@@ -148,6 +160,40 @@ System maintenance tasks: updates, cleanup, monitoring.
 - hosts: all
   roles:
     - maintenance
+```
+
+### cadvisor
+cAdvisor container monitoring for resource usage and performance metrics.
+
+```yaml
+- hosts: docker_hosts
+  roles:
+    - cadvisor
+  vars:
+    cadvisor_install_method: docker  # or 'binary'
+    cadvisor_port: 8080
+```
+
+### k3s
+Lightweight Kubernetes with Calico CNI support for container orchestration.
+
+```yaml
+# Server mode with Calico CNI
+- hosts: k3s_servers
+  roles:
+    - k3s
+  vars:
+    k3s_mode: server
+    k3s_cni: calico
+
+# Agent mode
+- hosts: k3s_agents
+  roles:
+    - k3s
+  vars:
+    k3s_mode: agent
+    k3s_server_url: "https://server-ip:6443"
+    k3s_server_token: "your-token"
 ```
 
 ## Testing with Molecule
@@ -225,6 +271,20 @@ ansible-playbook playbooks/maintenance/system_maintenance.yml
 ### Deploy Docker Stack
 ```bash
 ansible-playbook playbooks/docker/deploy-docker-stack.yml -e stack=adguardhome
+```
+
+### Deploy Container Monitoring
+```bash
+ansible-playbook playbooks/monitoring/cadvisor.yml
+```
+
+### Deploy k3s Kubernetes
+```bash
+# Single server
+ansible-playbook playbooks/kubernetes/k3s-server.yml
+
+# Multi-node cluster
+ansible-playbook playbooks/kubernetes/k3s-cluster.yml -i inventories/k3s-cluster.yml
 ```
 
 ### Update SSH Keys

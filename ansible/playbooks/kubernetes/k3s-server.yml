@@ -1,0 +1,95 @@
+---
+# k3s Server Deployment Playbook
+# This playbook deploys k3s in server mode with Calico CNI
+- name: Deploy k3s Kubernetes Server
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg: |
+          === Deploying k3s Server to {{ inventory_hostname }} ===
+          OS Family: {{ ansible_os_family }}
+          Distribution: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Mode: Server
+          CNI: {{ k3s_cni | default('calico') }}
+          Version: {{ k3s_version | default('v1.28.5+k3s1') }}
+
+    - name: Check system requirements
+      ansible.builtin.assert:
+        that:
+          - ansible_memtotal_mb >= 512
+          - ansible_processor_vcpus >= 1
+        fail_msg: "System does not meet minimum requirements (512MB RAM, 1 CPU)"
+        success_msg: "System meets minimum requirements"
+      tags: [k3s, validate]
+
+  roles:
+    - k3s
+
+  post_tasks:
+    - name: Wait for all system pods to be ready
+      ansible.builtin.command:
+        cmd: /usr/local/bin/k3s kubectl get pods -A
+      register: all_pods
+      changed_when: false
+      failed_when: false
+      tags: [k3s, verify]
+
+    - name: Display cluster status
+      ansible.builtin.debug:
+        msg: |
+          === k3s Server Successfully Deployed ===
+
+          Cluster Information:
+          API Server: https://{{ ansible_default_ipv4.address }}:{{ k3s_server_port | default(6443) }}
+          Kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+          Access the cluster:
+          sudo k3s kubectl get nodes
+          sudo k3s kubectl get pods -A
+
+          Or using kubectl:
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          kubectl get nodes
+
+          CNI: {{ k3s_cni | default('calico') }}
+          {% if k3s_cni | default('calico') == 'calico' %}
+          Calico Version: {{ calico_version | default('v3.27.0') }}
+          {% endif %}
+
+          === Available Tags ===
+          --tags prerequisites - Only system prerequisites
+          --tags install       - Only installation tasks
+          --tags calico        - Only Calico CNI installation
+          --tags kubectl       - Only kubectl configuration
+          --tags verify        - Only verification tasks
+      tags: [k3s, always]
+
+    - name: Display server token for agent nodes
+      ansible.builtin.debug:
+        msg: |
+          === Agent Configuration ===
+          To join agent nodes to this cluster, use:
+
+          k3s_mode: agent
+          k3s_server_url: "https://{{ ansible_default_ipv4.address }}:6443"
+          k3s_server_token: "{{ k3s_server_token | default('See /var/lib/rancher/k3s/server/node-token') }}"
+      when: k3s_server_token is defined
+      tags: [k3s, token]
+
+    - name: Get cluster node information
+      ansible.builtin.command:
+        cmd: /usr/local/bin/k3s kubectl get nodes -o wide
+      register: cluster_nodes
+      changed_when: false
+      failed_when: false
+      tags: [k3s, verify]
+
+    - name: Display cluster nodes
+      ansible.builtin.debug:
+        var: cluster_nodes.stdout_lines
+      when: cluster_nodes.rc == 0
+      tags: [k3s, verify]

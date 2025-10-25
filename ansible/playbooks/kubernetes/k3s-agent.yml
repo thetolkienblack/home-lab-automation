@@ -1,0 +1,74 @@
+---
+# k3s Agent Deployment Playbook
+# This playbook deploys k3s in agent mode to join an existing cluster
+- name: Deploy k3s Kubernetes Agent
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Validate agent configuration
+      ansible.builtin.assert:
+        that:
+          - k3s_server_url is defined
+          - k3s_server_url | length > 0
+          - k3s_server_token is defined
+          - k3s_server_token | length > 0
+        fail_msg: "k3s_server_url and k3s_server_token must be defined for agent deployment"
+        success_msg: "Agent configuration is valid"
+      tags: [k3s, validate]
+
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg: |
+          === Deploying k3s Agent to {{ inventory_hostname }} ===
+          OS Family: {{ ansible_os_family }}
+          Distribution: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Mode: Agent
+          Server URL: {{ k3s_server_url }}
+          Version: {{ k3s_version | default('v1.28.5+k3s1') }}
+
+    - name: Check system requirements
+      ansible.builtin.assert:
+        that:
+          - ansible_memtotal_mb >= 512
+          - ansible_processor_vcpus >= 1
+        fail_msg: "System does not meet minimum requirements (512MB RAM, 1 CPU)"
+        success_msg: "System meets minimum requirements"
+      tags: [k3s, validate]
+
+  roles:
+    - role: k3s
+      vars:
+        k3s_mode: agent
+
+  post_tasks:
+    - name: Display agent status
+      ansible.builtin.debug:
+        msg: |
+          === k3s Agent Successfully Deployed ===
+
+          Agent Information:
+          Server URL: {{ k3s_server_url }}
+          Node Name: {{ ansible_hostname }}
+
+          The agent should now appear in the cluster's node list.
+          Check from the server node:
+          sudo k3s kubectl get nodes
+
+          === Available Tags ===
+          --tags prerequisites - Only system prerequisites
+          --tags install       - Only installation tasks
+          --tags verify        - Only verification tasks
+      tags: [k3s, always]
+
+    - name: Verify agent service is running
+      ansible.builtin.systemd:
+        name: k3s-agent
+      register: agent_service
+      tags: [k3s, verify]
+
+    - name: Display agent service status
+      ansible.builtin.debug:
+        msg: "Agent service status: {{ agent_service.status.ActiveState }}"
+      tags: [k3s, verify]

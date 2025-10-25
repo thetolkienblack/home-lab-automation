@@ -1,0 +1,24 @@
+[Unit]
+Description=cAdvisor - Container Advisor
+Documentation=https://github.com/google/cadvisor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ cadvisor_user }}
+Group={{ cadvisor_group }}
+ExecStart={{ cadvisor_binary_path }} {{ (cadvisor_args + cadvisor_extra_args) | join(' ') }}
+Restart=on-failure
+RestartSec=10s
+LimitNOFILE=1048576
+LimitNPROC=infinity
+LimitCORE=infinity
+TasksMax=infinity
+TimeoutStartSec=0
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

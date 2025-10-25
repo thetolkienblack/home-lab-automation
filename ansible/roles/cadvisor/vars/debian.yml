@@ -1,0 +1,13 @@
+---
+# Debian-specific variables for cAdvisor
+
+# Package dependencies for binary installation
+cadvisor_dependencies:
+  - curl
+  - ca-certificates
+
+# Firewall package
+cadvisor_firewall_package: ufw
+
+# Additional Docker volumes specific to Debian
+cadvisor_os_docker_volumes: "{{ cadvisor_docker_volumes_debian }}"

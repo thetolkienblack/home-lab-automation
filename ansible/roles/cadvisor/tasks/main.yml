@@ -1,0 +1,33 @@
+---
+# cAdvisor role - Main tasks orchestration
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family | lower }}.yml"
+  tags: [cadvisor, always]
+
+- name: Validate installation method
+  ansible.builtin.assert:
+    that:
+      - cadvisor_install_method in ['docker', 'binary']
+    fail_msg: "cadvisor_install_method must be either 'docker' or 'binary'"
+    success_msg: "Installation method {{ cadvisor_install_method }} is valid"
+  tags: [cadvisor, validate]
+
+- name: Include Docker installation tasks
+  ansible.builtin.include_tasks: install-docker.yml
+  when: cadvisor_install_method == 'docker'
+  tags: [cadvisor, install, docker]
+
+- name: Include binary installation tasks
+  ansible.builtin.include_tasks: install-binary.yml
+  when: cadvisor_install_method == 'binary'
+  tags: [cadvisor, install, binary]
+
+- name: Configure firewall for cAdvisor
+  ansible.builtin.include_tasks: firewall.yml
+  when: cadvisor_configure_firewall | bool
+  tags: [cadvisor, firewall]
+
+- name: Verify cAdvisor installation
+  ansible.builtin.include_tasks: verify.yml
+  tags: [cadvisor, verify]

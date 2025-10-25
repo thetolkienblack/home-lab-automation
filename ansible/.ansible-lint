@@ -25,6 +25,7 @@ kinds:
 mock_modules:
   - community.general.timezone
   - community.general.ufw
+  - community.general.modprobe
   - ansible.posix.firewalld
   - ansible.posix.sysctl
 
@@ -35,3 +36,5 @@ mock_roles:
   - tailscale
   - ntp
   - maintenance
+  - cadvisor
+  - k3s

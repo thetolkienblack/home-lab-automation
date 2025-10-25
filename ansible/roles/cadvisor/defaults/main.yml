@@ -1,0 +1,72 @@
+---
+# cAdvisor default variables
+
+# Installation method: 'docker' or 'binary'
+cadvisor_install_method: docker
+
+# cAdvisor version
+cadvisor_version: v0.47.0
+
+# Docker-specific settings
+cadvisor_docker_image: gcr.io/cadvisor/cadvisor
+cadvisor_docker_container_name: cadvisor
+cadvisor_docker_restart_policy: unless-stopped
+
+# Network settings
+cadvisor_port: 8080
+cadvisor_bind_address: "0.0.0.0"
+
+# Storage settings
+cadvisor_storage_duration: 2m0s
+cadvisor_housekeeping_interval: 10s
+
+# Docker volumes for cAdvisor
+cadvisor_docker_volumes:
+  - /:/rootfs:ro
+  - /var/run:/var/run:ro
+  - /sys:/sys:ro
+  - /var/lib/docker/:/var/lib/docker:ro
+  - /dev/disk/:/dev/disk:ro
+
+# Additional Docker volumes for specific OS families
+cadvisor_docker_volumes_debian:
+  - /cgroup:/cgroup:ro
+
+cadvisor_docker_volumes_redhat: []
+
+# Privileged mode (required for full access to host metrics)
+cadvisor_docker_privileged: false
+
+# Additional devices to expose
+cadvisor_docker_devices:
+  - /dev/kmsg
+
+# Environment variables
+cadvisor_env_vars: {}
+
+# Systemd service settings (for binary installation)
+cadvisor_service_name: cadvisor
+cadvisor_service_enabled: true
+cadvisor_service_state: started
+
+# Binary installation settings
+cadvisor_binary_path: /usr/local/bin/cadvisor
+cadvisor_binary_url: "https://github.com/google/cadvisor/releases/download/{{ cadvisor_version }}/cadvisor-{{ cadvisor_version }}-linux-amd64"
+
+# User and group for binary installation
+cadvisor_user: cadvisor
+cadvisor_group: cadvisor
+cadvisor_create_user: true
+
+# cAdvisor command-line arguments
+cadvisor_args:
+  - "--port={{ cadvisor_port }}"
+  - "--housekeeping_interval={{ cadvisor_housekeeping_interval }}"
+  - "--docker_only=false"
+
+# Additional command-line arguments
+cadvisor_extra_args: []
+
+# Firewall settings
+cadvisor_configure_firewall: false
+cadvisor_firewall_zone: public

@@ -1,0 +1,63 @@
+---
+# Install cAdvisor using Docker
+
+- name: Ensure Docker is installed
+  ansible.builtin.package:
+    name: docker.io
+    state: present
+  when: ansible_os_family == "Debian"
+  tags: [cadvisor, install, docker]
+
+- name: Ensure Docker is installed (RHEL)
+  ansible.builtin.package:
+    name: docker-ce
+    state: present
+  when: ansible_os_family == "RedHat"
+  tags: [cadvisor, install, docker]
+
+- name: Ensure Docker service is running
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+  tags: [cadvisor, install, docker]
+
+- name: Pull cAdvisor Docker image
+  community.docker.docker_image:
+    name: "{{ cadvisor_docker_image }}"
+    tag: "{{ cadvisor_version }}"
+    source: pull
+    force_source: false
+  tags: [cadvisor, install, docker]
+
+- name: Combine Docker volumes
+  ansible.builtin.set_fact:
+    cadvisor_all_volumes: "{{ cadvisor_docker_volumes + cadvisor_os_docker_volumes }}"
+  tags: [cadvisor, install, docker]
+
+- name: Create cAdvisor container
+  community.docker.docker_container:
+    name: "{{ cadvisor_docker_container_name }}"
+    image: "{{ cadvisor_docker_image }}:{{ cadvisor_version }}"
+    state: started
+    restart_policy: "{{ cadvisor_docker_restart_policy }}"
+    published_ports:
+      - "{{ cadvisor_bind_address }}:{{ cadvisor_port }}:8080"
+    volumes: "{{ cadvisor_all_volumes }}"
+    devices: "{{ cadvisor_docker_devices }}"
+    privileged: "{{ cadvisor_docker_privileged }}"
+    env: "{{ cadvisor_env_vars }}"
+    detach: true
+    pull: false
+  tags: [cadvisor, install, docker]
+
+- name: Wait for cAdvisor to be ready
+  ansible.builtin.uri:
+    url: "http://{{ cadvisor_bind_address }}:{{ cadvisor_port }}/healthz"
+    status_code: 200
+    timeout: 5
+  register: cadvisor_health
+  until: cadvisor_health.status == 200
+  retries: 12
+  delay: 5
+  tags: [cadvisor, install, docker]

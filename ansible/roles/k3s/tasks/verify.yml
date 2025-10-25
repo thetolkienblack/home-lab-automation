@@ -1,0 +1,93 @@
+---
+# Verify k3s installation
+
+- name: Check k3s binary exists
+  ansible.builtin.stat:
+    path: "{{ k3s_install_dir }}/k3s"
+  register: k3s_binary_check
+  tags: [k3s, verify]
+
+- name: Verify k3s binary is installed
+  ansible.builtin.assert:
+    that:
+      - k3s_binary_check.stat.exists
+      - k3s_binary_check.stat.executable
+    fail_msg: "k3s binary not found or not executable"
+    success_msg: "k3s binary is installed and executable"
+  tags: [k3s, verify]
+
+- name: Get k3s version
+  ansible.builtin.command:
+    cmd: "{{ k3s_install_dir }}/k3s --version"
+  register: k3s_version_output
+  changed_when: false
+  tags: [k3s, verify]
+
+- name: Check k3s server service status
+  ansible.builtin.systemd:
+    name: k3s
+  register: k3s_server_service
+  when: k3s_server_enabled | bool
+  failed_when: false
+  tags: [k3s, verify]
+
+- name: Check k3s agent service status
+  ansible.builtin.systemd:
+    name: k3s-agent
+  register: k3s_agent_service
+  when:
+    - k3s_agent_enabled | bool
+    - k3s_mode == 'agent'
+  failed_when: false
+  tags: [k3s, verify]
+
+- name: Get cluster nodes
+  ansible.builtin.command:
+    cmd: "{{ k3s_install_dir }}/k3s kubectl get nodes"
+  register: k3s_nodes_output
+  changed_when: false
+  failed_when: false
+  when: k3s_server_enabled | bool
+  tags: [k3s, verify]
+
+- name: Get cluster pods
+  ansible.builtin.command:
+    cmd: "{{ k3s_install_dir }}/k3s kubectl get pods -A"
+  register: k3s_pods_output
+  changed_when: false
+  failed_when: false
+  when: k3s_server_enabled | bool
+  tags: [k3s, verify]
+
+- name: Display verification results
+  ansible.builtin.debug:
+    msg: |
+      === k3s Installation Verification ===
+      Mode: {{ k3s_mode }}
+      Version: {{ k3s_version_output.stdout_lines[0] if k3s_version_output.stdout_lines else 'Unknown' }}
+      {% if k3s_server_enabled | bool %}
+      Server Service: {{ k3s_server_service.status.ActiveState | default('unknown') }}
+      {% endif %}
+      {% if k3s_agent_enabled | bool and k3s_mode == 'agent' %}
+      Agent Service: {{ k3s_agent_service.status.ActiveState | default('unknown') }}
+      {% endif %}
+      CNI: {{ k3s_cni }}
+      {% if k3s_nodes_output is defined and k3s_nodes_output.rc == 0 %}
+
+      Cluster Nodes:
+      {{ k3s_nodes_output.stdout }}
+      {% endif %}
+  tags: [k3s, verify]
+
+- name: Display kubeconfig location
+  ansible.builtin.debug:
+    msg: |
+      === kubectl Configuration ===
+      Kubeconfig: {{ k3s_kubeconfig_path }}
+      User kubeconfig: {{ k3s_kubeconfig_user_path }}
+
+      To use kubectl:
+      export KUBECONFIG={{ k3s_kubeconfig_path }}
+      kubectl get nodes
+  when: k3s_server_enabled | bool
+  tags: [k3s, verify]

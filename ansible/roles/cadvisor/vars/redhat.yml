@@ -1,0 +1,13 @@
+---
+# RedHat-specific variables for cAdvisor
+
+# Package dependencies for binary installation
+cadvisor_dependencies:
+  - curl
+  - ca-certificates
+
+# Firewall package
+cadvisor_firewall_package: firewalld
+
+# Additional Docker volumes specific to RedHat
+cadvisor_os_docker_volumes: "{{ cadvisor_docker_volumes_redhat }}"

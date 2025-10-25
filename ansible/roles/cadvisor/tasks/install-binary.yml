@@ -1,0 +1,60 @@
+---
+# Install cAdvisor as a binary
+
+- name: Install dependencies
+  ansible.builtin.package:
+    name: "{{ cadvisor_dependencies }}"
+    state: present
+  tags: [cadvisor, install, binary]
+
+- name: Create cAdvisor user
+  ansible.builtin.user:
+    name: "{{ cadvisor_user }}"
+    group: "{{ cadvisor_group }}"
+    system: true
+    shell: /sbin/nologin
+    home: /nonexistent
+    create_home: false
+  when: cadvisor_create_user | bool
+  tags: [cadvisor, install, binary]
+
+- name: Download cAdvisor binary
+  ansible.builtin.get_url:
+    url: "{{ cadvisor_binary_url }}"
+    dest: "{{ cadvisor_binary_path }}"
+    mode: "0755"
+    owner: root
+    group: root
+    timeout: 60
+  tags: [cadvisor, install, binary]
+
+- name: Create cAdvisor systemd service file
+  ansible.builtin.template:
+    src: cadvisor.service.j2
+    dest: /etc/systemd/system/{{ cadvisor_service_name }}.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - restart cadvisor
+  tags: [cadvisor, install, binary]
+
+- name: Ensure cAdvisor service is enabled and started
+  ansible.builtin.systemd:
+    name: "{{ cadvisor_service_name }}"
+    enabled: "{{ cadvisor_service_enabled }}"
+    state: "{{ cadvisor_service_state }}"
+    daemon_reload: true
+  tags: [cadvisor, install, binary]
+
+- name: Wait for cAdvisor to be ready
+  ansible.builtin.uri:
+    url: "http://{{ cadvisor_bind_address }}:{{ cadvisor_port }}/healthz"
+    status_code: 200
+    timeout: 5
+  register: cadvisor_health
+  until: cadvisor_health.status == 200
+  retries: 12
+  delay: 5
+  tags: [cadvisor, install, binary]

@@ -1,0 +1,54 @@
+---
+# Install k3s agent
+
+- name: Validate agent configuration
+  ansible.builtin.assert:
+    that:
+      - k3s_server_url is defined
+      - k3s_server_url | length > 0
+      - k3s_server_token is defined
+      - k3s_server_token | length > 0
+    fail_msg: "k3s_server_url and k3s_server_token must be set for agent mode"
+    success_msg: "Agent configuration is valid"
+  tags: [k3s, agent, validate]
+
+- name: Create k3s agent configuration
+  ansible.builtin.template:
+    src: k3s-agent-config.yaml.j2
+    dest: "{{ k3s_config_dir }}/config.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart k3s agent
+  tags: [k3s, agent, install]
+
+- name: Download k3s installation script
+  ansible.builtin.get_url:
+    url: https://get.k3s.io
+    dest: /tmp/k3s-install.sh
+    mode: "0755"
+    timeout: 60
+  tags: [k3s, agent, install]
+
+- name: Install k3s agent
+  ansible.builtin.shell: |
+    set -o pipefail
+    INSTALL_K3S_VERSION="{{ k3s_version }}" \
+    INSTALL_K3S_EXEC="agent" \
+    K3S_URL="{{ k3s_server_url }}" \
+    K3S_TOKEN="{{ k3s_server_token }}" \
+    sh /tmp/k3s-install.sh
+  args:
+    creates: "{{ k3s_install_dir }}/k3s"
+    executable: /bin/bash
+  environment:
+    INSTALL_K3S_SKIP_START: "false"
+  tags: [k3s, agent, install]
+
+- name: Ensure k3s agent service is enabled and started
+  ansible.builtin.systemd:
+    name: k3s-agent
+    enabled: "{{ k3s_service_enabled }}"
+    state: "{{ k3s_service_state }}"
+    daemon_reload: true
+  tags: [k3s, agent, service]

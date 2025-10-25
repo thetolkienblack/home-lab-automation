@@ -1,0 +1,22 @@
+---
+# Handlers for cAdvisor role
+
+- name: Restart cadvisor container
+  community.docker.docker_container:
+    name: "{{ cadvisor_docker_container_name }}"
+    state: started
+    restart: true
+  when: cadvisor_install_method == 'docker'
+  listen: restart cadvisor
+
+- name: Restart cadvisor service
+  ansible.builtin.systemd:
+    name: "{{ cadvisor_service_name }}"
+    state: restarted
+    daemon_reload: true
+  when: cadvisor_install_method == 'binary'
+  listen: restart cadvisor
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
