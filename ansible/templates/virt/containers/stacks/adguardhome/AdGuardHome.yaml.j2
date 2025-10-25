@@ -1,0 +1,427 @@
+http:
+  pprof:
+    port: 6060
+    enabled: false
+  address: 0.0.0.0:6061
+  session_ttl: 720h
+users:
+  - name: admin
+    password: $2y$10$h8t5OHww6P700lbNxwv1RuJPjl0UWW3IGocDTDKnRaD2WvxKBY/Ye
+auth_attempts: 5
+block_auth_min: 15
+http_proxy: ""
+language: en
+theme: dark
+dns:
+  bind_hosts:
+    - 0.0.0.0
+  port: 53
+  anonymize_client_ip: false
+  ratelimit: 20
+  ratelimit_subnet_len_ipv4: 24
+  ratelimit_subnet_len_ipv6: 56
+  ratelimit_whitelist: []
+  refuse_any: true
+  upstream_dns:
+    - 100.126.136.116:5533
+    - 100.96.98.101:5533
+  upstream_dns_file: ""
+  bootstrap_dns:
+    - 1.1.1.1
+    - 8.8.8.8
+  fallback_dns:
+    - 9.9.9.9
+  upstream_mode: parallel
+  fastest_timeout: 1s
+  allowed_clients:
+    - 192.168.0.0/16
+    - 172.20.0.0/16
+    - 10.10.0.0/16
+    - 37.114.63.170/32
+  disallowed_clients: []
+  blocked_hosts:
+    - version.bind
+    - id.server
+    - hostname.bind
+  trusted_proxies:
+    - 127.0.0.0/8
+    - 192.168.50.0/16
+    - 172.20.0.0/16
+  cache_enabled: true
+  cache_size: 4194304
+  cache_ttl_min: 900
+  cache_ttl_max: 604800
+  cache_optimistic: false
+  bogus_nxdomain: []
+  aaaa_disabled: false
+  enable_dnssec: true
+  edns_client_subnet:
+    custom_ip: ""
+    enabled: true
+    use_custom: false
+  max_goroutines: 300
+  handle_ddr: true
+  ipset: []
+  ipset_file: ""
+  bootstrap_prefer_ipv6: false
+  upstream_timeout: 10s
+  private_networks: []
+  use_private_ptr_resolvers: true
+  local_ptr_upstreams:
+    - 100.126.136.116:5533
+  use_dns64: false
+  dns64_prefixes: []
+  serve_http3: false
+  use_http3_upstreams: true
+  serve_plain_dns: true
+  hostsfile_enabled: true
+  pending_requests:
+    enabled: true
+tls:
+  enabled: false
+  server_name: dns2.graylock.eu
+  force_https: true
+  port_https: 6062
+  port_dns_over_tls: 853
+  port_dns_over_quic: 853
+  port_dnscrypt: 0
+  dnscrypt_config_file: ""
+  allow_unencrypted_doh: false
+  certificate_chain: ""
+  private_key: ""
+  certificate_path: /opt/AdGuardHome/conf/certs/adguardhome.crt
+  private_key_path: /opt/AdGuardHome/conf/certs/adguardhome.key
+  strict_sni_check: false
+querylog:
+  dir_path: ""
+  ignored: []
+  interval: 2160h
+  size_memory: 1000
+  enabled: true
+  file_enabled: true
+statistics:
+  dir_path: ""
+  ignored: []
+  interval: 2160h
+  enabled: true
+filters:
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
+    name: AdGuard DNS filter
+    id: 1
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_2.txt
+    name: AdAway Default Blocklist
+    id: 2
+  - enabled: true
+    url: https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt
+    name: Hagezi Adblock Pro
+    id: 1715251523
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_44.txt
+    name: HaGeZi's Threat Intelligence Feeds
+    id: 1715251524
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_56.txt
+    name: HaGeZi's The World's Most Abused TLDs
+    id: 1715251525
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_42.txt
+    name: ShadowWhisperer's Malware List
+    id: 1715251526
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_51.txt
+    name: HaGeZi's Pro++ Blocklist
+    id: 1715251527
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_52.txt
+    name: HaGeZi's Encrypted DNS/VPN/TOR/Proxy Bypass
+    id: 1715251528
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_55.txt
+    name: HaGeZi's Badware Hoster Blocklist
+    id: 1715251529
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_53.txt
+    name: AWAvenue Ads Rule
+    id: 1715251530
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_11.txt
+    name: Malicious URL Blocklist (URLHaus)
+    id: 1715251531
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_7.txt
+    name: Perflyst and Dandelion Sprout's Smart-TV Blocklist
+    id: 1715251532
+  - enabled: true
+    url: https://oblocky.org/l.php?l=AD-BSC_TL-BSC_MAL-PHISH_TM-WIN
+    name: oBlocky
+    id: 1715251533
+whitelist_filters: []
+user_rules:
+  - '@@||dns.quad9.net^$important'
+  - '@@||mask.icloud.com^$important'
+  - '@@||*.nordvpn.com^$important'
+  - '@@||nordvpn.com^$important'
+  - '@@||www.nslookup.io^$important'
+  - '@@||mask-h2.icloud.com^$important'
+  - '@@||doh.dns.apple.com^$important'
+  - '@@||duckduckgo.com^$important'
+  - '@@||www.youtube.com^$important'
+  - '@@||blog.pcloud.com^$important'
+  - '@@||tailscale.com^$important'
+  - '@@||tp.napps-1.com^$important'
+  - '@@||stats.grafana.org^$important'
+  - '@@||kali.download^$important'
+  - '@@||*.nordaccount.com^$important'
+  - '@@||nordaccount.com^$important'
+  - '@@||*.nordcdn.com^$important'
+  - '@@||wix.com^$important'
+  - '@@||*.acloud.guru^$important'
+  - '@@||acloud.guru^$important'
+  - '@@||*.xboxlive.com^$important'
+  - '@@||plex.tv^$important'
+  - '@@||*.plex.tv^$important'
+  - '@@||*.plex.direct^$important'
+  - '@@||*.viber.com^$important'
+  - '@@||mask.apple-dns.net^$important'
+  - '@@||nadaandaria.wedding^$important'
+  - '@@||tagman.britishairways.com^$important'
+  - '@@||doh.mullvad.net^$important'
+  - '@@||dns.cloudflare.com^$important'
+  - '@@||doh.cleanbrowsing.org^$important'
+  - '@@||privateinternetaccess.com^$important'
+  - '@@||*.privateinternetaccess.com^$important'
+  - '@@||napps-1.com^$important'
+  - '@@||i.instagram.com^$client=''192.168.50.99'''
+  - '@@||theoldwritingdude.blogspot.com^$important'
+  - '@@||protonvpn.com^$important'
+  - '@@||api-license.orbstack.dev^$important'
+  - '@@||www.zlibrary.to^$important'
+  - '@@||public-ubiservices.ubi.com^$client=''192.168.50.202'''
+  - ""
+dhcp:
+  enabled: false
+  interface_name: ""
+  local_domain_name: lan
+  dhcpv4:
+    gateway_ip: ""
+    subnet_mask: ""
+    range_start: ""
+    range_end: ""
+    lease_duration: 86400
+    icmp_timeout_msec: 1000
+    options: []
+  dhcpv6:
+    range_start: ""
+    lease_duration: 86400
+    ra_slaac_only: false
+    ra_allow_slaac: false
+filtering:
+  blocking_ipv4: ""
+  blocking_ipv6: ""
+  blocked_services:
+    schedule:
+      time_zone: Europe/Sofia
+    ids:
+      - 4chan
+      - 500px
+      - 9gag
+      - activision_blizzard
+      - amazon_streaming
+      - amino
+      - battle_net
+      - betano
+      - betfair
+      - betway
+      - bigo_live
+      - bilibili
+      - blaze
+      - blizzard_entertainment
+      - bluesky
+      - box
+      - canais_globo
+      - claro
+      - clubhouse
+      - coolapk
+      - crunchyroll
+      - directvgo
+      - discoveryplus
+      - disneyplus
+      - douban
+      - dropbox
+      - ebay
+      - electronic_arts
+      - espn
+      - globoplay
+      - gog
+      - hulu
+      - iheartradio
+      - instagram
+      - iqiyi
+      - kakaotalk
+      - kik
+      - kook
+      - lazada
+      - leagueoflegends
+      - line
+      - lionsgateplus
+      - looke
+      - mail_ru
+      - mastodon
+      - mercado_libre
+      - minecraft
+      - nebula
+      - nintendo
+      - ok
+      - olvid
+      - onlyfans
+      - origin
+      - paramountplus
+      - peacock_tv
+      - playstation
+      - plenty_of_fish
+      - plex
+      - pluto_tv
+      - qq
+      - rakuten_viki
+      - riot_games
+      - roblox
+      - samsung_tv_plus
+      - shopee
+      - signal
+      - skype
+      - slack
+      - snapchat
+      - soundcloud
+      - steam
+      - telegram
+      - tidal
+      - tinder
+      - tumblr
+      - twitch
+      - ubisoft
+      - valorant
+      - viber
+      - vimeo
+      - vk
+      - voot
+      - wargaming
+      - wechat
+      - weibo
+      - whatsapp
+      - wizz
+      - xiaohongshu
+      - yy
+      - zhihu
+      - deezer
+      - odysee
+  protection_disabled_until: null
+  safe_search:
+    enabled: true
+    bing: true
+    duckduckgo: true
+    ecosia: true
+    google: true
+    pixabay: true
+    yandex: true
+    youtube: true
+  blocking_mode: default
+  parental_block_host: family-block.dns.adguard.com
+  safebrowsing_block_host: standard-block.dns.adguard.com
+  rewrites:
+    - domain: graylock.eu
+      answer: 192.168.50.54
+    - domain: '*.graylock.eu'
+      answer: 192.168.50.54
+    - domain: sidney.bg
+      answer: 37.114.63.170
+    - domain: '*.sidney.bg'
+      answer: 192.168.50.54
+    - domain: samsung.tv
+      answer: 192.168.0.250
+    - domain: 74software.eu
+      answer: 37.114.63.170
+    - domain: '*.74software.eu'
+      answer: 37.114.63.170
+    - domain: www.asusrouter.com
+      answer: 192.168.50.1
+    - domain: '*.frankfurt.graylock.eu'
+      answer: 37.114.63.170
+    - domain: docs.graylock.eu
+      answer: 37.114.63.170
+    - domain: '*.netflix.sidney.bg'
+      answer: 192.168.50.54
+    - domain: starlink.graylock.eu
+      answer: 37.114.63.170
+    - domain: cars.sidney.bg
+      answer: 37.114.63.170
+    - domain: www.sidney.bg
+      answer: 37.114.63.170
+    - domain: status.graylock.eu
+      answer: 37.114.63.170
+    - domain: pve.graylock.eu
+      answer: 37.114.63.170
+  safe_fs_patterns:
+    - /opt/adguardhome/work/data/userfilters/*
+  safebrowsing_cache_size: 1048576
+  safesearch_cache_size: 1048576
+  parental_cache_size: 1048576
+  cache_time: 30
+  filters_update_interval: 24
+  blocked_response_ttl: 10
+  filtering_enabled: true
+  parental_enabled: false
+  safebrowsing_enabled: true
+  protection_enabled: true
+clients:
+  runtime_sources:
+    whois: true
+    arp: true
+    rdns: true
+    dhcp: true
+    hosts: true
+  persistent:
+    - safe_search:
+        enabled: false
+        bing: false
+        duckduckgo: false
+        ecosia: false
+        google: false
+        pixabay: false
+        yandex: false
+        youtube: false
+      blocked_services:
+        schedule:
+          time_zone: Europe/Sofia
+        ids: []
+      name: Client 192.168.50.202
+      ids:
+        - 192.168.50.202
+      tags:
+        - device_gameconsole
+      upstreams: []
+      uid: 0196dde6-fe92-76c6-902e-59bcd731e9dc
+      upstreams_cache_size: 0
+      upstreams_cache_enabled: false
+      use_global_settings: true
+      filtering_enabled: false
+      parental_enabled: false
+      safebrowsing_enabled: false
+      use_global_blocked_services: true
+      ignore_querylog: false
+      ignore_statistics: false
+log:
+  enabled: true
+  file: ""
+  max_backups: 0
+  max_size: 100
+  max_age: 3
+  compress: false
+  local_time: false
+  verbose: false
+os:
+  group: ""
+  user: ""
+  rlimit_nofile: 0
+schema_version: 30

@@ -1,0 +1,26 @@
+---
+# Firewalld configuration (RHEL/CentOS)
+- name: Start and enable firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    enabled: true
+    state: started
+  tags: [security, firewall, firewalld]
+
+- name: Configure firewalld rich rules for whitelisted IPs
+  ansible.posix.firewalld:
+    rich_rule: "rule family='ipv4' source address='{{ item }}' accept"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ whitelist_ips }}"
+  tags: [security, firewall, firewalld]
+
+- name: Allow SSH in firewalld
+  ansible.posix.firewalld:
+    service: ssh
+    permanent: true
+    immediate: true
+    state: enabled
+  when: firewall_allow_ssh_from_anywhere | default(true)
+  tags: [security, firewall, firewalld]

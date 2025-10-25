@@ -16,3 +16,8 @@ docker_daemon_config:
       name: "nofile"
       soft: 65536
       hard: 65536
+docker_puid: 1000
+docker_pgid: 1000
+docker_ext_network: "homelab"
+docker_sec_opts:
+  - "no-new-privileges:true"

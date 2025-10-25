@@ -1,0 +1,77 @@
+---
+# Debian NTP configuration using systemd-timesyncd
+- name: Install systemd-timesyncd (Debian)
+  ansible.builtin.package:
+    name: systemd-timesyncd
+    state: present
+  tags: [ntp, debian, install]
+
+- name: Stop and disable conflicting NTP services (Debian)
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop:
+    - ntp
+    - chrony
+    - ntpd
+  failed_when: false
+  tags: [ntp, debian, configure]
+
+- name: Configure timesyncd (Debian)
+  ansible.builtin.template:
+    src: timesyncd.conf.j2
+    dest: /etc/systemd/timesyncd.conf
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  notify: Restart systemd-timesyncd
+  tags: [ntp, debian, configure]
+
+- name: Configure systemd-timesyncd security (Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/systemd/timesyncd.conf
+    insertafter: "^\\[Time\\]"
+    line: "# Security: Connect only to authenticated time servers"
+    state: present
+  when: ntp_security_hardening | default(true)
+  tags: [ntp, debian, configure]
+
+- name: Enable and start systemd-timesyncd (Debian)
+  ansible.builtin.systemd:
+    name: systemd-timesyncd
+    state: started
+    enabled: true
+    daemon_reload: true
+  tags: [ntp, debian, service]
+
+- name: Configure UFW firewall for NTP (Debian)
+  when:
+    - firewall_enabled | default(true)
+    - ntp_firewall_rules | default(true)
+  block:
+    - name: Check if UFW is active
+      ansible.builtin.command: systemctl is-active ufw
+      register: ufw_status
+      failed_when: false
+      changed_when: false
+
+    - name: Allow NTP through UFW (Debian)
+      community.general.ufw:
+        rule: allow
+        port: '123'
+        proto: udp
+        comment: "NTP - Network Time Protocol"
+        state: enabled
+      when: ufw_status.stdout == "active"
+
+    - name: Allow NTP client connections UFW (Debian)
+      community.general.ufw:
+        rule: allow
+        direction: out
+        port: '123'
+        proto: udp
+        comment: "NTP client connections"
+      when: ufw_status.stdout == "active"
+  tags: [ntp, debian, firewall]

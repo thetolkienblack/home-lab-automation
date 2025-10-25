@@ -1,0 +1,43 @@
+---
+# Common role - Basic system setup tasks
+- name: Update package cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+  tags: [packages]
+
+- name: Update package cache (RHEL/CentOS)
+  ansible.builtin.dnf:
+    update_cache: true
+  when: ansible_os_family == "RedHat"
+  tags: [packages]
+
+- name: Install common packages
+  ansible.builtin.package:
+    name: "{{ common_packages }}"
+    state: present
+  when: common_packages is defined
+  tags: [packages]
+
+- name: Install OS-specific packages
+  ansible.builtin.package:
+    name: "{{ os_specific_packages }}"
+    state: present
+  when: os_specific_packages is defined
+  tags: [packages]
+
+- name: Configure system timezone
+  community.general.timezone:
+    name: "{{ timezone }}"
+  when: timezone is defined
+  tags: [timezone]
+
+- name: Configure hostname FQDN
+  ansible.builtin.hostname:
+    name: "{{ hostname_fqdn | default(ansible_hostname) }}"
+    use: "{{ ansible_os_family | lower }}"
+  when:
+    - hostname_fqdn is defined
+    - ansible_fqdn != hostname_fqdn
+  tags: [hostname]

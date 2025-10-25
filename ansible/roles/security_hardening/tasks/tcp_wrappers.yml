@@ -1,0 +1,21 @@
+---
+# TCP wrappers configuration tasks
+- name: Configure hosts.allow with whitelist
+  ansible.builtin.template:
+    src: hosts.allow.j2
+    dest: /etc/hosts.allow
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  tags: [security, tcp_wrappers]
+
+- name: Configure hosts.deny
+  ansible.builtin.template:
+    src: hosts.deny.j2
+    dest: /etc/hosts.deny
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  tags: [security, tcp_wrappers]

@@ -1,0 +1,53 @@
+---
+# NTP verification tasks
+- name: Wait for NTP synchronization
+  ansible.builtin.wait_for:
+    timeout: 30
+  tags: [ntp, verify]
+
+- name: Verify NTP synchronization (Debian)
+  ansible.builtin.command: timedatectl show --property=NTPSynchronized --value
+  register: ntp_sync_debian
+  changed_when: false
+  when: ansible_os_family == "Debian"
+  tags: [ntp, verify, debian]
+
+- name: Verify NTP synchronization (RHEL)
+  ansible.builtin.command: chronyc sources -v
+  register: ntp_sync_rhel
+  changed_when: false
+  when: ansible_os_family == "RedHat"
+  tags: [ntp, verify, rhel]
+
+- name: Get chronyd tracking status (RHEL)
+  ansible.builtin.command: chronyc tracking
+  register: chrony_tracking
+  changed_when: false
+  when: ansible_os_family == "RedHat"
+  tags: [ntp, verify, rhel]
+
+- name: Display NTP sync status (Debian)
+  ansible.builtin.debug:
+    msg:
+      - "NTP synchronization status: {{ 'SYNCHRONIZED' if ntp_sync_debian.stdout == 'yes' else 'NOT SYNCHRONIZED' }}"
+      - "Timezone: {{ current_timezone.stdout }}"
+  when:
+    - ansible_os_family == "Debian"
+    - ntp_sync_debian is defined
+  tags: [ntp, verify, debian]
+
+- name: Display NTP sync status (RHEL)
+  ansible.builtin.debug:
+    msg:
+      - "Chrony sources:"
+      - "{{ ntp_sync_rhel.stdout_lines }}"
+      - ""
+      - "Chrony tracking:"
+      - "{{ chrony_tracking.stdout_lines }}"
+      - ""
+      - "Timezone: {{ current_timezone.stdout }}"
+  when:
+    - ansible_os_family == "RedHat"
+    - ntp_sync_rhel is defined
+    - chrony_tracking is defined
+  tags: [ntp, verify, rhel]

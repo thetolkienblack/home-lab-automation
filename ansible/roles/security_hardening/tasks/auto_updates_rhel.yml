@@ -1,0 +1,18 @@
+---
+# RHEL/CentOS dnf-automatic configuration
+- name: Enable automatic updates
+  ansible.builtin.package:
+    name: dnf-automatic
+    state: present
+  tags: [security, auto_updates, rhel]
+
+- name: Configure dnf-automatic for security updates
+  ansible.builtin.template:
+    src: dnf-automatic.conf.j2
+    dest: /etc/dnf/automatic.conf
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  notify: Restart dnf-automatic
+  tags: [security, auto_updates, rhel]

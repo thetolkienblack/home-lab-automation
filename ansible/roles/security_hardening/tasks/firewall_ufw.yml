@@ -1,0 +1,34 @@
+---
+# UFW firewall configuration (Debian/Ubuntu)
+- name: Configure UFW default policies
+  community.general.ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - {direction: 'incoming', policy: "{{ firewall_default_incoming }}"}
+    - {direction: 'outgoing', policy: "{{ firewall_default_outgoing }}"}
+    - {direction: 'routed', policy: "deny"}
+  tags: [security, firewall, ufw]
+
+- name: Allow all traffic from whitelisted IPs (UFW)
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item }}"
+    comment: "Whitelist {{ item }}"
+  loop: "{{ whitelist_ips }}"
+  tags: [security, firewall, ufw]
+
+- name: Allow SSH from anywhere (UFW)
+  community.general.ufw:
+    rule: allow
+    port: "{{ ssh_port }}"
+    proto: tcp
+    comment: "SSH access"
+  when: firewall_allow_ssh_from_anywhere | default(true)
+  tags: [security, firewall, ufw]
+
+- name: Enable UFW logging and firewall
+  community.general.ufw:
+    state: enabled
+    logging: "on"
+  tags: [security, firewall, ufw]

@@ -1,0 +1,29 @@
+---
+# NTP and Timezone Configuration Playbook (Using Role)
+# This playbook uses the ntp role for time synchronization
+- name: Configure NTP Time Synchronization and Timezone
+  hosts: all
+  become: true
+  gather_facts: true
+
+  roles:
+    - common
+    - ntp
+
+  post_tasks:
+    - name: Display final time status
+      ansible.builtin.command: timedatectl status
+      register: time_after
+      changed_when: false
+
+    - name: Show final time synchronization status
+      ansible.builtin.debug:
+        msg: |
+          === FINAL TIME CONFIGURATION ===
+          {{ time_after.stdout }}
+
+          Use tags to run specific tasks:
+          --tags timezone   - Only configure timezone
+          --tags debian     - Only Debian/Ubuntu NTP setup
+          --tags rhel       - Only RHEL/CentOS NTP setup
+          --tags verify     - Only verification tasks

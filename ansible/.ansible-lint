@@ -1,0 +1,37 @@
+---
+profile: production
+
+exclude_paths:
+  - .cache/
+  - .github/
+  - collections/
+  - .facts_cache/
+  - '*.backup'
+
+skip_list:
+  - yaml[line-length]  # Allow longer lines in some cases
+  - name[casing]       # Allow flexible task naming
+
+warn_list:
+  - command-instead-of-module
+  - no-changed-when
+  - risky-file-permissions
+
+kinds:
+  - yaml: "*.yaml"
+  - yaml: "*.yml"
+  - yaml: ".yamllint"
+
+mock_modules:
+  - community.general.timezone
+  - community.general.ufw
+  - ansible.posix.firewalld
+  - ansible.posix.sysctl
+
+mock_roles:
+  - common
+  - docker
+  - security_hardening
+  - tailscale
+  - ntp
+  - maintenance

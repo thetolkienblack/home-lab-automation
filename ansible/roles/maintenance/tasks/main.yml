@@ -1,0 +1,13 @@
+---
+# Maintenance role - System maintenance and monitoring tasks
+- name: Include update tasks
+  ansible.builtin.include_tasks: updates.yml
+  tags: [maintenance, updates]
+
+- name: Include cleanup tasks
+  ansible.builtin.include_tasks: cleanup.yml
+  tags: [maintenance, cleanup]
+
+- name: Include monitoring tasks
+  ansible.builtin.include_tasks: monitoring.yml
+  tags: [maintenance, monitoring]

@@ -1,0 +1,16 @@
+---
+# Default variables for maintenance role
+
+# Cleanup settings
+maintenance_cleanup_old_logs: false
+maintenance_log_retention_days: 30
+
+# Monitoring display settings
+maintenance_show_disk_usage: true
+maintenance_show_memory_usage: true
+maintenance_show_cpu_info: true
+maintenance_show_system_load: true
+
+# Alert thresholds
+maintenance_disk_usage_threshold: 85
+maintenance_memory_usage_threshold: 90

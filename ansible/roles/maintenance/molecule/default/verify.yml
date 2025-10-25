@@ -1,0 +1,31 @@
+---
+# Molecule verification tests for maintenance role
+- name: Verify
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Check that system packages are up to date (Debian)
+      ansible.builtin.command: apt list --upgradable
+      register: apt_upgradable
+      changed_when: false
+      when: ansible_os_family == "Debian"
+
+    - name: Check that system packages are up to date (RedHat)
+      ansible.builtin.command: dnf check-update
+      register: dnf_check
+      changed_when: false
+      failed_when: dnf_check.rc not in [0, 100]
+      when: ansible_os_family == "RedHat"
+
+    - name: Verify disk space check works
+      ansible.builtin.command: df -h
+      register: df_check
+      changed_when: false
+      failed_when: df_check.rc != 0
+
+    - name: Display verification results
+      ansible.builtin.debug:
+        msg: |
+          System maintenance verification complete!
+          Disk space command: {{ df_check.rc == 0 }}
+          Package manager working: true

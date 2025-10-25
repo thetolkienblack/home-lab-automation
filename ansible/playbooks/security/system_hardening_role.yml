@@ -1,0 +1,37 @@
+---
+# Security Hardening Playbook (Using Role)
+# This playbook uses the security_hardening role for comprehensive server hardening
+- name: Comprehensive Security Hardening
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Validate whitelist_ips is defined
+      ansible.builtin.assert:
+        that:
+          - whitelist_ips is defined
+          - whitelist_ips | length > 0
+        fail_msg: "whitelist_ips must be defined in group_vars or host_vars"
+
+  roles:
+    - common
+    - security_hardening
+
+  post_tasks:
+    - name: Display security hardening completion
+      ansible.builtin.debug:
+        msg: |
+          === SECURITY HARDENING COMPLETED ===
+          Hostname: {{ ansible_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+
+          Use tags to run specific tasks:
+          --tags ssh          - Only SSH hardening
+          --tags firewall     - Only firewall configuration
+          --tags fail2ban     - Only fail2ban setup
+          --tags sysctl       - Only kernel security parameters
+          --tags tcp_wrappers - Only TCP wrappers
+          --tags auto_updates - Only automatic updates
+
+          IMPORTANT: Test SSH connectivity before logging out!

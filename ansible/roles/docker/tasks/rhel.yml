@@ -1,0 +1,20 @@
+---
+# RHEL/CentOS specific Docker installation tasks
+- name: Install required packages
+  ansible.builtin.package:
+    name:
+      - dnf-plugins-core
+      - curl
+      - ca-certificates
+    state: present
+  tags: [docker, install]
+
+- name: Add Docker repository
+  ansible.builtin.yum_repository:
+    name: docker-ce-stable
+    description: Docker CE Stable - $basearch
+    baseurl: https://download.docker.com/linux/rhel/9/$basearch/stable
+    gpgcheck: true
+    gpgkey: https://download.docker.com/linux/rhel/gpg
+    enabled: true
+  tags: [docker, install]

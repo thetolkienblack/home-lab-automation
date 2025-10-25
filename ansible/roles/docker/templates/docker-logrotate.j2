@@ -1,0 +1,13 @@
+/var/lib/docker/containers/*/*.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    notifempty
+    create 0644 root root
+    copytruncate
+    postrotate
+        /usr/bin/docker kill --signal="USR1" $(docker ps -q) 2>/dev/null || true
+    endscript
+}

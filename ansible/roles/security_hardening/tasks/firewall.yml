@@ -1,0 +1,11 @@
+---
+# Firewall configuration tasks - UFW (Debian) and firewalld (RHEL)
+- name: Include Debian/Ubuntu firewall tasks (UFW)
+  ansible.builtin.include_tasks: firewall_ufw.yml
+  when: ansible_os_family == "Debian"
+  tags: [security, firewall, ufw]
+
+- name: Include RHEL/CentOS firewall tasks (firewalld)
+  ansible.builtin.include_tasks: firewall_firewalld.yml
+  when: ansible_os_family == "RedHat"
+  tags: [security, firewall, firewalld]

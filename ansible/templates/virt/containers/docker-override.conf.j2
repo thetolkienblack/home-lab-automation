@@ -1,4 +1,12 @@
 [Service]
+Type=notify
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=yes
+ProtectHome=yes
+ReadWritePaths=/var/lib/docker /var/run/docker /var/log/docker
+RestrictSUIDSGID=yes
 # Resource limits only
 LimitNOFILE=1048576
 LimitNPROC=infinity

@@ -1,0 +1,61 @@
+---
+# Default variables for security_hardening role
+
+# Security feature toggles
+firewall_enabled: true
+fail2ban_enabled: true
+tcp_wrappers_enabled: true
+configure_sysctl_security: true
+configure_system_limits: true
+configure_custom_logrotate: true
+enable_unattended_upgrades: true
+
+# SSH configuration
+ssh_port: 22
+
+# SSH users and their authorized keys
+# Define this in group_vars/all/vault.yml or host_vars for security
+# Example:
+# ssh_users:
+#   - user: root
+#     authorized_keys:
+#       - "ssh-ed25519 AAAAC3NzaC1... admin@workstation"
+#       - "ssh-ed25519 AAAAC3NzaC1... backup@server"
+#     exclusive: false  # If true, removes all other keys for this user
+#
+#   - user: deploy
+#     authorized_keys:
+#       - "ssh-ed25519 AAAAC3NzaC1... deploy@ci-server"
+#     exclusive: false
+#     ensure_user: true  # Create user if doesn't exist (not needed for root)
+#     shell: /bin/bash
+#     groups: [sudo, docker]
+#     home: /home/deploy  # Optional: custom home directory
+#     remove_keys:  # Optional: keys to explicitly remove
+#       - "ssh-rsa AAAAB3NzaC1... oldkey@deprecated"
+#
+#   - user: developer
+#     authorized_keys:
+#       - "ssh-ed25519 AAAAC3NzaC1... dev@laptop"
+#     exclusive: true  # This will remove all other keys for developer user
+#     ensure_user: true
+#     shell: /bin/zsh
+#     groups: [developers]
+ssh_users: []
+
+# Backup existing SSH keys before modification
+ssh_backup_keys: false
+
+# Firewall defaults
+firewall_default_incoming: "deny"
+firewall_default_outgoing: "allow"
+firewall_allow_ssh_from_anywhere: true
+firewall_allow_http: false
+firewall_allow_https: false
+firewall_reset_before_config: false
+
+# Whitelist IPs (REQUIRED - must be overridden)
+whitelist_ips: []
+
+# Timezone
+timezone: "UTC"

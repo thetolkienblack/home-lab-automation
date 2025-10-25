@@ -1,0 +1,43 @@
+---
+# Default variables for docker role
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+docker_users: []
+
+# Docker daemon configuration
+docker_daemon_config:
+  log-driver: "json-file"
+  log-opts:
+    max-size: "10m"
+    max-file: "3"
+  storage-driver: "overlay2"
+  live-restore: true
+  userland-proxy: false
+  no-new-privileges: true
+  seccomp-profile: "/etc/docker/seccomp.json"
+  icc: false
+  userns-remap: "default"
+  default-ulimits:
+    nofile:
+      name: "nofile"
+      soft: 65536
+      hard: 65536
+
+# Docker compose completion
+docker_compose_completion_url: "https://raw.githubusercontent.com/docker/compose/v2.23.0/contrib/completion/bash/docker-compose"
+
+# User/Group IDs for Docker
+docker_puid: 1000
+docker_pgid: 1000
+
+# Docker network
+docker_ext_network: "homelab"
+
+# Docker security options
+docker_sec_opts:
+  - "no-new-privileges:true"

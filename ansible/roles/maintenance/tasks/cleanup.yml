@@ -1,0 +1,36 @@
+---
+# System cleanup tasks
+- name: Remove old kernels (Debian/Ubuntu)
+  ansible.builtin.apt:
+    autoremove: true
+    autoclean: true
+    purge: true
+  when: ansible_os_family == "Debian"
+  tags: [maintenance, cleanup]
+
+- name: Clean package cache (RedHat/CentOS)
+  ansible.builtin.dnf:
+    autoremove: true
+  when: ansible_os_family == "RedHat"
+  tags: [maintenance, cleanup]
+
+- name: Find and remove old log files
+  ansible.builtin.find:
+    paths:
+      - /var/log
+    patterns: "*.gz,*.old,*.1"
+    age: "{{ maintenance_log_retention_days }}d"
+    recurse: true
+  register: old_logs
+  when: maintenance_cleanup_old_logs | bool
+  tags: [maintenance, cleanup]
+
+- name: Remove old log files
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ old_logs.files | default([]) }}"
+  when:
+    - maintenance_cleanup_old_logs | bool
+    - old_logs.files is defined
+  tags: [maintenance, cleanup]
