@@ -1,0 +1,56 @@
+---
+# Configure Trivy integration for Wazuh Agent
+
+- name: Create Trivy-Wazuh integration script
+  ansible.builtin.template:
+    src: trivy-wazuh-integration.py.j2
+    dest: "{{ wazuh_trivy_wazuh_script }}"
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [wazuh, trivy]
+
+- name: Create Trivy scan wrapper script
+  ansible.builtin.template:
+    src: trivy-scan-wrapper.sh.j2
+    dest: /usr/local/bin/trivy-scan-wazuh.sh
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [wazuh, trivy]
+
+- name: Configure Trivy custom rules
+  ansible.builtin.template:
+    src: local_rules_trivy.xml.j2
+    dest: "{{ wazuh_config_dir }}/rules/local_rules_trivy.xml"
+    owner: root
+    group: "{{ wazuh_group }}"
+    mode: "0640"
+  notify: restart wazuh-agent
+  tags: [wazuh, trivy]
+
+- name: Create cron job for Trivy scans
+  ansible.builtin.cron:
+    name: "Trivy-Wazuh vulnerability scan"
+    minute: "{{ wazuh_trivy_scan_schedule.split()[0] }}"
+    hour: "{{ wazuh_trivy_scan_schedule.split()[1] }}"
+    day: "{{ wazuh_trivy_scan_schedule.split()[2] }}"
+    month: "{{ wazuh_trivy_scan_schedule.split()[3] }}"
+    weekday: "{{ wazuh_trivy_scan_schedule.split()[4] }}"
+    user: root
+    job: "/usr/local/bin/trivy-scan-wazuh.sh >> /var/log/trivy-wazuh.log 2>&1"
+    state: present
+  tags: [wazuh, trivy, cron]
+
+- name: Create Trivy report directory monitoring
+  ansible.builtin.blockinfile:
+    path: "{{ wazuh_config_dir }}/ossec.conf"
+    marker: "<!-- {mark} ANSIBLE MANAGED BLOCK - TRIVY -->"
+    block: |
+      <localfile>
+        <log_format>json</log_format>
+        <location>/var/log/trivy-wazuh.json</location>
+      </localfile>
+    insertafter: "<ossec_config>"
+  notify: restart wazuh-agent
+  tags: [wazuh, trivy]

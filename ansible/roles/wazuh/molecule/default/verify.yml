@@ -1,0 +1,357 @@
+---
+- name: Verify Wazuh All-in-One Installation
+  hosts: wazuh_servers
+  become: true
+  gather_facts: false
+
+  tasks:
+    # Manager Verification
+    - name: Check if Wazuh Manager is installed
+      ansible.builtin.stat:
+        path: /var/ossec/bin/wazuh-control
+      register: wazuh_manager_binary
+
+    - name: Verify Wazuh Manager binary exists
+      ansible.builtin.assert:
+        that:
+          - wazuh_manager_binary.stat.exists
+        fail_msg: "Wazuh Manager binary not found"
+        success_msg: "Wazuh Manager binary exists"
+
+    - name: Check Wazuh Manager service status
+      ansible.builtin.systemd:
+        name: wazuh-manager
+      register: wazuh_manager_service
+
+    - name: Verify Wazuh Manager service is running
+      ansible.builtin.assert:
+        that:
+          - wazuh_manager_service.status.ActiveState == "active"
+        fail_msg: "Wazuh Manager service is not active"
+        success_msg: "Wazuh Manager service is active"
+
+    - name: Check Wazuh Manager configuration file
+      ansible.builtin.stat:
+        path: /var/ossec/etc/ossec.conf
+      register: wazuh_manager_config
+
+    - name: Verify Wazuh Manager configuration exists
+      ansible.builtin.assert:
+        that:
+          - wazuh_manager_config.stat.exists
+        fail_msg: "Wazuh Manager configuration not found"
+        success_msg: "Wazuh Manager configuration exists"
+
+    - name: Read Wazuh Manager configuration
+      ansible.builtin.slurp:
+        path: /var/ossec/etc/ossec.conf
+      register: wazuh_config_content
+
+    - name: Verify vulnerability detection is enabled
+      ansible.builtin.assert:
+        that:
+          - "'<vulnerability-detector>' in (wazuh_config_content.content | b64decode)"
+        fail_msg: "Vulnerability detection not configured"
+        success_msg: "Vulnerability detection is configured"
+
+    - name: Verify email notification is enabled
+      ansible.builtin.assert:
+        that:
+          - "'<email_notification>yes</email_notification>' in (wazuh_config_content.content | b64decode)"
+        fail_msg: "Email notification not enabled"
+        success_msg: "Email notification is enabled"
+
+    # Indexer Verification
+    - name: Check if Wazuh Indexer is installed
+      ansible.builtin.stat:
+        path: /usr/share/wazuh-indexer/bin/opensearch
+      register: wazuh_indexer_binary
+
+    - name: Verify Wazuh Indexer binary exists
+      ansible.builtin.assert:
+        that:
+          - wazuh_indexer_binary.stat.exists
+        fail_msg: "Wazuh Indexer binary not found"
+        success_msg: "Wazuh Indexer binary exists"
+
+    - name: Check Wazuh Indexer service status
+      ansible.builtin.systemd:
+        name: wazuh-indexer
+      register: wazuh_indexer_service
+
+    - name: Verify Wazuh Indexer service is running
+      ansible.builtin.assert:
+        that:
+          - wazuh_indexer_service.status.ActiveState == "active"
+        fail_msg: "Wazuh Indexer service is not active"
+        success_msg: "Wazuh Indexer service is active"
+
+    - name: Check Wazuh Indexer configuration
+      ansible.builtin.stat:
+        path: /etc/wazuh-indexer/opensearch.yml
+      register: wazuh_indexer_config
+
+    - name: Verify Wazuh Indexer configuration exists
+      ansible.builtin.assert:
+        that:
+          - wazuh_indexer_config.stat.exists
+        fail_msg: "Wazuh Indexer configuration not found"
+        success_msg: "Wazuh Indexer configuration exists"
+
+    # Dashboard Verification
+    - name: Check if Wazuh Dashboard is installed
+      ansible.builtin.stat:
+        path: /usr/share/wazuh-dashboard/bin/opensearch-dashboards
+      register: wazuh_dashboard_binary
+
+    - name: Verify Wazuh Dashboard binary exists
+      ansible.builtin.assert:
+        that:
+          - wazuh_dashboard_binary.stat.exists
+        fail_msg: "Wazuh Dashboard binary not found"
+        success_msg: "Wazuh Dashboard binary exists"
+
+    - name: Check Wazuh Dashboard service status
+      ansible.builtin.systemd:
+        name: wazuh-dashboard
+      register: wazuh_dashboard_service
+
+    - name: Verify Wazuh Dashboard service is running
+      ansible.builtin.assert:
+        that:
+          - wazuh_dashboard_service.status.ActiveState == "active"
+        fail_msg: "Wazuh Dashboard service is not active"
+        success_msg: "Wazuh Dashboard service is active"
+
+    - name: Check Wazuh Dashboard configuration
+      ansible.builtin.stat:
+        path: /etc/wazuh-dashboard/opensearch_dashboards.yml
+      register: wazuh_dashboard_config
+
+    - name: Verify Wazuh Dashboard configuration exists
+      ansible.builtin.assert:
+        that:
+          - wazuh_dashboard_config.stat.exists
+        fail_msg: "Wazuh Dashboard configuration not found"
+        success_msg: "Wazuh Dashboard configuration exists"
+
+    # Docker Monitoring Verification
+    - name: Check Docker monitoring configuration
+      ansible.builtin.stat:
+        path: /var/ossec/etc/shared/default/agent.conf
+      register: wazuh_docker_config
+
+    - name: Verify Docker monitoring is configured
+      ansible.builtin.assert:
+        that:
+          - wazuh_docker_config.stat.exists
+        fail_msg: "Docker monitoring configuration not found"
+        success_msg: "Docker monitoring configuration exists"
+
+    - name: Check for Docker event listener
+      ansible.builtin.stat:
+        path: /var/ossec/wodles/docker/DockerListener
+      register: wazuh_docker_listener
+
+    - name: Check wazuh user is in docker group
+      ansible.builtin.command:
+        cmd: id wazuh
+      register: wazuh_user_groups
+      changed_when: false
+
+    - name: Verify wazuh user has docker access
+      ansible.builtin.assert:
+        that:
+          - "'docker' in wazuh_user_groups.stdout"
+        fail_msg: "wazuh user not in docker group"
+        success_msg: "wazuh user has docker access"
+
+    # Trivy Integration Verification
+    - name: Check Trivy integration script
+      ansible.builtin.stat:
+        path: /usr/local/bin/trivy-wazuh-integration.py
+      register: wazuh_trivy_script
+
+    - name: Verify Trivy integration script exists
+      ansible.builtin.assert:
+        that:
+          - wazuh_trivy_script.stat.exists
+          - wazuh_trivy_script.stat.mode == '0755'
+        fail_msg: "Trivy integration script not found or not executable"
+        success_msg: "Trivy integration script is configured"
+
+    - name: Check Trivy scan wrapper
+      ansible.builtin.stat:
+        path: /usr/local/bin/trivy-scan-wazuh.sh
+      register: wazuh_trivy_wrapper
+
+    - name: Verify Trivy scan wrapper exists
+      ansible.builtin.assert:
+        that:
+          - wazuh_trivy_wrapper.stat.exists
+          - wazuh_trivy_wrapper.stat.mode == '0755'
+        fail_msg: "Trivy scan wrapper not found or not executable"
+        success_msg: "Trivy scan wrapper is configured"
+
+    - name: Check for Trivy cron job
+      ansible.builtin.command:
+        cmd: crontab -l
+      register: wazuh_trivy_cron
+      changed_when: false
+      failed_when: false
+
+    - name: Verify Trivy cron job is scheduled
+      ansible.builtin.assert:
+        that:
+          - "'trivy-scan-wazuh.sh' in wazuh_trivy_cron.stdout"
+        fail_msg: "Trivy cron job not scheduled"
+        success_msg: "Trivy cron job is scheduled"
+      when: wazuh_trivy_cron.rc == 0
+
+    - name: Check Trivy custom rules
+      ansible.builtin.stat:
+        path: /var/ossec/etc/rules/local_rules_trivy.xml
+      register: wazuh_trivy_rules
+
+    - name: Verify Trivy custom rules exist
+      ansible.builtin.assert:
+        that:
+          - wazuh_trivy_rules.stat.exists
+        fail_msg: "Trivy custom rules not found"
+        success_msg: "Trivy custom rules are configured"
+
+    # SSL Certificate Verification
+    - name: Check Manager SSL certificate
+      ansible.builtin.stat:
+        path: /etc/wazuh-indexer/certs/wazuh-manager.pem
+      register: wazuh_ssl_cert
+
+    - name: Verify SSL certificate exists
+      ansible.builtin.assert:
+        that:
+          - wazuh_ssl_cert.stat.exists
+        fail_msg: "SSL certificate not found"
+        success_msg: "SSL certificate exists"
+
+    # API Verification
+    - name: Check Wazuh API port is listening
+      ansible.builtin.wait_for:
+        port: 55000
+        timeout: 10
+      register: wazuh_api_port
+
+    - name: Verify Wazuh API is accessible
+      ansible.builtin.assert:
+        that:
+          - wazuh_api_port is succeeded
+        fail_msg: "Wazuh API port 55000 not accessible"
+        success_msg: "Wazuh API is accessible"
+
+- name: Verify Wazuh Agent Installation
+  hosts: wazuh_agents
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check if Wazuh Agent is installed
+      ansible.builtin.stat:
+        path: /var/ossec/bin/wazuh-control
+      register: wazuh_agent_binary
+
+    - name: Verify Wazuh Agent binary exists
+      ansible.builtin.assert:
+        that:
+          - wazuh_agent_binary.stat.exists
+        fail_msg: "Wazuh Agent binary not found"
+        success_msg: "Wazuh Agent binary exists"
+
+    - name: Check Wazuh Agent service status
+      ansible.builtin.systemd:
+        name: wazuh-agent
+      register: wazuh_agent_service
+
+    - name: Verify Wazuh Agent service is running
+      ansible.builtin.assert:
+        that:
+          - wazuh_agent_service.status.ActiveState == "active"
+        fail_msg: "Wazuh Agent service is not active"
+        success_msg: "Wazuh Agent service is active"
+
+    - name: Check Wazuh Agent configuration
+      ansible.builtin.stat:
+        path: /var/ossec/etc/ossec.conf
+      register: wazuh_agent_config
+
+    - name: Verify Wazuh Agent configuration exists
+      ansible.builtin.assert:
+        that:
+          - wazuh_agent_config.stat.exists
+        fail_msg: "Wazuh Agent configuration not found"
+        success_msg: "Wazuh Agent configuration exists"
+
+    - name: Read Wazuh Agent configuration
+      ansible.builtin.slurp:
+        path: /var/ossec/etc/ossec.conf
+      register: wazuh_agent_config_content
+
+    - name: Verify agent is configured with manager IP
+      ansible.builtin.assert:
+        that:
+          - "wazuh_agent_manager_ip in (wazuh_agent_config_content.content | b64decode)"
+        fail_msg: "Manager IP not configured in agent"
+        success_msg: "Agent is configured with manager IP"
+
+    # Docker Monitoring on Agent
+    - name: Check wazuh user is in docker group (agent)
+      ansible.builtin.command:
+        cmd: id wazuh
+      register: wazuh_agent_user_groups
+      changed_when: false
+
+    - name: Verify wazuh user has docker access (agent)
+      ansible.builtin.assert:
+        that:
+          - "'docker' in wazuh_agent_user_groups.stdout"
+        fail_msg: "wazuh user not in docker group on agent"
+        success_msg: "wazuh user has docker access on agent"
+
+    # Trivy Integration on Agent
+    - name: Check Trivy integration script (agent)
+      ansible.builtin.stat:
+        path: /usr/local/bin/trivy-wazuh-integration.py
+      register: wazuh_agent_trivy_script
+
+    - name: Verify Trivy integration script exists (agent)
+      ansible.builtin.assert:
+        that:
+          - wazuh_agent_trivy_script.stat.exists
+          - wazuh_agent_trivy_script.stat.mode == '0755'
+        fail_msg: "Trivy integration script not found on agent"
+        success_msg: "Trivy integration script is configured on agent"
+
+    - name: Check for Trivy cron job (agent)
+      ansible.builtin.command:
+        cmd: crontab -l
+      register: wazuh_agent_trivy_cron
+      changed_when: false
+      failed_when: false
+
+    - name: Verify Trivy cron job is scheduled (agent)
+      ansible.builtin.assert:
+        that:
+          - "'trivy-scan-wazuh.sh' in wazuh_agent_trivy_cron.stdout"
+        fail_msg: "Trivy cron job not scheduled on agent"
+        success_msg: "Trivy cron job is scheduled on agent"
+      when: wazuh_agent_trivy_cron.rc == 0
+
+    - name: Check client.keys file exists
+      ansible.builtin.stat:
+        path: /var/ossec/etc/client.keys
+      register: wazuh_client_keys
+
+    - name: Verify client.keys exists
+      ansible.builtin.assert:
+        that:
+          - wazuh_client_keys.stat.exists
+        fail_msg: "client.keys file not found"
+        success_msg: "client.keys file exists"

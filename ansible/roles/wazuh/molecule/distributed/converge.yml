@@ -1,0 +1,59 @@
+---
+- name: Converge - Deploy Wazuh Indexer Cluster
+  hosts: wazuh_indexer
+  become: true
+  gather_facts: true
+  serial: 1
+
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  roles:
+    - role: wazuh
+
+- name: Converge - Deploy Wazuh Manager
+  hosts: wazuh_manager
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Wait for indexer cluster to be ready
+      ansible.builtin.wait_for:
+        host: "{{ wazuh_indexer_ip }}"
+        port: 9200
+        timeout: 300
+      delegate_to: localhost
+
+  roles:
+    - role: docker
+    - role: trivy
+    - role: wazuh
+
+- name: Converge - Deploy Wazuh Dashboard
+  hosts: wazuh_dashboard
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Wait for manager to be ready
+      ansible.builtin.wait_for:
+        host: "{{ groups['wazuh_manager'][0] }}"
+        port: 1514
+        timeout: 300
+      delegate_to: localhost
+
+  roles:
+    - role: wazuh

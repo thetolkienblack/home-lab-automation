@@ -1,0 +1,49 @@
+---
+# Install and configure Wazuh Manager
+
+- name: Install Wazuh Manager package
+  ansible.builtin.package:
+    name: "{{ wazuh_manager_package }}={{ wazuh_version }}-1"
+    state: present
+  tags: [wazuh, manager, install]
+
+- name: Hold Wazuh Manager package
+  ansible.builtin.dpkg_selections:
+    name: "{{ wazuh_manager_package }}"
+    selection: hold
+  when:
+    - ansible_os_family == "Debian"
+    - wazuh_hold_packages | bool
+  tags: [wazuh, manager, install]
+
+- name: Configure Wazuh Manager
+  ansible.builtin.template:
+    src: ossec.conf.j2
+    dest: "{{ wazuh_config_dir }}/ossec.conf"
+    owner: root
+    group: "{{ wazuh_group }}"
+    mode: "0640"
+    backup: true
+  notify: restart wazuh-manager
+  tags: [wazuh, manager, configure]
+
+- name: Enable and start Wazuh Manager service
+  ansible.builtin.systemd:
+    name: wazuh-manager
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [wazuh, manager, service]
+
+- name: Wait for Wazuh Manager API to be ready
+  ansible.builtin.uri:
+    url: "https://localhost:{{ wazuh_manager_api_port }}"
+    method: GET
+    validate_certs: false
+    status_code: [200, 401]
+  register: wazuh_api_check
+  until: wazuh_api_check.status in [200, 401]
+  retries: 30
+  delay: 10
+  failed_when: false
+  tags: [wazuh, manager, verify]

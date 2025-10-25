@@ -1,0 +1,46 @@
+---
+- name: Converge - Deploy Wazuh All-in-One Servers
+  hosts: wazuh_servers
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Update apt cache (Debian)
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == 'Debian'
+
+    - name: Update dnf cache (RedHat)
+      ansible.builtin.dnf:
+        update_cache: true
+      when: ansible_os_family == 'RedHat'
+
+  roles:
+    - role: docker
+    - role: trivy
+    - role: wazuh
+
+- name: Converge - Deploy Wazuh Agents
+  hosts: wazuh_agents
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Update apt cache (Debian)
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == 'Debian'
+
+    - name: Wait for manager to be available
+      ansible.builtin.wait_for:
+        host: "{{ wazuh_agent_manager_ip }}"
+        port: 1515
+        timeout: 300
+      delegate_to: localhost
+
+  roles:
+    - role: docker
+    - role: trivy
+    - role: wazuh

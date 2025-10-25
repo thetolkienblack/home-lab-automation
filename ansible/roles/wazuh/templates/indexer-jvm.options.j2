@@ -1,0 +1,4 @@
+-Xms{{ wazuh_indexer_heap_size_min }}
+-Xmx{{ wazuh_indexer_heap_size_max }}
+-XX:+UseG1GC
+-Djava.io.tmpdir=/var/lib/wazuh-indexer/tmp

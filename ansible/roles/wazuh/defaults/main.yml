@@ -1,0 +1,298 @@
+---
+# Wazuh role default variables
+
+# ============================================================================
+# GENERAL SETTINGS
+# ============================================================================
+
+# Wazuh version
+wazuh_version: "4.9.0"
+wazuh_major_version: "4.x"
+
+# Installation mode: 'all-in-one', 'distributed', 'manager', 'indexer', 'dashboard', 'agent'
+wazuh_install_mode: all-in-one
+
+# Components to install (for distributed mode)
+wazuh_install_manager: true
+wazuh_install_indexer: true
+wazuh_install_dashboard: true
+wazuh_install_agent: false
+
+# Disable package updates after installation
+wazuh_disable_updates: true
+
+# ============================================================================
+# WAZUH MANAGER SETTINGS
+# ============================================================================
+
+wazuh_manager_name: wazuh-manager
+wazuh_manager_port: 1514
+wazuh_manager_api_port: 55000
+wazuh_manager_cluster_port: 1516
+
+# Manager configuration
+wazuh_manager_email_notification: true
+wazuh_manager_email_to: "admin@example.com"
+wazuh_manager_email_from: "wazuh@{{ ansible_hostname }}"
+wazuh_manager_smtp_server: localhost
+
+# Vulnerability detection
+wazuh_manager_vulnerability_detection: true
+wazuh_manager_vuln_db_update_interval: 3600
+
+# Active response
+wazuh_manager_active_response: true
+wazuh_manager_ar_repeated_offenders: true
+
+# Log analysis
+wazuh_manager_logall: true
+wazuh_manager_logall_json: true
+
+# Manager cluster settings
+wazuh_manager_cluster_enabled: false
+wazuh_manager_cluster_name: wazuh
+wazuh_manager_cluster_node_name: "{{ ansible_hostname }}"
+wazuh_manager_cluster_node_type: master
+wazuh_manager_cluster_key: ""
+wazuh_manager_cluster_nodes: []
+
+# ============================================================================
+# WAZUH INDEXER SETTINGS
+# ============================================================================
+
+wazuh_indexer_name: wazuh-indexer
+wazuh_indexer_http_port: 9200
+wazuh_indexer_node_port: 9300
+
+# Indexer type: 'single-node' or 'cluster'
+wazuh_indexer_cluster_type: single-node
+wazuh_indexer_cluster_name: wazuh-cluster
+wazuh_indexer_node_name: "{{ ansible_hostname }}"
+
+# Heap size (in GB) - should be 50% of available RAM, max 32GB
+wazuh_indexer_heap_size_min: 1g
+wazuh_indexer_heap_size_max: 1g
+
+# Indexer cluster settings
+wazuh_indexer_cluster_nodes: []
+wazuh_indexer_minimum_master_nodes: 1
+wazuh_indexer_discovery_seed_hosts: []
+
+# Indexer performance
+wazuh_indexer_shards_per_index: 1
+wazuh_indexer_replicas: 0
+
+# ============================================================================
+# WAZUH DASHBOARD SETTINGS
+# ============================================================================
+
+wazuh_dashboard_name: wazuh-dashboard
+wazuh_dashboard_port: 443
+wazuh_dashboard_server_host: "0.0.0.0"
+
+# Dashboard credentials
+wazuh_dashboard_username: admin
+wazuh_dashboard_password: "SecurePassword123!"
+
+# Dashboard SSL/TLS
+wazuh_dashboard_ssl_enabled: true
+wazuh_dashboard_ssl_cert_path: /etc/wazuh-dashboard/certs/dashboard.crt
+wazuh_dashboard_ssl_key_path: /etc/wazuh-dashboard/certs/dashboard.key
+
+# ============================================================================
+# WAZUH AGENT SETTINGS
+# ============================================================================
+
+wazuh_agent_name: "{{ ansible_hostname }}"
+wazuh_agent_groups: []
+
+# Agent manager connection
+wazuh_agent_manager_ip: ""
+wazuh_agent_manager_port: 1514
+wazuh_agent_protocol: tcp
+
+# Agent authentication method: 'password' or 'certificate'
+wazuh_agent_auth_method: password
+wazuh_agent_auth_password: ""
+wazuh_agent_auth_use_source_ip: true
+
+# Agent configuration
+wazuh_agent_log_format: plain
+wazuh_agent_notify_time: 10
+wazuh_agent_time_reconnect: 60
+
+# ============================================================================
+# DOCKER MONITORING SETTINGS
+# ============================================================================
+
+wazuh_monitor_docker: true
+wazuh_docker_socket_path: /var/run/docker.sock
+wazuh_docker_monitor_interval: 300
+
+# Docker monitoring features
+wazuh_docker_monitor_containers: true
+wazuh_docker_monitor_images: true
+wazuh_docker_monitor_networks: true
+wazuh_docker_monitor_volumes: true
+wazuh_docker_monitor_events: true
+
+# Docker file integrity monitoring
+wazuh_docker_fim_enabled: true
+wazuh_docker_fim_paths:
+  - /var/lib/docker/containers
+  - /var/lib/docker/volumes
+
+# ============================================================================
+# TRIVY INTEGRATION SETTINGS
+# ============================================================================
+
+wazuh_trivy_integration: true
+wazuh_trivy_scan_schedule: "0 */6 * * *"  # Every 6 hours
+wazuh_trivy_severity_levels:
+  - CRITICAL
+  - HIGH
+  - MEDIUM
+wazuh_trivy_scan_path: /usr/local/bin/trivy
+wazuh_trivy_reports_dir: /var/log/trivy
+wazuh_trivy_wazuh_script: /var/ossec/wodles/trivy-wazuh-integration.py
+
+# ============================================================================
+# FILE INTEGRITY MONITORING (FIM)
+# ============================================================================
+
+wazuh_fim_enabled: true
+wazuh_fim_frequency: 79200  # 22 hours
+wazuh_fim_scan_on_start: true
+wazuh_fim_directories:
+  - path: /etc
+    report_changes: true
+    check_all: true
+  - path: /usr/bin
+    check_all: true
+  - path: /usr/sbin
+    check_all: true
+  - path: /bin
+    check_all: true
+  - path: /sbin
+    check_all: true
+  - path: /boot
+    check_all: true
+
+# Ignore specific files
+wazuh_fim_ignore_paths:
+  - /etc/mtab
+  - /etc/hosts.deny
+  - /etc/mail/statistics
+  - /etc/random-seed
+  - /etc/adjtime
+
+# ============================================================================
+# ROOTCHECK SETTINGS
+# ============================================================================
+
+wazuh_rootcheck_enabled: true
+wazuh_rootcheck_frequency: 36000  # 10 hours
+wazuh_rootcheck_rootkit_files: true
+wazuh_rootcheck_rootkit_trojans: true
+wazuh_rootcheck_system_audit: true
+
+# ============================================================================
+# OPENSCAP SETTINGS
+# ============================================================================
+
+wazuh_openscap_enabled: true
+wazuh_openscap_timeout: 1800
+wazuh_openscap_interval: 86400  # Daily
+wazuh_openscap_scan_on_start: true
+
+# ============================================================================
+# CIS-CAT SETTINGS
+# ============================================================================
+
+wazuh_ciscat_enabled: false
+wazuh_ciscat_timeout: 1800
+wazuh_ciscat_interval: 86400
+
+# ============================================================================
+# OSQUERY INTEGRATION
+# ============================================================================
+
+wazuh_osquery_enabled: true
+wazuh_osquery_bin_path: /usr/bin/osqueryd
+wazuh_osquery_log_path: /var/log/osquery/osqueryd.results.log
+wazuh_osquery_config_path: /etc/osquery/osquery.conf
+
+# ============================================================================
+# COMMAND MONITORING
+# ============================================================================
+
+wazuh_command_monitoring_enabled: true
+wazuh_command_monitoring_commands:
+  - name: df
+    command: df -P
+    frequency: 360
+  - name: netstat
+    command: netstat -tulpn | sed 's/\([[:alnum:]]\+\)\ \+[[:digit:]]\+\ \+[[:digit:]]\+\ \+\(.*\):\([[:digit:]]*\)\ \+\([0-9\.\:\*]\+\).\+\ \([[:digit:]]*\/[[:alnum:]\-]*\).*/\1 \2 == \3 == \4 \5/' | sort -k 4 -g | sed 's/ == \(.*\) ==/:\1/' | sed 1,2d
+    frequency: 360
+  - name: last
+    command: last -n 20
+    frequency: 360
+
+# ============================================================================
+# LOG COLLECTION
+# ============================================================================
+
+wazuh_log_collection_enabled: true
+wazuh_log_files:
+  - /var/log/auth.log
+  - /var/log/syslog
+  - /var/log/dpkg.log
+  - /var/log/kern.log
+
+# Docker logs
+wazuh_docker_log_collection: true
+wazuh_docker_log_path: /var/lib/docker/containers/*/*-json.log
+
+# ============================================================================
+# SECURITY CONFIGURATION ASSESSMENT (SCA)
+# ============================================================================
+
+wazuh_sca_enabled: true
+wazuh_sca_scan_on_start: true
+wazuh_sca_interval: 43200  # 12 hours
+wazuh_sca_skip_nfs: true
+
+# ============================================================================
+# SSL/TLS CERTIFICATE SETTINGS
+# ============================================================================
+
+wazuh_ssl_enabled: true
+wazuh_ssl_generate_self_signed: true
+wazuh_ssl_cert_dir: /etc/wazuh-certificates
+wazuh_ssl_cert_validity_days: 3650
+wazuh_ssl_country: US
+wazuh_ssl_state: California
+wazuh_ssl_locality: San Francisco
+wazuh_ssl_organization: "Home Lab"
+wazuh_ssl_common_name: "{{ ansible_hostname }}"
+
+# ============================================================================
+# SYSTEM SETTINGS
+# ============================================================================
+
+wazuh_user: wazuh
+wazuh_group: wazuh
+
+# Directories
+wazuh_dir: /var/ossec
+wazuh_config_dir: /var/ossec/etc
+wazuh_log_dir: /var/ossec/logs
+wazuh_queue_dir: /var/ossec/queue
+
+# Repository settings
+wazuh_apt_key_url: "https://packages.wazuh.com/key/GPG-KEY-WAZUH"
+wazuh_apt_repository: "deb https://packages.wazuh.com/{{ wazuh_major_version }}/apt/ stable main"
+wazuh_yum_repository_url: "https://packages.wazuh.com/{{ wazuh_major_version }}/yum/"
+
+# Package hold/lock
+wazuh_hold_packages: "{{ wazuh_disable_updates }}"

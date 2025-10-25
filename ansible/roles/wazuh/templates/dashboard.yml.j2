@@ -1,0 +1,15 @@
+# Wazuh Dashboard Configuration
+server.host: "{{ wazuh_dashboard_server_host }}"
+server.port: {{ wazuh_dashboard_port }}
+opensearch.hosts: ["https://localhost:9200"]
+opensearch.ssl.verificationMode: certificate
+{% if wazuh_dashboard_ssl_enabled %}
+server.ssl.enabled: true
+server.ssl.certificate: "{{ wazuh_dashboard_ssl_cert_path }}"
+server.ssl.key: "{{ wazuh_dashboard_ssl_key_path }}"
+{% endif %}
+opensearch.username: "{{ wazuh_dashboard_username }}"
+opensearch.password: "{{ wazuh_dashboard_password }}"
+opensearch.requestHeadersWhitelist: ["securitytenant","Authorization"]
+wazuh.monitoring.enabled: true
+wazuh.monitoring.frequency: 900

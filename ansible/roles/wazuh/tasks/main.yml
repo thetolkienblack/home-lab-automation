@@ -1,0 +1,65 @@
+---
+# Wazuh role - Main tasks orchestration
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family | lower }}.yml"
+  tags: [wazuh, always]
+
+- name: Determine installation components
+  ansible.builtin.set_fact:
+    wazuh_install_manager: "{{ wazuh_install_mode in ['all-in-one', 'manager'] or wazuh_install_manager }}"
+    wazuh_install_indexer: "{{ wazuh_install_mode in ['all-in-one', 'indexer'] or wazuh_install_indexer }}"
+    wazuh_install_dashboard: "{{ wazuh_install_mode in ['all-in-one', 'dashboard'] or wazuh_install_dashboard }}"
+    wazuh_install_agent: "{{ wazuh_install_mode == 'agent' or wazuh_install_agent }}"
+  tags: [wazuh, always]
+
+- name: Include prerequisites tasks
+  ansible.builtin.include_tasks: prerequisites.yml
+  tags: [wazuh, prerequisites]
+
+- name: Include repository setup
+  ansible.builtin.include_tasks: repository.yml
+  tags: [wazuh, repository]
+
+- name: Include SSL certificate generation
+  ansible.builtin.include_tasks: ssl-certificates.yml
+  when: wazuh_ssl_enabled | bool
+  tags: [wazuh, ssl, certificates]
+
+- name: Include Wazuh indexer installation
+  ansible.builtin.include_tasks: install-indexer.yml
+  when: wazuh_install_indexer | bool
+  tags: [wazuh, indexer, install]
+
+- name: Include Wazuh manager installation
+  ansible.builtin.include_tasks: install-manager.yml
+  when: wazuh_install_manager | bool
+  tags: [wazuh, manager, install]
+
+- name: Include Wazuh dashboard installation
+  ansible.builtin.include_tasks: install-dashboard.yml
+  when: wazuh_install_dashboard | bool
+  tags: [wazuh, dashboard, install]
+
+- name: Include Wazuh agent installation
+  ansible.builtin.include_tasks: install-agent.yml
+  when: wazuh_install_agent | bool
+  tags: [wazuh, agent, install]
+
+- name: Include Docker monitoring configuration
+  ansible.builtin.include_tasks: configure-docker-monitoring.yml
+  when:
+    - wazuh_install_agent | bool
+    - wazuh_monitor_docker | bool
+  tags: [wazuh, agent, docker]
+
+- name: Include Trivy integration configuration
+  ansible.builtin.include_tasks: configure-trivy-integration.yml
+  when:
+    - wazuh_install_agent | bool
+    - wazuh_trivy_integration | bool
+  tags: [wazuh, agent, trivy]
+
+- name: Include verification tasks
+  ansible.builtin.include_tasks: verify.yml
+  tags: [wazuh, verify]

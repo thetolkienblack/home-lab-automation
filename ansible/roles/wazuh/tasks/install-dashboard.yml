@@ -1,0 +1,50 @@
+---
+# Install Wazuh Dashboard
+
+- name: Install Wazuh Dashboard
+  ansible.builtin.package:
+    name: "{{ wazuh_dashboard_package }}={{ wazuh_version }}-1"
+    state: present
+  tags: [wazuh, dashboard]
+
+- name: Hold Wazuh Dashboard package
+  ansible.builtin.dpkg_selections:
+    name: "{{ wazuh_dashboard_package }}"
+    selection: hold
+  when:
+    - ansible_os_family == "Debian"
+    - wazuh_hold_packages | bool
+  tags: [wazuh, dashboard]
+
+- name: Configure Wazuh Dashboard
+  ansible.builtin.template:
+    src: dashboard.yml.j2
+    dest: /etc/wazuh-dashboard/opensearch_dashboards.yml
+    owner: wazuh-dashboard
+    group: wazuh-dashboard
+    mode: "0660"
+  notify: restart wazuh-dashboard
+  tags: [wazuh, dashboard]
+
+- name: Copy SSL certificates for dashboard
+  ansible.builtin.copy:
+    src: "{{ wazuh_ssl_cert_dir }}/dashboard.{{ item }}"
+    dest: "{{ wazuh_dashboard_ssl_cert_path if item == 'crt' else wazuh_dashboard_ssl_key_path }}"
+    owner: wazuh-dashboard
+    group: wazuh-dashboard
+    mode: "{{ '0600' if item == 'key' else '0644' }}"
+    remote_src: true
+  loop:
+    - crt
+    - key
+  when: wazuh_dashboard_ssl_enabled | bool
+  notify: restart wazuh-dashboard
+  tags: [wazuh, dashboard]
+
+- name: Enable and start Wazuh Dashboard
+  ansible.builtin.systemd:
+    name: wazuh-dashboard
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [wazuh, dashboard]

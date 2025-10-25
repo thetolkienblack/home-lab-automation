@@ -1,0 +1,59 @@
+<!-- Wazuh Agent Configuration -->
+<ossec_config>
+  <client>
+    <server>
+      <address>{{ wazuh_agent_manager_ip }}</address>
+      <port>{{ wazuh_agent_manager_port }}</port>
+      <protocol>{{ wazuh_agent_protocol }}</protocol>
+    </server>
+    <notify_time>{{ wazuh_agent_notify_time }}</notify_time>
+    <time-reconnect>{{ wazuh_agent_time_reconnect }}</time-reconnect>
+  </client>
+
+  <logging>
+    <log_format>{{ wazuh_agent_log_format }}</log_format>
+  </logging>
+
+  {% if wazuh_fim_enabled %}
+  <syscheck>
+    <disabled>no</disabled>
+    <frequency>{{ wazuh_fim_frequency }}</frequency>
+    <scan_on_start>{{ 'yes' if wazuh_fim_scan_on_start else 'no' }}</scan_on_start>
+    {% for dir in wazuh_fim_directories %}
+    <directories {{ 'check_all="yes"' if dir.check_all | default(false) else '' }} {{ 'report_changes="yes"' if dir.report_changes | default(false) else '' }}>{{ dir.path }}</directories>
+    {% endfor %}
+    {% for ignore in wazuh_fim_ignore_paths %}
+    <ignore>{{ ignore }}</ignore>
+    {% endfor %}
+  </syscheck>
+  {% endif %}
+
+  {% if wazuh_rootcheck_enabled %}
+  <rootcheck>
+    <disabled>no</disabled>
+    <frequency>{{ wazuh_rootcheck_frequency }}</frequency>
+    <rootkit_files>{{ wazuh_rootcheck_rootkit_files | ternary('yes', 'no') }}</rootkit_files>
+    <rootkit_trojans>{{ wazuh_rootcheck_rootkit_trojans | ternary('yes', 'no') }}</rootkit_trojans>
+    <system_audit>{{ wazuh_rootcheck_system_audit | ternary('yes', 'no') }}</system_audit>
+  </rootcheck>
+  {% endif %}
+
+  {% if wazuh_sca_enabled %}
+  <sca>
+    <enabled>yes</enabled>
+    <scan_on_start>{{ 'yes' if wazuh_sca_scan_on_start else 'no' }}</scan_on_start>
+    <interval>{{ wazuh_sca_interval }}</interval>
+    <skip_nfs>{{ 'yes' if wazuh_sca_skip_nfs else 'no' }}</skip_nfs>
+  </sca>
+  {% endif %}
+
+  {% if wazuh_log_collection_enabled %}
+  {% for log in wazuh_log_files %}
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>{{ log }}</location>
+  </localfile>
+  {% endfor %}
+  {% endif %}
+
+</ossec_config>

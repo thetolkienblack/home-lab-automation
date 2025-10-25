@@ -1,0 +1,20 @@
+#!/bin/bash
+# Trivy-Wazuh Scan Wrapper
+set -euo pipefail
+
+TRIVY_BIN="{{ wazuh_trivy_scan_path }}"
+REPORTS_DIR="{{ wazuh_trivy_reports_dir }}"
+WAZUH_SCRIPT="{{ wazuh_trivy_wazuh_script }}"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+TEMP_REPORT="/tmp/trivy_wazuh_${TIMESTAMP}.json"
+
+# Scan running containers
+for container in $(docker ps --format "{{`{{.Names}}`}}"); do
+    image=$(docker inspect --format='{{`{{.Config.Image}}`}}' "${container}")
+    ${TRIVY_BIN} image --format json --severity {{ wazuh_trivy_severity_levels | join(',') }} "${image}" > "${TEMP_REPORT}" 2>&1 || true
+    if [ -s "${TEMP_REPORT}" ]; then
+        python3 "${WAZUH_SCRIPT}" "${TEMP_REPORT}"
+    fi
+done
+
+rm -f "${TEMP_REPORT}"
