@@ -1,0 +1,38 @@
+# ===========================================
+# Vzdump Configuration
+# Managed by Ansible - {{ ansible_managed }}
+# Generated on: {{ ansible_date_time.iso8601 }}
+# ===========================================
+
+{% if proxmox_backup_schedules is defined and proxmox_backup_schedules | length > 0 %}
+# Backup mode: snapshot, suspend, stop
+mode: {{ proxmox_backup_schedules[0].mode | default('snapshot') }}
+
+# Backup compression
+compress: {{ proxmox_backup_schedules[0].compression | default('zstd') }}
+
+# Storage location
+storage: {{ proxmox_backup_schedules[0].storage | default('local') }}
+
+# Retention policy
+{% if proxmox_backup_schedules[0].retention is defined %}
+{% for key, value in proxmox_backup_schedules[0].retention.items() %}
+{{ key | replace('keep_', 'maxfiles-') }}: {{ value }}
+{% endfor %}
+{% endif %}
+
+# Email notifications
+{% if proxmox_email_enabled %}
+mailto: {{ proxmox_email_to }}
+{% endif %}
+
+# Exclude temporary and swap files
+stdexcludes: 1
+
+# Enable pigz for parallel compression
+pigz: 1
+
+# Remove old backups
+prune-backups: keep-all=1,keep-daily=7,keep-weekly=4,keep-monthly=3
+
+{% endif %}

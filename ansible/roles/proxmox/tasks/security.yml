@@ -1,0 +1,258 @@
+---
+# ===========================================
+# Proxmox VE Role - Security Hardening
+# Managed by Ansible
+# ===========================================
+
+- name: "Security | Configure SSH hardening"
+  block:
+    - name: "Security | Configure SSH daemon"
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+        backup: true
+      loop:
+        - { regexp: '^#?Port ', line: 'Port {{ proxmox_ssh_port }}' }
+        - { regexp: '^#?PermitRootLogin ', line: 'PermitRootLogin {{ proxmox_ssh_permit_root_login }}' }
+        - { regexp: '^#?PasswordAuthentication ', line: 'PasswordAuthentication {{ "yes" if proxmox_ssh_password_authentication else "no" }}' }
+        - { regexp: '^#?PubkeyAuthentication ', line: 'PubkeyAuthentication {{ "yes" if proxmox_ssh_pubkey_authentication else "no" }}' }
+        - { regexp: '^#?PermitEmptyPasswords ', line: 'PermitEmptyPasswords no' }
+        - { regexp: '^#?X11Forwarding ', line: 'X11Forwarding no' }
+        - { regexp: '^#?MaxAuthTries ', line: 'MaxAuthTries 3' }
+        - { regexp: '^#?ClientAliveInterval ', line: 'ClientAliveInterval 300' }
+        - { regexp: '^#?ClientAliveCountMax ', line: 'ClientAliveCountMax 2' }
+      notify: restart sshd
+
+    - name: "Security | Add SSH authorized keys"
+      ansible.posix.authorized_key:
+        user: root
+        key: "{{ item }}"
+        state: present
+      loop: "{{ proxmox_ssh_authorized_keys }}"
+      when: proxmox_ssh_authorized_keys | length > 0
+
+- name: "Security | Configure system hardening with sysctl"
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: true
+    reload: true
+  loop: "{{ proxmox_sysctl_settings | dict2items }}"
+  when: proxmox_sysctl_hardening | bool
+
+- name: "Security | Install and configure fail2ban"
+  block:
+    - name: "Security | Install fail2ban"
+      ansible.builtin.apt:
+        name: fail2ban
+        state: present
+
+    - name: "Security | Create fail2ban Proxmox filter"
+      ansible.builtin.copy:
+        dest: "{{ proxmox_fail2ban_filter_dir }}/proxmox.conf"
+        content: |
+          # Managed by Ansible
+          [Definition]
+          failregex = pvedaemon\[.*authentication failure; rhost=<HOST>
+                      pvedaemon\[.*authentication failure.*rhost=<HOST>
+          ignoreregex =
+        mode: '0644'
+
+    - name: "Security | Configure fail2ban jail for Proxmox"
+      ansible.builtin.blockinfile:
+        path: "{{ proxmox_fail2ban_jail_local }}"
+        marker: "# {mark} ANSIBLE MANAGED PROXMOX JAIL"
+        block: |
+          [proxmox]
+          enabled = true
+          port = https,http,8006
+          filter = proxmox
+          logpath = /var/log/daemon.log
+          maxretry = {{ proxmox_fail2ban_maxretry }}
+          findtime = {{ proxmox_fail2ban_findtime }}
+          bantime = {{ proxmox_fail2ban_bantime }}
+
+          [sshd]
+          enabled = true
+          port = {{ proxmox_ssh_port }}
+          maxretry = {{ proxmox_fail2ban_maxretry }}
+          findtime = {{ proxmox_fail2ban_findtime }}
+          bantime = {{ proxmox_fail2ban_bantime }}
+        create: true
+        mode: '0644'
+      notify: restart fail2ban
+
+    - name: "Security | Enable and start fail2ban"
+      ansible.builtin.systemd:
+        name: "{{ proxmox_fail2ban_service }}"
+        enabled: true
+        state: started
+  when: proxmox_fail2ban_enabled | bool
+
+- name: "Security | Configure AppArmor"
+  block:
+    - name: "Security | Install AppArmor"
+      ansible.builtin.apt:
+        name:
+          - apparmor
+          - apparmor-utils
+        state: present
+
+    - name: "Security | Enable AppArmor service"
+      ansible.builtin.systemd:
+        name: "{{ proxmox_apparmor_service }}"
+        enabled: true
+        state: started
+
+    - name: "Security | Set AppArmor to enforce mode"
+      ansible.builtin.command: aa-enforce /etc/apparmor.d/*
+      register: apparmor_enforce
+      changed_when: apparmor_enforce.rc == 0
+      failed_when: false
+  when:
+    - proxmox_apparmor_enabled | bool
+    - ansible_os_family == "Debian"
+
+- name: "Security | Configure SELinux (RHEL only)"
+  block:
+    - name: "Security | Install SELinux packages"
+      ansible.builtin.yum:
+        name: "{{ proxmox_selinux_packages }}"
+        state: present
+
+    - name: "Security | Set SELinux state"
+      ansible.posix.selinux:
+        policy: targeted
+        state: "{{ proxmox_selinux_state }}"
+  when:
+    - proxmox_selinux_enabled | bool
+    - ansible_os_family == "RedHat"
+
+- name: "Security | Configure audit logging"
+  block:
+    - name: "Security | Install auditd"
+      ansible.builtin.apt:
+        name: auditd
+        state: present
+
+    - name: "Security | Configure audit rules for Proxmox"
+      ansible.builtin.blockinfile:
+        path: /etc/audit/rules.d/proxmox.rules
+        marker: "# {mark} ANSIBLE MANAGED PROXMOX AUDIT RULES"
+        block: |
+          # Proxmox configuration changes
+          -w /etc/pve/ -p wa -k proxmox_config
+          -w /etc/pve/firewall/ -p wa -k proxmox_firewall
+          -w /etc/pve/storage.cfg -p wa -k proxmox_storage
+          -w /etc/pve/user.cfg -p wa -k proxmox_users
+          -w /etc/pve/datacenter.cfg -p wa -k proxmox_datacenter
+
+          # VM/CT operations
+          -w /var/log/pve/tasks/ -p wa -k proxmox_tasks
+
+          # Authentication
+          -w /var/log/auth.log -p wa -k auth_log
+        create: true
+        mode: '0640'
+      notify: restart auditd
+
+    - name: "Security | Enable and start auditd"
+      ansible.builtin.systemd:
+        name: auditd
+        enabled: true
+        state: started
+  when: proxmox_audit_logging | bool
+
+- name: "Security | Configure automatic security updates"
+  block:
+    - name: "Security | Install unattended-upgrades"
+      ansible.builtin.apt:
+        name:
+          - unattended-upgrades
+          - apt-listchanges
+        state: present
+
+    - name: "Security | Configure unattended-upgrades"
+      ansible.builtin.template:
+        src: virt/proxmox/pve/50unattended-upgrades.j2
+        dest: /etc/apt/apt.conf.d/50unattended-upgrades
+        mode: '0644'
+
+    - name: "Security | Enable automatic updates"
+      ansible.builtin.template:
+        src: virt/proxmox/pve/20auto-upgrades.j2
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        mode: '0644'
+  when: proxmox_auto_updates | bool
+
+- name: "Security | Disable unnecessary services"
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - bluetooth
+    - cups
+  failed_when: false
+
+- name: "Security | Set proper file permissions on sensitive files"
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    mode: "{{ item.mode }}"
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+  loop:
+    - { path: '/etc/pve', mode: '0750', owner: 'root', group: 'www-data' }
+    - { path: '/etc/ssh/sshd_config', mode: '0600' }
+    - { path: '/root/.ssh', mode: '0700' }
+  failed_when: false
+
+- name: "Security | Configure password policy"
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: '^PASS_MAX_DAYS', line: 'PASS_MAX_DAYS   90' }
+    - { regexp: '^PASS_MIN_DAYS', line: 'PASS_MIN_DAYS   7' }
+    - { regexp: '^PASS_WARN_AGE', line: 'PASS_WARN_AGE   14' }
+    - { regexp: '^PASS_MIN_LEN', line: 'PASS_MIN_LEN    12' }
+
+- name: "Security | Configure performance tuning"
+  block:
+    - name: "Security | Set CPU governor"
+      ansible.builtin.shell: |
+        for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+          echo "{{ proxmox_cpu_governor }}" > "$cpu"
+        done
+      changed_when: true
+      when: proxmox_performance_tuning | bool
+
+    - name: "Security | Configure transparent hugepages"
+      ansible.builtin.command: echo {{ proxmox_transparent_hugepages }} > /sys/kernel/mm/transparent_hugepage/enabled
+      changed_when: true
+      when: proxmox_performance_tuning | bool
+
+    - name: "Security | Set swappiness"
+      ansible.posix.sysctl:
+        name: vm.swappiness
+        value: "{{ proxmox_swappiness }}"
+        state: present
+        sysctl_set: true
+      when: proxmox_performance_tuning | bool
+  when: proxmox_performance_tuning | bool
+
+- name: "Security | Display security hardening summary"
+  ansible.builtin.debug:
+    msg:
+      - "=== Security Hardening Summary ==="
+      - "SSH Hardening: Enabled"
+      - "SSH Port: {{ proxmox_ssh_port }}"
+      - "Fail2ban: {{ 'Enabled' if proxmox_fail2ban_enabled else 'Disabled' }}"
+      - "AppArmor: {{ 'Enabled' if proxmox_apparmor_enabled else 'Disabled' }}"
+      - "Audit Logging: {{ 'Enabled' if proxmox_audit_logging else 'Disabled' }}"
+      - "Automatic Updates: {{ 'Enabled' if proxmox_auto_updates else 'Disabled' }}"

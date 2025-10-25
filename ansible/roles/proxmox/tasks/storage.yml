@@ -1,0 +1,252 @@
+---
+# ===========================================
+# Proxmox VE Role - Storage Configuration
+# Managed by Ansible
+# ===========================================
+
+- name: "Storage | Backup storage configuration"
+  ansible.builtin.copy:
+    src: "{{ proxmox_storage_config }}"
+    dest: "{{ proxmox_storage_config }}.backup"
+    remote_src: true
+    mode: preserve
+    backup: true
+  when:
+    - proxmox_is_installed | bool
+    - proxmox_storage_configure | bool
+
+- name: "Storage | Remove local-lvm storage"
+  block:
+    - name: "Storage | Check if local-lvm exists"
+      ansible.builtin.command: pvesm status --storage local-lvm
+      register: local_lvm_check
+      changed_when: false
+      failed_when: false
+
+    - name: "Storage | Remove local-lvm from configuration"
+      ansible.builtin.command: pvesm remove local-lvm
+      register: lvm_remove
+      changed_when: lvm_remove.rc == 0
+      when: local_lvm_check.rc == 0
+
+    - name: "Storage | Remove LVM thin pool"
+      ansible.builtin.command: lvremove -f pve/data
+      register: lvremove_result
+      changed_when: lvremove_result.rc == 0
+      failed_when: false
+
+    - name: "Storage | Extend root LV with freed space"
+      ansible.builtin.command: lvextend -l +100%FREE /dev/pve/root
+      register: lvextend_result
+      changed_when: lvextend_result.rc == 0
+      failed_when: false
+
+    - name: "Storage | Resize root filesystem"
+      ansible.builtin.command: resize2fs /dev/mapper/pve-root
+      register: resize_result
+      changed_when: resize_result.rc == 0
+      failed_when: false
+  when:
+    - proxmox_storage_remove_local_lvm | bool
+    - proxmox_is_installed | bool
+
+- name: "Storage | Configure NFS storage"
+  ansible.builtin.command: >
+    pvesm add nfs {{ item.name }}
+    --server {{ item.server }}
+    --export {{ item.export }}
+    --content {{ item.content | join(',') }}
+    {% if item.maxfiles is defined %}--maxfiles {{ item.maxfiles }}{% endif %}
+    {% if item.options is defined %}--options {{ item.options }}{% endif %}
+  loop: "{{ proxmox_storage_backends | selectattr('type', 'equalto', 'nfs') | list }}"
+  register: nfs_storage
+  changed_when: nfs_storage.rc == 0
+  failed_when: false
+  when:
+    - proxmox_storage_configure | bool
+    - proxmox_is_installed | bool
+
+- name: "Storage | Configure CIFS/SMB storage"
+  ansible.builtin.command: >
+    pvesm add cifs {{ item.name }}
+    --server {{ item.server }}
+    --share {{ item.share }}
+    --username {{ item.username }}
+    --password {{ item.password }}
+    --content {{ item.content | join(',') }}
+    {% if item.domain is defined %}--domain {{ item.domain }}{% endif %}
+    {% if item.maxfiles is defined %}--maxfiles {{ item.maxfiles }}{% endif %}
+  loop: "{{ proxmox_storage_backends | selectattr('type', 'equalto', 'cifs') | list }}"
+  register: cifs_storage
+  changed_when: cifs_storage.rc == 0
+  failed_when: false
+  no_log: true
+  when:
+    - proxmox_storage_configure | bool
+    - proxmox_is_installed | bool
+
+- name: "Storage | Configure iSCSI storage"
+  ansible.builtin.command: >
+    pvesm add iscsi {{ item.name }}
+    --portal {{ item.portal }}
+    --target {{ item.target }}
+    --content {{ item.content | join(',') }}
+  loop: "{{ proxmox_storage_backends | selectattr('type', 'equalto', 'iscsi') | list }}"
+  register: iscsi_storage
+  changed_when: iscsi_storage.rc == 0
+  failed_when: false
+  when:
+    - proxmox_storage_configure | bool
+    - proxmox_is_installed | bool
+
+- name: "Storage | Configure LVM storage"
+  ansible.builtin.command: >
+    pvesm add lvm {{ item.name }}
+    --vgname {{ item.vgname }}
+    --content {{ item.content | join(',') }}
+    {% if item.shared is defined %}--shared {{ item.shared }}{% endif %}
+  loop: "{{ proxmox_storage_backends | selectattr('type', 'equalto', 'lvm') | list }}"
+  register: lvm_storage
+  changed_when: lvm_storage.rc == 0
+  failed_when: false
+  when:
+    - proxmox_storage_configure | bool
+    - proxmox_is_installed | bool
+
+- name: "Storage | Configure LVM-Thin storage"
+  ansible.builtin.command: >
+    pvesm add lvmthin {{ item.name }}
+    --vgname {{ item.vgname }}
+    --thinpool {{ item.thinpool }}
+    --content {{ item.content | join(',') }}
+  loop: "{{ proxmox_storage_backends | selectattr('type', 'equalto', 'lvmthin') | list }}"
+  register: lvmthin_storage
+  changed_when: lvmthin_storage.rc == 0
+  failed_when: false
+  when:
+    - proxmox_storage_configure | bool
+    - proxmox_is_installed | bool
+
+- name: "Storage | Configure ZFS storage"
+  block:
+    - name: "Storage | Install ZFS packages"
+      ansible.builtin.apt:
+        name:
+          - zfsutils-linux
+        state: present
+
+    - name: "Storage | Create ZFS pools"
+      ansible.builtin.command: >
+        zpool create
+        {% if item.raid == 'mirror' %}mirror
+        {%- elif item.raid == 'raidz' %}raidz
+        {%- elif item.raid == 'raidz2' %}raidz2
+        {%- elif item.raid == 'raidz3' %}raidz3{% endif %}
+        {{ item.name }}
+        {{ item.devices | join(' ') }}
+      loop: "{{ proxmox_zfs_pools }}"
+      register: zfs_pool_create
+      changed_when: zfs_pool_create.rc == 0
+      failed_when: false
+
+    - name: "Storage | Set ZFS compression"
+      ansible.builtin.command: zfs set compression={{ item.compression | default('lz4') }} {{ item.name }}
+      loop: "{{ proxmox_zfs_pools }}"
+      changed_when: true
+      when: item.compression is defined
+
+    - name: "Storage | Add ZFS storage to Proxmox"
+      ansible.builtin.command: >
+        pvesm add zfspool {{ item.name }}
+        --pool {{ item.name }}
+        --content {{ item.content | default(['images', 'rootdir']) | join(',') }}
+        {% if item.sparse is defined %}--sparse {{ item.sparse }}{% endif %}
+      loop: "{{ proxmox_storage_backends | selectattr('type', 'equalto', 'zfspool') | list }}"
+      register: zfs_storage
+      changed_when: zfs_storage.rc == 0
+      failed_when: false
+  when:
+    - proxmox_zfs_enabled | bool
+    - proxmox_storage_configure | bool
+    - proxmox_is_installed | bool
+
+- name: "Storage | Configure directory storage"
+  block:
+    - name: "Storage | Create storage directories"
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ proxmox_storage_backends | selectattr('type', 'equalto', 'dir') | list }}"
+
+    - name: "Storage | Add directory storage"
+      ansible.builtin.command: >
+        pvesm add dir {{ item.name }}
+        --path {{ item.path }}
+        --content {{ item.content | join(',') }}
+        {% if item.maxfiles is defined %}--maxfiles {{ item.maxfiles }}{% endif %}
+      loop: "{{ proxmox_storage_backends | selectattr('type', 'equalto', 'dir') | list }}"
+      register: dir_storage
+      changed_when: dir_storage.rc == 0
+      failed_when: false
+  when:
+    - proxmox_storage_configure | bool
+    - proxmox_is_installed | bool
+
+- name: "Storage | Configure Ceph storage"
+  block:
+    - name: "Storage | Install Ceph packages"
+      ansible.builtin.apt:
+        name:
+          - ceph-common
+          - ceph
+        state: present
+
+    - name: "Storage | Initialize Ceph"
+      ansible.builtin.command: pveceph install
+      register: ceph_install
+      changed_when: ceph_install.rc == 0
+      failed_when: false
+
+    - name: "Storage | Create Ceph configuration"
+      ansible.builtin.command: >
+        pveceph init
+        --network {{ proxmox_ceph_network }}
+        {% if proxmox_ceph_cluster_network %}--cluster-network {{ proxmox_ceph_cluster_network }}{% endif %}
+      register: ceph_init
+      changed_when: ceph_init.rc == 0
+      failed_when: false
+  when:
+    - proxmox_ceph_enabled | bool
+    - proxmox_storage_configure | bool
+    - proxmox_is_installed | bool
+
+- name: "Storage | Configure Proxmox Backup Server integration"
+  ansible.builtin.command: >
+    pvesm add pbs {{ proxmox_pbs_server }}
+    --server {{ proxmox_pbs_server }}
+    --datastore {{ proxmox_pbs_datastore }}
+    --username {{ proxmox_pbs_username }}
+    --password {{ proxmox_pbs_password }}
+    --fingerprint {{ proxmox_pbs_fingerprint }}
+  register: pbs_storage
+  changed_when: pbs_storage.rc == 0
+  failed_when: false
+  no_log: true
+  when:
+    - proxmox_pbs_enabled | bool
+    - proxmox_storage_configure | bool
+    - proxmox_is_installed | bool
+
+- name: "Storage | Verify storage configuration"
+  ansible.builtin.command: pvesm status
+  register: storage_status
+  changed_when: false
+  when: proxmox_is_installed | bool
+
+- name: "Storage | Display configured storage"
+  ansible.builtin.debug:
+    msg: "{{ storage_status.stdout_lines }}"
+  when:
+    - proxmox_is_installed | bool
+    - storage_status.rc == 0

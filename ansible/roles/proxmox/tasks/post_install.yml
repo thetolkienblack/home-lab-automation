@@ -1,0 +1,142 @@
+---
+# ===========================================
+# Proxmox VE Role - Post Installation Tasks
+# Managed by Ansible
+# ===========================================
+
+- name: "Post-Install | Configure email notifications"
+  block:
+    - name: "Post-Install | Configure postfix"
+      ansible.builtin.lineinfile:
+        path: "{{ proxmox_postfix_config }}"
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+      loop:
+        - { regexp: '^relayhost =', line: 'relayhost = {{ proxmox_email_server }}:{{ proxmox_email_port }}' }
+        - { regexp: '^myhostname =', line: 'myhostname = {{ proxmox_fqdn }}' }
+      notify: restart postfix
+
+    - name: "Post-Install | Set root email alias"
+      ansible.builtin.lineinfile:
+        path: /etc/aliases
+        regexp: '^root:'
+        line: 'root: {{ proxmox_email_to }}'
+        state: present
+      notify: update aliases
+  when:
+    - proxmox_email_enabled | bool
+    - proxmox_is_installed | bool
+
+- name: "Post-Install | Configure remote syslog"
+  ansible.builtin.lineinfile:
+    path: /etc/rsyslog.conf
+    line: "*.* @@{{ proxmox_syslog_remote_server }}:{{ proxmox_syslog_remote_port }}"
+    state: present
+  notify: restart rsyslog
+  when:
+    - proxmox_syslog_remote_enabled | bool
+    - proxmox_is_installed | bool
+
+- name: "Post-Install | Download VM/CT templates"
+  block:
+    - name: "Post-Install | Create templates directory"
+      ansible.builtin.file:
+        path: /var/lib/vz/template/qemu
+        state: directory
+        mode: '0755'
+
+    - name: "Post-Install | Download templates"
+      ansible.builtin.get_url:
+        url: "{{ item.url }}"
+        dest: "/var/lib/vz/template/qemu/{{ item.name }}.qcow2"
+        mode: '0644'
+        timeout: 300
+      loop: "{{ proxmox_templates_list }}"
+      register: template_download
+      async: 600
+      poll: 0
+
+    - name: "Post-Install | Wait for template downloads"
+      ansible.builtin.async_status:
+        jid: "{{ item.ansible_job_id }}"
+      register: template_jobs
+      until: template_jobs.finished
+      retries: 60
+      delay: 10
+      loop: "{{ template_download.results }}"
+  when:
+    - proxmox_templates_download | bool
+    - proxmox_templates_list | length > 0
+    - proxmox_is_installed | bool
+
+- name: "Post-Install | Clean up old package files"
+  ansible.builtin.apt:
+    autoclean: true
+    autoremove: true
+  when: proxmox_is_installed | bool
+
+- name: "Post-Install | Update GRUB configuration"
+  ansible.builtin.command: update-grub
+  register: grub_update
+  changed_when: grub_update.rc == 0
+  failed_when: false
+  when: proxmox_is_installed | bool
+
+- name: "Post-Install | Verify all Proxmox services are running"
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  loop: "{{ proxmox_services }}"
+  register: service_status
+  failed_when: false
+  when: proxmox_is_installed | bool
+
+- name: "Post-Install | Get Proxmox version"
+  ansible.builtin.command: pveversion
+  register: pve_final_version
+  changed_when: false
+  when: proxmox_is_installed | bool
+
+- name: "Post-Install | Get node status"
+  ansible.builtin.command: pvesh get /nodes/{{ ansible_hostname }}/status
+  register: node_status
+  changed_when: false
+  failed_when: false
+  when: proxmox_is_installed | bool
+
+- name: "Post-Install | Display installation summary"
+  ansible.builtin.debug:
+    msg:
+      - "=========================================="
+      - "Proxmox VE Installation Complete!"
+      - "=========================================="
+      - "Proxmox Version: {{ pve_final_version.stdout }}"
+      - "Node Name: {{ ansible_hostname }}"
+      - "FQDN: {{ proxmox_fqdn }}"
+      - "IP Address: {{ ansible_default_ipv4.address }}"
+      - "Web Interface: https://{{ ansible_default_ipv4.address }}:8006"
+      - ""
+      - "Configuration Summary:"
+      - "- Cluster: {{ 'Enabled' if proxmox_cluster_enabled else 'Disabled' }}"
+      - "- Firewall: {{ 'Enabled' if proxmox_firewall_enabled else 'Disabled' }}"
+      - "- Storage Backends: {{ proxmox_storage_backends | length }}"
+      - "- Security Hardening: {{ 'Applied' if proxmox_security_hardening else 'Not Applied' }}"
+      - "- SSL/TLS: {{ proxmox_ssl_certificate_source }}"
+      - "- Backups: {{ 'Configured' if proxmox_backup_configure else 'Not Configured' }}"
+      - ""
+      - "Next Steps:"
+      - "1. Access web interface: https://{{ ansible_default_ipv4.address }}:8006"
+      - "2. Login with root credentials"
+      - "3. Review configuration in datacenter settings"
+      - "4. Create VMs and containers"
+      - "=========================================="
+  when: proxmox_is_installed | bool
+
+- name: "Post-Install | Create post-installation flag"
+  ansible.builtin.file:
+    path: /etc/pve/.ansible_configured
+    state: touch
+    mode: '0644'
+  when: proxmox_is_installed | bool

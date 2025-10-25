@@ -1,0 +1,124 @@
+---
+# ===========================================
+# Proxmox VE Role - Firewall Configuration
+# Managed by Ansible
+# ===========================================
+
+- name: "Firewall | Enable Proxmox firewall at datacenter level"
+  ansible.builtin.copy:
+    dest: /etc/pve/firewall/cluster.fw
+    content: |
+      # Managed by Ansible
+      [OPTIONS]
+      enable: {{ 1 if proxmox_firewall_enabled else 0 }}
+      policy_in: {{ proxmox_firewall_default_input_policy }}
+      policy_out: {{ proxmox_firewall_default_output_policy }}
+      log_level_in: {{ proxmox_firewall_log_level }}
+      log_level_out: {{ proxmox_firewall_log_level }}
+
+      [RULES]
+    mode: '0640'
+    owner: root
+    group: www-data
+  when:
+    - proxmox_firewall_enabled | bool
+    - proxmox_is_installed | bool
+
+- name: "Firewall | Configure IP sets"
+  block:
+    - name: "Firewall | Create IP sets"
+      ansible.builtin.blockinfile:
+        path: /etc/pve/firewall/cluster.fw
+        marker: "# {mark} ANSIBLE MANAGED IPSET {{ item.name }}"
+        insertafter: '\[RULES\]'
+        block: |
+          [IPSET {{ item.name }}]
+          {% for ip in item.ips %}
+          {{ ip }}
+          {% endfor %}
+        create: false
+      loop: "{{ proxmox_firewall_ipsets }}"
+  when:
+    - proxmox_firewall_enabled | bool
+    - proxmox_firewall_ipsets | length > 0
+    - proxmox_is_installed | bool
+
+- name: "Firewall | Configure security groups"
+  block:
+    - name: "Firewall | Create security group files"
+      ansible.builtin.template:
+        src: virt/proxmox/firewall/security_group.fw.j2
+        dest: "/etc/pve/firewall/{{ item.name }}.fw"
+        mode: '0640'
+        owner: root
+        group: www-data
+      loop: "{{ proxmox_firewall_security_groups }}"
+  when:
+    - proxmox_firewall_enabled | bool
+    - proxmox_firewall_security_groups | length > 0
+    - proxmox_is_installed | bool
+
+- name: "Firewall | Configure firewall rules"
+  ansible.builtin.blockinfile:
+    path: /etc/pve/firewall/cluster.fw
+    marker: "# {mark} ANSIBLE MANAGED RULES"
+    insertafter: '\[RULES\]'
+    block: |
+      {% for rule in proxmox_firewall_rules %}
+      {{ rule.action | upper }} {{ rule.type | upper }}
+      {%- if rule.source is defined %} -source {{ rule.source }}{% endif %}
+      {%- if rule.dest is defined %} -dest {{ rule.dest }}{% endif %}
+      {%- if rule.proto is defined %} -p {{ rule.proto }}{% endif %}
+      {%- if rule.dport is defined %} -dport {{ rule.dport }}{% endif %}
+      {%- if rule.sport is defined %} -sport {{ rule.sport }}{% endif %}
+      {%- if rule.enabled is defined %}{% if rule.enabled == 1 %} -enable{% else %} -disable{% endif %}{% endif %}
+      {%- if rule.comment is defined %} # {{ rule.comment }}{% endif %}
+      {% endfor %}
+    create: false
+  when:
+    - proxmox_firewall_enabled | bool
+    - proxmox_firewall_rules | length > 0
+    - proxmox_is_installed | bool
+
+- name: "Firewall | Enable firewall on node"
+  ansible.builtin.copy:
+    dest: "/etc/pve/nodes/{{ ansible_hostname }}/host.fw"
+    content: |
+      # Managed by Ansible
+      [OPTIONS]
+      enable: {{ 1 if proxmox_firewall_enabled else 0 }}
+      nftables: 1
+      ndp: 1
+      log_level_in: {{ proxmox_firewall_log_level }}
+      log_level_out: {{ proxmox_firewall_log_level }}
+
+      [RULES]
+      # Node-specific rules can be added here
+    mode: '0640'
+    owner: root
+    group: www-data
+  when:
+    - proxmox_firewall_enabled | bool
+    - proxmox_is_installed | bool
+
+- name: "Firewall | Reload Proxmox firewall"
+  ansible.builtin.systemd:
+    name: pve-firewall
+    state: reloaded
+  when:
+    - proxmox_firewall_enabled | bool
+    - proxmox_is_installed | bool
+
+- name: "Firewall | Verify firewall status"
+  ansible.builtin.command: pve-firewall status
+  register: firewall_status
+  changed_when: false
+  failed_when: false
+  when: proxmox_is_installed | bool
+
+- name: "Firewall | Display firewall status"
+  ansible.builtin.debug:
+    msg: "{{ firewall_status.stdout_lines }}"
+  when:
+    - proxmox_is_installed | bool
+    - firewall_status.rc == 0

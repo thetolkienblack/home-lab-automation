@@ -1,0 +1,32 @@
+// ===========================================
+// Unattended Upgrades Configuration
+// Managed by Ansible - {{ ansible_managed }}
+// Generated on: {{ ansible_date_time.iso8601 }}
+// ===========================================
+
+Unattended-Upgrade::Origins-Pattern {
+    "origin=Debian,codename=${distro_codename},label=Debian";
+    "origin=Debian,codename=${distro_codename},label=Debian-Security";
+    "origin=Proxmox,codename=${distro_codename},label=Proxmox VE";
+};
+
+Unattended-Upgrade::Package-Blacklist {
+};
+
+Unattended-Upgrade::DevRelease "false";
+Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+Unattended-Upgrade::MinimalSteps "true";
+Unattended-Upgrade::InstallOnShutdown "false";
+
+{% if proxmox_email_enabled %}
+Unattended-Upgrade::Mail "{{ proxmox_email_to }}";
+Unattended-Upgrade::MailReport "on-change";
+{% endif %}
+
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "{{ 'true' if proxmox_auto_reboot else 'false' }}";
+
+{% if proxmox_auto_reboot %}
+Unattended-Upgrade::Automatic-Reboot-Time "{{ proxmox_auto_reboot_time }}";
+{% endif %}

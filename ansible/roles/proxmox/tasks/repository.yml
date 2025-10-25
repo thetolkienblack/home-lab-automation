@@ -1,0 +1,68 @@
+---
+# ===========================================
+# Proxmox VE Role - Repository Configuration
+# Managed by Ansible
+# ===========================================
+
+- name: "Repository | Add Proxmox GPG key"
+  ansible.builtin.apt_key:
+    url: "{{ proxmox_repo_key_url }}"
+    id: "{{ proxmox_repo_key_id }}"
+    state: present
+  register: proxmox_key_added
+  retries: 3
+  delay: 5
+  until: proxmox_key_added is succeeded
+
+- name: "Repository | Configure enterprise repository"
+  ansible.builtin.apt_repository:
+    repo: "deb https://enterprise.proxmox.com/debian/pve {{ ansible_distribution_release }} pve-enterprise"
+    filename: pve-enterprise
+    state: "{{ 'present' if proxmox_repo_enterprise_enabled else 'absent' }}"
+  when: proxmox_subscription_type == "enterprise"
+
+- name: "Repository | Disable enterprise repository (no subscription)"
+  ansible.builtin.lineinfile:
+    path: "{{ proxmox_repo_files.enterprise }}"
+    regexp: '^deb https://enterprise.proxmox.com'
+    line: '#deb https://enterprise.proxmox.com/debian/pve {{ ansible_distribution_release }} pve-enterprise'
+    state: present
+    create: true
+    mode: '0644'
+  when:
+    - proxmox_subscription_type == "no-subscription"
+    - not proxmox_repo_enterprise_enabled
+
+- name: "Repository | Configure no-subscription repository"
+  ansible.builtin.apt_repository:
+    repo: "deb http://download.proxmox.com/debian/pve {{ ansible_distribution_release }} pve-no-subscription"
+    filename: pve-no-subscription
+    state: "{{ 'present' if proxmox_repo_no_subscription_enabled else 'absent' }}"
+  when: proxmox_subscription_type == "no-subscription"
+
+- name: "Repository | Configure test repository"
+  ansible.builtin.apt_repository:
+    repo: "deb http://download.proxmox.com/debian/pve {{ ansible_distribution_release }} pvetest"
+    filename: pvetest
+    state: "{{ 'present' if proxmox_repo_test_enabled else 'absent' }}"
+  when: proxmox_repo_test_enabled | bool
+
+- name: "Repository | Configure Ceph repository"
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb http://download.proxmox.com/debian/ceph-{{ proxmox_version.split('.')[0] | default('quincy') }}
+      {{ ansible_distribution_release }} no-subscription
+    filename: ceph
+    state: "{{ 'present' if proxmox_repo_ceph_enabled else 'absent' }}"
+  when:
+    - proxmox_ceph_enabled | bool
+    - proxmox_repo_ceph_enabled | bool
+
+- name: "Repository | Update apt cache"
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  register: apt_update
+  retries: 3
+  delay: 5
+  until: apt_update is succeeded

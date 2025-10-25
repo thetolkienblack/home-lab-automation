@@ -1,0 +1,45 @@
+---
+# ===========================================
+# Proxmox VE Role - Metadata
+# Managed by Ansible
+# ===========================================
+
+galaxy_info:
+  role_name: proxmox
+  author: Sidney (via Claude Code)
+  description: Comprehensive Proxmox VE installation and configuration with security hardening, cluster support, and best practices
+  company: Home Lab
+  license: MIT
+  min_ansible_version: "2.10"
+
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+        - bullseye
+        - buster
+    - name: Ubuntu
+      versions:
+        - jammy
+        - focal
+
+  galaxy_tags:
+    - proxmox
+    - virtualization
+    - hypervisor
+    - kvm
+    - lxc
+    - containers
+    - cluster
+    - high-availability
+    - security
+    - networking
+    - storage
+    - backup
+    - infrastructure
+
+dependencies: []
+
+collections:
+  - community.general
+  - ansible.posix

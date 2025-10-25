@@ -1,0 +1,175 @@
+---
+# ===========================================
+# Proxmox VE Setup Playbook
+# Managed by Ansible
+# ===========================================
+
+- name: "Install and configure Proxmox VE"
+  hosts: proxmox_nodes
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../group_vars/all/main.yml"
+    - "{{ playbook_dir }}/../../group_vars/all/vault.yml"
+
+  pre_tasks:
+    - name: "Pre-tasks | Display playbook information"
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Proxmox VE Setup Playbook"
+          - "=========================================="
+          - "Target hosts: {{ ansible_play_hosts | join(', ') }}"
+          - "Execution time: {{ ansible_date_time.iso8601 }}"
+          - "=========================================="
+      run_once: true
+
+    - name: "Pre-tasks | Load OS-specific variables"
+      ansible.builtin.include_vars: "{{ playbook_dir }}/../../group_vars/{{ ansible_os_family | lower }}/main.yml"
+      when: ansible_os_family in ["Debian", "RedHat"]
+
+    - name: "Pre-tasks | Verify connectivity"
+      ansible.builtin.ping:
+
+    - name: "Pre-tasks | Gather additional facts"
+      ansible.builtin.setup:
+        gather_subset:
+          - hardware
+          - network
+          - virtual
+
+  roles:
+    - role: proxmox
+      tags:
+        - proxmox
+        - virtualization
+
+  post_tasks:
+    - name: "Post-tasks | Verify Proxmox installation"
+      block:
+        - name: "Post-tasks | Check Proxmox version"
+          ansible.builtin.command: pveversion
+          register: pve_version_check
+          changed_when: false
+          failed_when: false
+
+        - name: "Post-tasks | Display Proxmox version"
+          ansible.builtin.debug:
+            msg: "Proxmox VE version: {{ pve_version_check.stdout }}"
+          when: pve_version_check.rc == 0
+
+        - name: "Post-tasks | Check cluster status"
+          ansible.builtin.command: pvecm status
+          register: cluster_status_check
+          changed_when: false
+          failed_when: false
+          when: proxmox_cluster_enabled | default(false)
+
+        - name: "Post-tasks | Display cluster status"
+          ansible.builtin.debug:
+            msg: "{{ cluster_status_check.stdout_lines }}"
+          when:
+            - proxmox_cluster_enabled | default(false)
+            - cluster_status_check.rc == 0
+
+        - name: "Post-tasks | Gather node information"
+          ansible.builtin.command: pvesh get /nodes/{{ ansible_hostname }}/status
+          register: node_info
+          changed_when: false
+          failed_when: false
+
+        - name: "Post-tasks | Create deployment summary"
+          ansible.builtin.debug:
+            msg:
+              - "=========================================="
+              - "Proxmox VE Deployment Summary"
+              - "=========================================="
+              - "Node: {{ ansible_hostname }}"
+              - "FQDN: {{ ansible_fqdn }}"
+              - "IP: {{ ansible_default_ipv4.address }}"
+              - "Web UI: https://{{ ansible_default_ipv4.address }}:8006"
+              - "Cluster: {{ 'Enabled' if proxmox_cluster_enabled | default(false) else 'Disabled' }}"
+              - "Security: {{ 'Hardened' if proxmox_security_hardening | default(false) else 'Standard' }}"
+              - "=========================================="
+
+      rescue:
+        - name: "Post-tasks | Log verification failure"
+          ansible.builtin.debug:
+            msg:
+              - "WARNING: Post-installation verification encountered issues"
+              - "Please verify Proxmox installation manually"
+
+  handlers:
+    - name: reboot system
+      ansible.builtin.reboot:
+        msg: "Rebooting system to complete Proxmox setup"
+        reboot_timeout: 300
+      listen: reboot system
+
+# ===========================================
+# Additional Plays for Multi-Node Setup
+# ===========================================
+
+- name: "Configure Proxmox cluster (if enabled)"
+  hosts: proxmox_nodes
+  become: true
+  gather_facts: false
+  serial: 1
+
+  tasks:
+    - name: "Cluster | Wait for cluster synchronization"
+      ansible.builtin.pause:
+        seconds: 30
+      when:
+        - proxmox_cluster_enabled | default(false)
+        - inventory_hostname != groups['proxmox_nodes'][0]
+
+    - name: "Cluster | Verify all nodes are online"
+      ansible.builtin.command: pvecm nodes
+      register: cluster_nodes
+      changed_when: false
+      failed_when: false
+      when: proxmox_cluster_enabled | default(false)
+      delegate_to: "{{ groups['proxmox_nodes'][0] }}"
+      run_once: true
+
+    - name: "Cluster | Display cluster nodes"
+      ansible.builtin.debug:
+        msg: "{{ cluster_nodes.stdout_lines }}"
+      when:
+        - proxmox_cluster_enabled | default(false)
+        - cluster_nodes.rc == 0
+      run_once: true
+
+- name: "Post-deployment configuration"
+  hosts: proxmox_nodes
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: "Post-deployment | Create completion timestamp"
+      ansible.builtin.copy:
+        dest: /etc/pve/.ansible_deployment_complete
+        content: |
+          Proxmox VE deployment completed
+          Timestamp: {{ ansible_date_time.iso8601 }}
+          Deployed by: {{ ansible_user_id }}
+          Hostname: {{ ansible_hostname }}
+        mode: '0644'
+
+    - name: "Post-deployment | Final summary"
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Proxmox VE Deployment Complete!"
+          - "=========================================="
+          - "{{ groups['proxmox_nodes'] | length }} node(s) configured"
+          - "Access web interface on each node:"
+          - "{% for host in groups['proxmox_nodes'] %}"
+          - "  - {{ hostvars[host].ansible_hostname }}: https://{{ hostvars[host].ansible_default_ipv4.address }}:8006"
+          - "{% endfor %}"
+          - ""
+          - "Default credentials: root / (your root password)"
+          - "=========================================="
+      run_once: true

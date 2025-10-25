@@ -131,3 +131,28 @@ tailscale_timeout: 60
 # Common variables
 tailscale_package_name: "tailscale"
 tailscale_daemon_port: 41641
+
+# ============================================
+# Proxmox VE Configuration
+# ============================================
+proxmox_subscription_type: "no-subscription"
+proxmox_cluster_enabled: false
+proxmox_security_hardening: true
+proxmox_firewall_enabled: true
+proxmox_network_configure: true
+proxmox_storage_configure: true
+proxmox_backup_configure: true
+proxmox_ssl_enabled: true
+proxmox_remove_subscription_notice: true
+
+# Proxmox networking
+proxmox_network_bridges:
+  - name: vmbr0
+    type: bridge
+    address: "{{ ansible_default_ipv4.address }}"
+    netmask: "{{ ansible_default_ipv4.netmask }}"
+    gateway: "{{ ansible_default_ipv4.gateway }}"
+    bridge_ports: "{{ ansible_default_ipv4.interface }}"
+    bridge_stp: "off"
+    bridge_fd: 0
+    comment: "Main bridge for VMs"

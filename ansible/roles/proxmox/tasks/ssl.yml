@@ -1,0 +1,123 @@
+---
+# ===========================================
+# Proxmox VE Role - SSL/TLS Configuration
+# Managed by Ansible
+# ===========================================
+
+- name: "SSL | Configure self-signed certificate"
+  block:
+    - name: "SSL | Generate self-signed certificate"
+      ansible.builtin.command: >
+        openssl req -x509 -nodes -days 3650 -newkey rsa:4096
+        -keyout {{ proxmox_ssl_key_file }}
+        -out {{ proxmox_ssl_cert_file }}
+        -subj "/C=US/ST=State/L=City/O=Organization/CN={{ proxmox_fqdn }}"
+      args:
+        creates: "{{ proxmox_ssl_cert_file }}"
+      notify: restart pveproxy
+
+    - name: "SSL | Set certificate permissions"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        mode: '0640'
+        owner: root
+        group: www-data
+      loop:
+        - "{{ proxmox_ssl_cert_file }}"
+        - "{{ proxmox_ssl_key_file }}"
+  when:
+    - proxmox_ssl_certificate_source == "self-signed"
+    - proxmox_is_installed | bool
+
+- name: "SSL | Configure ACME certificate"
+  block:
+    - name: "SSL | Register ACME account"
+      ansible.builtin.command: >
+        pvenode acme account register default
+        {{ proxmox_ssl_acme_email }}
+        {% if proxmox_ssl_acme_staging %}--directory https://acme-staging-v02.api.letsencrypt.org/directory{% endif %}
+      register: acme_register
+      changed_when: acme_register.rc == 0
+      failed_when: false
+
+    - name: "SSL | Add domain to ACME configuration"
+      ansible.builtin.command: >
+        pvenode config set
+        --acme domains={{ proxmox_ssl_acme_domain }}
+      register: acme_domain
+      changed_when: acme_domain.rc == 0
+
+    - name: "SSL | Order ACME certificate"
+      ansible.builtin.command: pvenode acme cert order
+      register: acme_order
+      changed_when: acme_order.rc == 0
+      notify: restart pveproxy
+
+    - name: "SSL | Create ACME renewal cron job"
+      ansible.builtin.cron:
+        name: "Renew Proxmox ACME certificate"
+        minute: "0"
+        hour: "0"
+        day: "1"
+        job: "/usr/bin/pvenode acme cert order && systemctl reload pveproxy"
+        user: root
+  when:
+    - proxmox_ssl_certificate_source == "acme"
+    - proxmox_ssl_acme_enabled | bool
+    - proxmox_is_installed | bool
+
+- name: "SSL | Configure custom certificate"
+  block:
+    - name: "SSL | Verify custom certificate files exist"
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ proxmox_ssl_custom_cert_path }}"
+        - "{{ proxmox_ssl_custom_key_path }}"
+      register: custom_cert_check
+      failed_when: not custom_cert_check.stat.exists
+
+    - name: "SSL | Copy custom certificate"
+      ansible.builtin.copy:
+        src: "{{ proxmox_ssl_custom_cert_path }}"
+        dest: "{{ proxmox_ssl_cert_file }}"
+        mode: '0640'
+        owner: root
+        group: www-data
+      notify: restart pveproxy
+
+    - name: "SSL | Copy custom private key"
+      ansible.builtin.copy:
+        src: "{{ proxmox_ssl_custom_key_path }}"
+        dest: "{{ proxmox_ssl_key_file }}"
+        mode: '0640'
+        owner: root
+        group: www-data
+      notify: restart pveproxy
+
+    - name: "SSL | Copy certificate chain if provided"
+      ansible.builtin.copy:
+        src: "{{ proxmox_ssl_custom_chain_path }}"
+        dest: "{{ proxmox_ssl_cert_dir }}/pve-ssl-chain.pem"
+        mode: '0640'
+        owner: root
+        group: www-data
+      when: proxmox_ssl_custom_chain_path | length > 0
+      notify: restart pveproxy
+  when:
+    - proxmox_ssl_certificate_source == "custom"
+    - proxmox_is_installed | bool
+
+- name: "SSL | Verify certificate"
+  ansible.builtin.command: openssl x509 -in {{ proxmox_ssl_cert_file }} -noout -text
+  register: cert_verify
+  changed_when: false
+  failed_when: false
+  when: proxmox_is_installed | bool
+
+- name: "SSL | Display certificate information"
+  ansible.builtin.debug:
+    msg: "Certificate configured successfully"
+  when:
+    - proxmox_is_installed | bool
+    - cert_verify.rc == 0

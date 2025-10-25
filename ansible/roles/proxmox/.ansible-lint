@@ -1,0 +1,78 @@
+---
+# ===========================================
+# Ansible Lint Configuration for Proxmox Role
+# Managed by Ansible
+# ===========================================
+
+# Exclude specific paths
+exclude_paths:
+  - .cache/
+  - .git/
+  - .github/
+  - molecule/
+  - .ansible/
+  - .tox/
+
+# Parseable output for CI/CD
+# parseable: true
+
+# Use default rules
+# List all rules: ansible-lint -L
+warn_list:
+  - experimental  # Experimental rules
+  - role-name  # Role naming convention
+  - yaml[line-length]  # YAML line length
+
+# Skip specific rules
+skip_list:
+  - '106'  # Role name does not match ^[a-z][a-z0-9_]+$ pattern
+  - package-latest  # Allow package latest for initial setup
+  - command-instead-of-module  # Allow command module where necessary
+  - risky-shell-pipe  # Allow pipefail usage
+  - no-changed-when  # Allow tasks without changed_when for read operations
+
+# Enable progressive mode
+# progressive: true
+
+# Set offline mode
+offline: false
+
+# Use strict rules
+# strict: true
+
+# Kinds of tasks/blocks to check
+kinds:
+  - yaml: "**/*.yaml"
+  - yaml: "**/*.yml"
+  - playbook: "**/playbooks/*.yml"
+  - playbook: "**/playbooks/*.yaml"
+  - tasks: "**/tasks/*.yml"
+  - tasks: "**/tasks/*.yaml"
+  - handlers: "**/handlers/*.yml"
+  - handlers: "**/handlers/*.yaml"
+  - vars: "**/vars/*.yml"
+  - vars: "**/defaults/*.yml"
+  - meta: "**/meta/main.yml"
+  - requirements: "**/requirements.yml"
+
+# Mock modules/filters for better analysis
+mock_modules:
+  - proxmox
+  - proxmox_kvm
+  - proxmox_tasks_info
+
+mock_roles:
+  - common
+  - docker
+
+# Enable/Disable specific rules
+enable_list:
+  - yaml
+  - no-free-form
+  - no-jinja-when
+
+# Tags to skip
+# skip_action_validation: false
+
+# Verbosity
+verbosity: 1

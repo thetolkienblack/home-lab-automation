@@ -1,0 +1,80 @@
+# ===========================================
+# Network Interface Configuration
+# Managed by Ansible - {{ ansible_managed }}
+# Generated on: {{ ansible_date_time.iso8601 }}
+# ===========================================
+
+# Loopback interface
+auto lo
+iface lo inet loopback
+
+# Primary network interface
+auto {{ ansible_default_ipv4.interface | default('eth0') }}
+iface {{ ansible_default_ipv4.interface | default('eth0') }} inet manual
+
+{% if proxmox_network_bridges is defined and proxmox_network_bridges | length > 0 %}
+# Network Bridges
+{% for bridge in proxmox_network_bridges %}
+auto {{ bridge.name }}
+iface {{ bridge.name }} inet {{ 'static' if bridge.address is defined else 'manual' }}
+{% if bridge.address is defined %}
+    address {{ bridge.address }}
+    netmask {{ bridge.netmask }}
+{% if bridge.gateway is defined %}
+    gateway {{ bridge.gateway }}
+{% endif %}
+{% endif %}
+    bridge-ports {{ bridge.bridge_ports }}
+    bridge-stp {{ bridge.bridge_stp | default('off') }}
+    bridge-fd {{ bridge.bridge_fd | default(0) }}
+{% if bridge.bridge_vlan_aware is defined %}
+    bridge-vlan-aware {{ 'yes' if bridge.bridge_vlan_aware else 'no' }}
+{% endif %}
+{% if bridge.comment is defined %}
+# {{ bridge.comment }}
+{% endif %}
+
+{% endfor %}
+{% endif %}
+
+{% if proxmox_network_vlans is defined and proxmox_network_vlans | length > 0 %}
+# VLAN Interfaces
+{% for vlan in proxmox_network_vlans %}
+auto {{ vlan.name }}
+iface {{ vlan.name }} inet {{ 'static' if vlan.address is defined else 'manual' }}
+{% if vlan.address is defined %}
+    address {{ vlan.address }}
+    netmask {{ vlan.netmask }}
+{% endif %}
+    vlan-raw-device {{ vlan.vlan_raw_device }}
+{% if vlan.comment is defined %}
+# {{ vlan.comment }}
+{% endif %}
+
+{% endfor %}
+{% endif %}
+
+{% if proxmox_network_bonds is defined and proxmox_network_bonds | length > 0 %}
+# Bond Interfaces
+{% for bond in proxmox_network_bonds %}
+auto {{ bond.name }}
+iface {{ bond.name }} inet {{ 'static' if bond.address is defined else 'manual' }}
+{% if bond.address is defined %}
+    address {{ bond.address }}
+    netmask {{ bond.netmask }}
+{% if bond.gateway is defined %}
+    gateway {{ bond.gateway }}
+{% endif %}
+{% endif %}
+    bond-slaves {{ bond.bond_slaves }}
+    bond-mode {{ bond.bond_mode }}
+    bond-miimon {{ bond.bond_miimon | default(100) }}
+{% if bond.bond_xmit_hash_policy is defined %}
+    bond-xmit-hash-policy {{ bond.bond_xmit_hash_policy }}
+{% endif %}
+{% if bond.comment is defined %}
+# {{ bond.comment }}
+{% endif %}
+
+{% endfor %}
+{% endif %}

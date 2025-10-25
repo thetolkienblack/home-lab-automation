@@ -1,0 +1,120 @@
+---
+# ===========================================
+# Proxmox VE Role - Main Tasks
+# Managed by Ansible
+# ===========================================
+
+- name: "Load OS-specific variables"
+  ansible.builtin.include_vars: "{{ ansible_os_family | lower }}.yml"
+  tags: always
+
+- name: "Run preflight checks"
+  ansible.builtin.include_tasks: preflight.yml
+  tags:
+    - proxmox
+    - proxmox_preflight
+    - preflight
+
+- name: "Configure Proxmox repositories"
+  ansible.builtin.include_tasks: repository.yml
+  when: ansible_os_family == "Debian"
+  tags:
+    - proxmox
+    - proxmox_repository
+    - repository
+
+- name: "Install Proxmox packages"
+  ansible.builtin.include_tasks: packages.yml
+  when: ansible_os_family == "Debian"
+  tags:
+    - proxmox
+    - proxmox_packages
+    - packages
+
+- name: "Configure Proxmox SSL/TLS certificates"
+  ansible.builtin.include_tasks: ssl.yml
+  when:
+    - proxmox_ssl_enabled | bool
+    - ansible_os_family == "Debian"
+  tags:
+    - proxmox
+    - proxmox_ssl
+    - ssl
+
+- name: "Configure Proxmox networking"
+  ansible.builtin.include_tasks: networking.yml
+  when:
+    - proxmox_network_configure | bool
+    - ansible_os_family == "Debian"
+  tags:
+    - proxmox
+    - proxmox_networking
+    - networking
+
+- name: "Configure Proxmox storage"
+  ansible.builtin.include_tasks: storage.yml
+  when:
+    - proxmox_storage_configure | bool
+    - ansible_os_family == "Debian"
+  tags:
+    - proxmox
+    - proxmox_storage
+    - storage
+
+- name: "Configure Proxmox cluster"
+  ansible.builtin.include_tasks: cluster.yml
+  when:
+    - proxmox_cluster_enabled | bool
+    - ansible_os_family == "Debian"
+  tags:
+    - proxmox
+    - proxmox_cluster
+    - cluster
+
+- name: "Apply Proxmox security hardening"
+  ansible.builtin.include_tasks: security.yml
+  when:
+    - proxmox_security_hardening | bool
+    - ansible_os_family == "Debian"
+  tags:
+    - proxmox
+    - proxmox_security
+    - security
+
+- name: "Configure Proxmox firewall"
+  ansible.builtin.include_tasks: firewall.yml
+  when:
+    - proxmox_firewall_enabled | bool
+    - ansible_os_family == "Debian"
+  tags:
+    - proxmox
+    - proxmox_firewall
+    - firewall
+
+- name: "Configure Proxmox users and permissions"
+  ansible.builtin.include_tasks: users.yml
+  when:
+    - proxmox_users_configure | bool
+    - ansible_os_family == "Debian"
+  tags:
+    - proxmox
+    - proxmox_users
+    - users
+
+- name: "Configure Proxmox backup"
+  ansible.builtin.include_tasks: backup.yml
+  when:
+    - proxmox_backup_configure | bool
+    - ansible_os_family == "Debian"
+  tags:
+    - proxmox
+    - proxmox_backup
+    - backup
+
+- name: "Post-configuration tasks"
+  ansible.builtin.include_tasks: post_install.yml
+  when: ansible_os_family == "Debian"
+  tags:
+    - proxmox
+    - proxmox_post_install
+    - post_install

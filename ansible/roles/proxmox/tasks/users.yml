@@ -1,0 +1,105 @@
+---
+# ===========================================
+# Proxmox VE Role - User and Permission Management
+# Managed by Ansible
+# ===========================================
+
+- name: "Users | Create Proxmox user groups"
+  ansible.builtin.command: >
+    pveum group add {{ item.name }}
+    {% if item.comment is defined %}--comment "{{ item.comment }}"{% endif %}
+  loop: "{{ proxmox_groups }}"
+  register: group_create
+  changed_when: group_create.rc == 0
+  failed_when: false
+  when:
+    - proxmox_users_configure | bool
+    - proxmox_groups | length > 0
+    - proxmox_is_installed | bool
+
+- name: "Users | Create Proxmox users"
+  ansible.builtin.command: >
+    pveum user add {{ item.username }}
+    {% if item.password is defined %}--password "{{ item.password }}"{% endif %}
+    {% if item.email is defined %}--email "{{ item.email }}"{% endif %}
+    {% if item.firstname is defined %}--firstname "{{ item.firstname }}"{% endif %}
+    {% if item.lastname is defined %}--lastname "{{ item.lastname }}"{% endif %}
+    {% if item.groups is defined and item.groups | length > 0 %}--groups {{ item.groups | join(',') }}{% endif %}
+    {% if item.expire is defined %}--expire {{ item.expire }}{% endif %}
+    {% if item.enabled is defined %}--enable {{ item.enabled }}{% endif %}
+    {% if item.comment is defined %}--comment "{{ item.comment }}"{% endif %}
+  loop: "{{ proxmox_users }}"
+  register: user_create
+  changed_when: user_create.rc == 0
+  failed_when: false
+  no_log: true
+  when:
+    - proxmox_users_configure | bool
+    - proxmox_users | length > 0
+    - proxmox_is_installed | bool
+
+- name: "Users | Configure Access Control Lists (ACLs)"
+  ansible.builtin.command: >
+    pveum acl modify {{ item.path }}
+    {% if item.users is defined %}--users {{ item.users | join(',') }}{% endif %}
+    {% if item.groups is defined %}--groups {{ item.groups | join(',') }}{% endif %}
+    --roles {{ item.roles | join(',') }}
+    {% if item.propagate is defined %}{% if item.propagate %}--propagate 1{% else %}--propagate 0{% endif %}{% endif %}
+  loop: "{{ proxmox_acls }}"
+  register: acl_config
+  changed_when: acl_config.rc == 0
+  failed_when: false
+  when:
+    - proxmox_users_configure | bool
+    - proxmox_acls | length > 0
+    - proxmox_is_installed | bool
+
+- name: "Users | Create API tokens"
+  ansible.builtin.command: >
+    pveum user token add {{ item.user }} {{ item.tokenid }}
+    {% if item.comment is defined %}--comment "{{ item.comment }}"{% endif %}
+    {% if item.expire is defined %}--expire {{ item.expire }}{% endif %}
+    {% if item.privsep is defined %}--privsep {{ item.privsep }}{% endif %}
+  loop: "{{ proxmox_api_tokens }}"
+  register: token_create
+  changed_when: token_create.rc == 0
+  failed_when: false
+  when:
+    - proxmox_users_configure | bool
+    - proxmox_api_tokens | length > 0
+    - proxmox_is_installed | bool
+
+- name: "Users | Display created token information"
+  ansible.builtin.debug:
+    msg: "{{ token_create.results | map(attribute='stdout') | list }}"
+  when:
+    - proxmox_api_tokens | length > 0
+    - token_create.changed
+
+- name: "Users | Configure two-factor authentication"
+  block:
+    - name: "Users | Enable 2FA for users"
+      ansible.builtin.command: >
+        pveum user modify {{ item.username }}
+        --keys "{{ proxmox_2fa_type }}:{{ item.username }}"
+      loop: "{{ proxmox_users | selectattr('enable_2fa', 'defined') | selectattr('enable_2fa', 'equalto', true) | list }}"
+      register: tfa_enable
+      changed_when: tfa_enable.rc == 0
+      failed_when: false
+  when:
+    - proxmox_2fa_enabled | bool
+    - proxmox_users_configure | bool
+    - proxmox_is_installed | bool
+
+- name: "Users | List all users"
+  ansible.builtin.command: pveum user list
+  register: user_list
+  changed_when: false
+  when: proxmox_is_installed | bool
+
+- name: "Users | Display user configuration"
+  ansible.builtin.debug:
+    msg: "{{ user_list.stdout_lines }}"
+  when:
+    - proxmox_is_installed | bool
+    - user_list.rc == 0

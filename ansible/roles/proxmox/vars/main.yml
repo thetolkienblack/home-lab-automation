@@ -1,0 +1,132 @@
+---
+# ===========================================
+# Proxmox VE Role - Main Variables
+# Managed by Ansible
+# ===========================================
+
+# Proxmox package names (version-agnostic)
+proxmox_packages:
+  - proxmox-ve
+  - postfix
+  - open-iscsi
+  - ifupdown2
+
+# Proxmox services
+proxmox_services:
+  - pve-cluster
+  - pvedaemon
+  - pveproxy
+  - pvestatd
+  - pve-firewall
+  - corosync
+  - pve-ha-lrm
+  - pve-ha-crm
+
+# Proxmox configuration paths
+proxmox_config_dir: "/etc/pve"
+proxmox_storage_config: "/etc/pve/storage.cfg"
+proxmox_cluster_config: "/etc/pve/corosync.conf"
+proxmox_firewall_config: "/etc/pve/firewall"
+proxmox_datacenter_config: "/etc/pve/datacenter.cfg"
+proxmox_nodes_config: "/etc/pve/nodes"
+
+# Proxmox web interface
+proxmox_web_port: 8006
+proxmox_spice_proxy_port: 3128
+
+# Cluster ports
+proxmox_cluster_ports:
+  corosync:
+    - 5404
+    - 5405
+  migration:
+    - 60000-60050
+  vnc:
+    - 5900-5999
+  spice:
+    - 3128
+
+# Storage content types
+proxmox_storage_content_types:
+  - images      # VM/CT disk images
+  - rootdir     # Container rootfs
+  - vztmpl      # Container templates
+  - backup      # Backups
+  - iso         # ISO images
+  - snippets    # Snippets (cloud-init, hooks)
+
+# Proxmox API endpoints
+proxmox_api_base: "https://localhost:8006/api2/json"
+
+# Certificate paths
+proxmox_ssl_cert_dir: "/etc/pve/local"
+proxmox_ssl_cert_file: "/etc/pve/local/pve-ssl.pem"
+proxmox_ssl_key_file: "/etc/pve/local/pve-ssl.key"
+
+# Backup modes
+proxmox_backup_modes:
+  - snapshot
+  - suspend
+  - stop
+
+# Backup compression algorithms
+proxmox_backup_compression_types:
+  - "0"      # No compression
+  - gzip
+  - lzo
+  - zstd
+
+# Network interface types
+proxmox_network_interface_types:
+  - bridge
+  - bond
+  - vlan
+  - OVSBridge
+  - OVSBond
+  - OVSPort
+  - OVSIntPort
+
+# Storage types
+proxmox_storage_types:
+  - dir
+  - nfs
+  - cifs
+  - glusterfs
+  - iscsi
+  - iscsidirect
+  - lvm
+  - lvmthin
+  - zfs
+  - zfspool
+  - rbd
+  - cephfs
+  - btrfs
+
+# User realms
+proxmox_user_realms:
+  - pve      # Proxmox VE authentication server
+  - pam      # Linux PAM standard authentication
+  - ldap     # LDAP Directory Server
+  - ad       # Microsoft Active Directory
+
+# Roles
+proxmox_builtin_roles:
+  - Administrator
+  - PVEAdmin
+  - PVEAuditor
+  - PVEDatastoreAdmin
+  - PVEDatastoreUser
+  - PVEPoolAdmin
+  - PVEPoolUser
+  - PVESysAdmin
+  - PVETemplateUser
+  - PVEUserAdmin
+  - PVEVMAdmin
+  - PVEVMUser
+
+# Log files
+proxmox_log_files:
+  - /var/log/pve/tasks/index
+  - /var/log/pvedaemon.log
+  - /var/log/pveproxy/access.log
+  - /var/log/pve-firewall.log

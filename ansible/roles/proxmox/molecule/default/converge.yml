@@ -1,0 +1,83 @@
+---
+# ===========================================
+# Molecule Converge Playbook
+# Managed by Ansible
+# ===========================================
+
+- name: Converge
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # Mock Proxmox installation for testing
+    proxmox_is_installed: true
+    proxmox_cluster_enabled: false
+    proxmox_security_hardening: true
+    proxmox_firewall_enabled: false  # Disable for container testing
+    proxmox_network_configure: false  # Disable for container testing
+    proxmox_storage_configure: false  # Disable for container testing
+    proxmox_backup_configure: false
+    proxmox_users_configure: false
+    proxmox_ssl_enabled: false
+    proxmox_fail2ban_enabled: false
+    proxmox_audit_logging: false
+    proxmox_auto_updates: false
+    proxmox_remove_subscription_notice: false
+
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Install Python dependencies
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-pip
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Create mock Proxmox directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /etc/pve
+        - /etc/pve/firewall
+        - /etc/pve/nodes
+        - /var/lib/vz
+        - /var/log/pve
+
+    - name: Create mock Proxmox binaries
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: touch
+        mode: '0755'
+      loop:
+        - /usr/bin/pvesh
+        - /usr/bin/pveversion
+        - /usr/bin/pvecm
+        - /usr/bin/pveum
+        - /usr/bin/vzdump
+
+    - name: Create mock pveversion command
+      ansible.builtin.copy:
+        dest: /usr/bin/pveversion
+        content: |
+          #!/bin/bash
+          echo "pve-manager/8.0.4/d258a813cfa6b390 (running kernel: 6.2.16-3-pve)"
+        mode: '0755'
+
+  roles:
+    - role: proxmox
+      tags:
+        - proxmox
+
+  post_tasks:
+    - name: Verify role execution
+      ansible.builtin.debug:
+        msg: "Proxmox role converged successfully"

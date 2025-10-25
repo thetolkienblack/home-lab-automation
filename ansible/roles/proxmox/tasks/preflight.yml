@@ -1,0 +1,240 @@
+---
+# ===========================================
+# Proxmox VE Role - Preflight Checks
+# Managed by Ansible
+# ===========================================
+
+- name: "Preflight | Verify Ansible version"
+  ansible.builtin.assert:
+    that:
+      - ansible_version.full is version('2.10', '>=')
+    fail_msg: "Ansible version must be 2.10 or higher"
+    success_msg: "Ansible version {{ ansible_version.full }} is supported"
+  tags: always
+
+- name: "Preflight | Verify operating system"
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family == "Debian"
+      - ansible_distribution in ["Debian", "Ubuntu"]
+    fail_msg: "Proxmox VE is only supported on Debian-based systems"
+    success_msg: "Operating system {{ ansible_distribution }} {{ ansible_distribution_version }} is supported"
+  tags: always
+
+- name: "Preflight | Verify system architecture"
+  ansible.builtin.assert:
+    that:
+      - ansible_architecture == "x86_64"
+    fail_msg: "Proxmox VE requires x86_64 architecture"
+    success_msg: "System architecture {{ ansible_architecture }} is supported"
+  tags: always
+
+- name: "Preflight | Check minimum RAM requirements"
+  ansible.builtin.assert:
+    that:
+      - ansible_memtotal_mb >= 2048
+    fail_msg: "Proxmox VE requires at least 2GB RAM. Current: {{ ansible_memtotal_mb }}MB"
+    success_msg: "System has {{ ansible_memtotal_mb }}MB RAM"
+  tags: always
+
+- name: "Preflight | Check minimum disk space"
+  ansible.builtin.assert:
+    that:
+      - ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='size_available') | first > 10737418240
+    fail_msg: "Root partition requires at least 10GB free space"
+    success_msg: "Root partition has sufficient space"
+  tags: always
+
+- name: "Preflight | Verify hostname configuration"
+  block:
+    - name: "Preflight | Check hostname is set"
+      ansible.builtin.assert:
+        that:
+          - ansible_hostname is defined
+          - ansible_hostname | length > 0
+          - ansible_hostname != "localhost"
+        fail_msg: "Hostname must be properly configured (not localhost)"
+        success_msg: "Hostname is {{ ansible_hostname }}"
+
+    - name: "Preflight | Check FQDN is set"
+      ansible.builtin.assert:
+        that:
+          - ansible_fqdn is defined
+          - ansible_fqdn | length > 0
+          - ansible_fqdn != "localhost.localdomain"
+          - ansible_fqdn != ansible_hostname
+        fail_msg: "FQDN must be properly configured"
+        success_msg: "FQDN is {{ ansible_fqdn }}"
+
+    - name: "Preflight | Verify hostname resolves"
+      ansible.builtin.command: "getent hosts {{ ansible_fqdn }}"
+      changed_when: false
+      register: hostname_resolution
+      failed_when: hostname_resolution.rc != 0
+
+    - name: "Preflight | Check /etc/hosts configuration"
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: "^{{ ansible_default_ipv4.address }}\\s+"
+        line: "{{ ansible_default_ipv4.address }} {{ ansible_fqdn }} {{ ansible_hostname }}"
+        state: present
+      check_mode: true
+      register: hosts_file_check
+      failed_when: hosts_file_check.changed
+  tags: always
+
+- name: "Preflight | Check for existing virtualization"
+  ansible.builtin.shell: |
+    set -o pipefail
+    systemd-detect-virt || true
+  args:
+    executable: /bin/bash
+  register: virt_check
+  changed_when: false
+  tags: always
+
+- name: "Preflight | Warn if running in virtual environment"
+  ansible.builtin.debug:
+    msg: "WARNING: Proxmox is running inside {{ virt_check.stdout }}. Nested virtualization may have limitations."
+  when:
+    - virt_check.stdout != "none"
+    - virt_check.stdout | length > 0
+  tags: always
+
+- name: "Preflight | Check CPU virtualization support"
+  ansible.builtin.shell: |
+    set -o pipefail
+    egrep -c '(vmx|svm)' /proc/cpuinfo || echo "0"
+  args:
+    executable: /bin/bash
+  register: cpu_virt_check
+  changed_when: false
+  tags: always
+
+- name: "Preflight | Verify CPU supports virtualization"
+  ansible.builtin.assert:
+    that:
+      - cpu_virt_check.stdout | int > 0
+    fail_msg: "CPU does not support hardware virtualization (VT-x/AMD-V)"
+    success_msg: "CPU supports hardware virtualization"
+  tags: always
+
+- name: "Preflight | Check if Proxmox is already installed"
+  ansible.builtin.stat:
+    path: /usr/bin/pvesh
+  register: proxmox_installed
+  tags: always
+
+- name: "Preflight | Set Proxmox installation status fact"
+  ansible.builtin.set_fact:
+    proxmox_is_installed: "{{ proxmox_installed.stat.exists }}"
+  tags: always
+
+- name: "Preflight | Check Proxmox version if installed"
+  ansible.builtin.command: pveversion
+  register: pve_version_output
+  changed_when: false
+  failed_when: false
+  when: proxmox_is_installed | bool
+  tags: always
+
+- name: "Preflight | Display current Proxmox version"
+  ansible.builtin.debug:
+    msg: "Proxmox VE is already installed: {{ pve_version_output.stdout }}"
+  when:
+    - proxmox_is_installed | bool
+    - pve_version_output.rc == 0
+  tags: always
+
+- name: "Preflight | Verify network configuration"
+  block:
+    - name: "Preflight | Check default gateway"
+      ansible.builtin.assert:
+        that:
+          - ansible_default_ipv4.gateway is defined
+        fail_msg: "No default gateway configured"
+        success_msg: "Default gateway: {{ ansible_default_ipv4.gateway }}"
+
+    - name: "Preflight | Check DNS configuration"
+      ansible.builtin.shell: |
+        set -o pipefail
+        cat /etc/resolv.conf | grep -E '^nameserver' | wc -l
+      args:
+        executable: /bin/bash
+      register: dns_check
+      changed_when: false
+      failed_when: dns_check.stdout | int == 0
+  tags: always
+
+- name: "Preflight | Check for required kernel modules"
+  ansible.builtin.shell: |
+    set -o pipefail
+    lsmod | grep -E '(kvm|vhost)' || echo "not_loaded"
+  args:
+    executable: /bin/bash
+  register: kernel_modules_check
+  changed_when: false
+  failed_when: false
+  tags: always
+
+- name: "Preflight | Verify time synchronization"
+  block:
+    - name: "Preflight | Check if time is synchronized"
+      ansible.builtin.command: timedatectl status
+      register: timedatectl_status
+      changed_when: false
+      failed_when: false
+
+    - name: "Preflight | Display time sync status"
+      ansible.builtin.debug:
+        msg: "Time synchronization status: {{ timedatectl_status.stdout_lines }}"
+      when: timedatectl_status.rc == 0
+  tags: always
+
+- name: "Preflight | Check for cluster configuration conflicts"
+  block:
+    - name: "Preflight | Verify cluster create/join are not both enabled"
+      ansible.builtin.assert:
+        that:
+          - not (proxmox_cluster_create | bool and proxmox_cluster_join | bool)
+        fail_msg: "Cannot create and join cluster simultaneously"
+        success_msg: "Cluster configuration is valid"
+      when: proxmox_cluster_enabled | bool
+
+    - name: "Preflight | Check cluster join requirements"
+      ansible.builtin.assert:
+        that:
+          - proxmox_cluster_master_node | length > 0
+          - proxmox_cluster_name | length > 0
+        fail_msg: "Cluster join requires master_node and cluster_name"
+        success_msg: "Cluster join configuration is complete"
+      when:
+        - proxmox_cluster_enabled | bool
+        - proxmox_cluster_join | bool
+
+    - name: "Preflight | Check cluster create requirements"
+      ansible.builtin.assert:
+        that:
+          - proxmox_cluster_name | length > 0
+        fail_msg: "Cluster creation requires cluster_name"
+        success_msg: "Cluster create configuration is complete"
+      when:
+        - proxmox_cluster_enabled | bool
+        - proxmox_cluster_create | bool
+  tags: always
+
+- name: "Preflight | Display configuration summary"
+  ansible.builtin.debug:
+    msg:
+      - "=== Proxmox VE Configuration Summary ==="
+      - "Hostname: {{ ansible_hostname }}"
+      - "FQDN: {{ ansible_fqdn }}"
+      - "IP Address: {{ ansible_default_ipv4.address }}"
+      - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+      - "Kernel: {{ ansible_kernel }}"
+      - "CPU Cores: {{ ansible_processor_vcpus }}"
+      - "Memory: {{ ansible_memtotal_mb }}MB"
+      - "Proxmox Installed: {{ proxmox_is_installed }}"
+      - "Cluster Enabled: {{ proxmox_cluster_enabled }}"
+      - "Security Hardening: {{ proxmox_security_hardening }}"
+  tags: always

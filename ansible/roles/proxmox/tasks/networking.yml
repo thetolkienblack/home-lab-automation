@@ -1,0 +1,166 @@
+---
+# ===========================================
+# Proxmox VE Role - Network Configuration
+# Managed by Ansible
+# ===========================================
+
+- name: "Networking | Backup current network configuration"
+  ansible.builtin.copy:
+    src: "{{ proxmox_network_config_file }}"
+    dest: "{{ proxmox_network_config_backup }}"
+    remote_src: true
+    mode: preserve
+    backup: true
+  when: proxmox_network_configure | bool
+
+- name: "Networking | Generate network interfaces configuration"
+  ansible.builtin.template:
+    src: virt/proxmox/pve/interfaces.j2
+    dest: "{{ proxmox_network_config_file }}"
+    mode: '0644'
+    backup: true
+    validate: /usr/sbin/ifquery --syntax-check --all --interfaces=%s
+  register: network_config
+  notify: reload networking
+
+- name: "Networking | Configure network bridges"
+  block:
+    - name: "Networking | Create bridge interfaces"
+      ansible.builtin.blockinfile:
+        path: "{{ proxmox_network_config_file }}"
+        marker: "# {mark} ANSIBLE MANAGED BRIDGE {{ item.name }}"
+        block: |
+          auto {{ item.name }}
+          iface {{ item.name }} inet {{ 'static' if item.address is defined else 'manual' }}
+          {% if item.address is defined %}
+              address {{ item.address }}
+              netmask {{ item.netmask }}
+          {% if item.gateway is defined %}
+              gateway {{ item.gateway }}
+          {% endif %}
+          {% endif %}
+              bridge-ports {{ item.bridge_ports }}
+              bridge-stp {{ item.bridge_stp | default('off') }}
+              bridge-fd {{ item.bridge_fd | default(0) }}
+          {% if item.comment is defined %}
+          # {{ item.comment }}
+          {% endif %}
+        create: true
+        mode: '0644'
+      loop: "{{ proxmox_network_bridges }}"
+      when: proxmox_network_bridges | length > 0
+  when: proxmox_network_configure | bool
+
+- name: "Networking | Configure VLAN interfaces"
+  ansible.builtin.blockinfile:
+    path: "{{ proxmox_network_config_file }}"
+    marker: "# {mark} ANSIBLE MANAGED VLAN {{ item.name }}"
+    block: |
+      auto {{ item.name }}
+      iface {{ item.name }} inet {{ 'static' if item.address is defined else 'manual' }}
+      {% if item.address is defined %}
+          address {{ item.address }}
+          netmask {{ item.netmask }}
+      {% endif %}
+          vlan-raw-device {{ item.vlan_raw_device }}
+      {% if item.comment is defined %}
+      # {{ item.comment }}
+      {% endif %}
+    create: true
+    mode: '0644'
+  loop: "{{ proxmox_network_vlans }}"
+  when:
+    - proxmox_network_configure | bool
+    - proxmox_network_vlans | length > 0
+
+- name: "Networking | Configure bond interfaces"
+  ansible.builtin.blockinfile:
+    path: "{{ proxmox_network_config_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BOND {{ item.name }}"
+    block: |
+      auto {{ item.name }}
+      iface {{ item.name }} inet {{ 'static' if item.address is defined else 'manual' }}
+      {% if item.address is defined %}
+          address {{ item.address }}
+          netmask {{ item.netmask }}
+      {% if item.gateway is defined %}
+          gateway {{ item.gateway }}
+      {% endif %}
+      {% endif %}
+          bond-slaves {{ item.bond_slaves }}
+          bond-mode {{ item.bond_mode }}
+          bond-miimon {{ item.bond_miimon | default(100) }}
+      {% if item.comment is defined %}
+      # {{ item.comment }}
+      {% endif %}
+    create: true
+    mode: '0644'
+  loop: "{{ proxmox_network_bonds }}"
+  when:
+    - proxmox_network_configure | bool
+    - proxmox_network_bonds | length > 0
+
+- name: "Networking | Verify network configuration syntax"
+  ansible.builtin.command: ifquery --syntax-check --all
+  changed_when: false
+  register: network_syntax_check
+
+- name: "Networking | Configure SDN zones"
+  block:
+    - name: "Networking | Create SDN zones"
+      ansible.builtin.command: >
+        pvesh create /cluster/sdn/zones
+        --zone {{ item.zone }}
+        --type {{ item.type }}
+        {% if item.bridge is defined %}--bridge {{ item.bridge }}{% endif %}
+      loop: "{{ proxmox_sdn_zones }}"
+      register: sdn_zone_result
+      changed_when: sdn_zone_result.rc == 0
+      failed_when: false
+
+    - name: "Networking | Create SDN VNets"
+      ansible.builtin.command: >
+        pvesh create /cluster/sdn/vnets
+        --vnet {{ item.vnet }}
+        --zone {{ item.zone }}
+        {% if item.tag is defined %}--tag {{ item.tag }}{% endif %}
+      loop: "{{ proxmox_sdn_vnets }}"
+      register: sdn_vnet_result
+      changed_when: sdn_vnet_result.rc == 0
+      failed_when: false
+
+    - name: "Networking | Create SDN subnets"
+      ansible.builtin.command: >
+        pvesh create /cluster/sdn/vnets/{{ item.vnet }}/subnets
+        --subnet {{ item.subnet }}
+        {% if item.gateway is defined %}--gateway {{ item.gateway }}{% endif %}
+        {% if item.snat is defined %}--snat {{ item.snat }}{% endif %}
+      loop: "{{ proxmox_sdn_subnets }}"
+      register: sdn_subnet_result
+      changed_when: sdn_subnet_result.rc == 0
+      failed_when: false
+
+    - name: "Networking | Apply SDN configuration"
+      ansible.builtin.command: pvesh set /cluster/sdn
+      register: sdn_apply
+      changed_when: sdn_apply.rc == 0
+  when:
+    - proxmox_sdn_enabled | bool
+    - proxmox_is_installed | bool
+
+- name: "Networking | Check if network reboot is required"
+  ansible.builtin.set_fact:
+    network_reboot_required: "{{ network_config.changed and proxmox_network_reboot_on_change }}"
+
+- name: "Networking | Display network change notice"
+  ansible.builtin.debug:
+    msg:
+      - "Network configuration has changed."
+      - "{{ 'System will reboot to apply changes.' if network_reboot_required else 'Please reboot manually or reload networking.' }}"
+  when: network_config.changed
+
+- name: "Networking | Reboot if network changed and auto-reboot enabled"
+  ansible.builtin.reboot:
+    msg: "Rebooting to apply network configuration changes"
+    reboot_timeout: 300
+  when: network_reboot_required | default(false)
