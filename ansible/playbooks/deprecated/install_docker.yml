@@ -171,7 +171,6 @@
         group: root
         mode: "0644"
         backup: true
-      notify: "Restart docker"
 
     - name: Create docker seccomp profile from template
       ansible.builtin.template:
@@ -180,7 +179,15 @@
         owner: root
         group: root
         mode: "0644"
-      notify: "Restart docker"
+
+    - name: Configure sysctl forwarding
+      ansible.builtin.template:
+        src: "{{ inventory_dir }}/../templates/virt/containers/docker-sysctl.conf.j2" # noqa no-relative-paths
+        dest: /etc/sysctl.d/99-docker.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: "Apply sysctl settings"
 
     - name: Create docker systemd override directory
       ansible.builtin.file:
@@ -270,3 +277,8 @@
       ansible.builtin.systemd:
         name: docker
         state: restarted
+
+    - name: "Apply sysctl settings"
+      ansible.builtin.command:
+        cmd: /usr/sbin/sysctl -p /etc/sysctl.d/99-docker.conf
+      changed_when: true
