@@ -1,0 +1,48 @@
+---
+# ===========================================
+# Proxmox VE Role - RedHat-specific Variables
+# Managed by Ansible
+# ===========================================
+# NOTE: Proxmox VE officially supports Debian-based systems only.
+# This file is provided for potential future RHEL/CentOS support
+# or for managing Proxmox from RHEL-based control nodes.
+
+# RHEL/CentOS specific package names (for management tools)
+proxmox_os_packages:
+  - gnupg2
+  - ca-certificates
+  - curl
+  - wget
+
+# Note: Proxmox VE cannot be installed on RHEL/CentOS
+# These variables are for managing Proxmox from RHEL systems
+proxmox_management_packages:
+  - python3-pip
+  - python3-requests
+  - python3-proxmoxer  # Python Proxmox API client
+
+# Service manager
+proxmox_service_manager: "systemd"
+
+# Firewall backend
+proxmox_firewall_backend: "firewalld"
+
+# SELinux
+proxmox_selinux_packages:
+  - policycoreutils
+  - policycoreutils-python-utils
+  - selinux-policy
+  - selinux-policy-targeted
+
+# System paths
+proxmox_yum_repos_dir: "/etc/yum.repos.d"
+
+# Postfix configuration (for email notifications from management node)
+proxmox_postfix_config: "/etc/postfix/main.cf"
+proxmox_postfix_service: "postfix"
+
+# Fail2ban (if managing from RHEL)
+proxmox_fail2ban_service: "fail2ban"
+proxmox_fail2ban_config_dir: "/etc/fail2ban"
+proxmox_fail2ban_jail_local: "/etc/fail2ban/jail.local"
+proxmox_fail2ban_filter_dir: "/etc/fail2ban/filter.d"

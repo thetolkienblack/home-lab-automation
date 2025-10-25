@@ -1,0 +1,11 @@
+# ===========================================
+# Vzdump Cron Jobs
+# Managed by Ansible - {{ ansible_managed }}
+# Generated on: {{ ansible_date_time.iso8601 }}
+# ===========================================
+
+{% for schedule in proxmox_backup_schedules %}
+# Backup for VM/CT {{ schedule.vmid }}
+{{ schedule.schedule }} root /usr/bin/vzdump {{ schedule.vmid }} --mode {{ schedule.mode | default('snapshot') }} --storage {{ schedule.storage | default('local') }} --compress {{ schedule.compression | default('zstd') }} {% if schedule.retention is defined %}--prune-backups keep-last={{ schedule.retention.keep_last | default(7) }},keep-daily={{ schedule.retention.keep_daily | default(7) }},keep-weekly={{ schedule.retention.keep_weekly | default(4) }},keep-monthly={{ schedule.retention.keep_monthly | default(3) }},keep-yearly={{ schedule.retention.keep_yearly | default(1) }}{% endif %} {% if proxmox_email_enabled %}--mailto {{ proxmox_email_to }}{% endif %}
+
+{% endfor %}

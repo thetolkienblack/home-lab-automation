@@ -1,0 +1,493 @@
+---
+# ===========================================
+# Proxmox VE Role - Default Variables
+# Managed by Ansible
+# ===========================================
+
+# ============================================
+# General Configuration
+# ============================================
+proxmox_version: "8.x"  # Target Proxmox VE version (7.x, 8.x, 9.x)
+proxmox_subscription_type: "no-subscription"  # no-subscription, enterprise, test
+proxmox_enable_updates: true
+proxmox_hostname: "{{ ansible_hostname }}"
+proxmox_domain: "{{ ansible_domain | default('localdomain') }}"
+proxmox_fqdn: "{{ proxmox_hostname }}.{{ proxmox_domain }}"
+
+# ============================================
+# Repository Configuration
+# ============================================
+proxmox_repo_enterprise_enabled: false
+proxmox_repo_no_subscription_enabled: true
+proxmox_repo_test_enabled: false
+proxmox_repo_ceph_enabled: false
+proxmox_repo_pvetest_enabled: false
+
+# ============================================
+# Cluster Configuration
+# ============================================
+proxmox_cluster_enabled: false
+proxmox_cluster_create: false  # Create new cluster
+proxmox_cluster_join: false    # Join existing cluster
+proxmox_cluster_name: "pve-cluster"
+proxmox_cluster_bindnet_addr: "{{ ansible_default_ipv4.address }}"
+proxmox_cluster_link0_addr: "{{ ansible_default_ipv4.address }}"
+proxmox_cluster_link1_addr: ""  # Optional secondary link for redundancy
+proxmox_cluster_master_node: ""  # IP or hostname of master node to join
+proxmox_cluster_master_fingerprint: ""  # SSH fingerprint of master node
+proxmox_cluster_master_password: ""  # Root password of master node (use vault!)
+
+# ============================================
+# Networking Configuration
+# ============================================
+proxmox_network_configure: true
+proxmox_network_reboot_on_change: false  # Reboot if network config changes
+
+# Network bridges
+proxmox_network_bridges:
+  - name: vmbr0
+    type: bridge
+    address: "{{ ansible_default_ipv4.address }}"
+    netmask: "{{ ansible_default_ipv4.netmask }}"
+    gateway: "{{ ansible_default_ipv4.gateway }}"
+    bridge_ports: "{{ ansible_default_ipv4.interface }}"
+    bridge_stp: "off"
+    bridge_fd: 0
+    comment: "Main bridge for VMs"
+  # - name: vmbr1
+  #   type: bridge
+  #   bridge_ports: none
+  #   bridge_stp: "off"
+  #   bridge_fd: 0
+  #   comment: "Internal bridge for VM-to-VM communication"
+
+# VLAN configuration
+proxmox_network_vlans: []
+  # - name: vmbr0.100
+  #   type: vlan
+  #   vlan_raw_device: vmbr0
+  #   vlan_id: 100
+  #   address: 192.168.100.1
+  #   netmask: 255.255.255.0
+  #   comment: "VLAN 100 - Management"
+
+# Bond configuration
+proxmox_network_bonds: []
+  # - name: bond0
+  #   type: bond
+  #   bond_mode: 802.3ad
+  #   bond_miimon: 100
+  #   bond_slaves: eth0 eth1
+  #   address: 192.168.1.100
+  #   netmask: 255.255.255.0
+  #   gateway: 192.168.1.1
+
+# ============================================
+# Storage Configuration
+# ============================================
+proxmox_storage_configure: true
+
+# Remove default local-lvm storage
+proxmox_storage_remove_local_lvm: false
+
+# Storage backends
+proxmox_storage_backends: []
+  # NFS Example:
+  # - name: nfs-backup
+  #   type: nfs
+  #   server: 192.168.1.10
+  #   export: /mnt/backup
+  #   content: ["backup", "iso", "vztmpl"]
+  #   maxfiles: 3
+  #   options: "vers=4.2"
+
+  # CIFS/SMB Example:
+  # - name: smb-storage
+  #   type: cifs
+  #   server: 192.168.1.20
+  #   share: storage
+  #   username: proxmox
+  #   password: "{{ vault_smb_password }}"
+  #   content: ["backup", "iso"]
+  #   domain: WORKGROUP
+
+  # iSCSI Example:
+  # - name: iscsi-san
+  #   type: iscsi
+  #   portal: 192.168.1.30
+  #   target: iqn.2020-01.com.example:storage
+  #   content: ["images"]
+
+  # LVM Example:
+  # - name: lvm-data
+  #   type: lvm
+  #   vgname: pve-data
+  #   content: ["images", "rootdir"]
+  #   shared: 0
+
+  # LVM-Thin Example:
+  # - name: lvm-thin-data
+  #   type: lvmthin
+  #   vgname: pve
+  #   thinpool: data
+  #   content: ["images", "rootdir"]
+
+  # ZFS Example:
+  # - name: zfs-pool
+  #   type: zfspool
+  #   pool: rpool/data
+  #   content: ["images", "rootdir"]
+  #   sparse: 1
+  #   mountpoint: /rpool/data
+
+  # Directory Example:
+  # - name: local-backup
+  #   type: dir
+  #   path: /mnt/backup
+  #   content: ["backup", "iso", "vztmpl"]
+  #   maxfiles: 10
+
+# ZFS Configuration
+proxmox_zfs_enabled: false
+proxmox_zfs_pools: []
+  # - name: tank
+  #   devices:
+  #     - /dev/sdb
+  #     - /dev/sdc
+  #   raid: mirror  # mirror, raidz, raidz2, raidz3
+  #   compression: lz4
+  #   mountpoint: /tank
+
+# Ceph Configuration
+proxmox_ceph_enabled: false
+proxmox_ceph_network: ""
+proxmox_ceph_cluster_network: ""
+proxmox_ceph_mon_nodes: []
+proxmox_ceph_osd_devices: []
+
+# ============================================
+# Backup Configuration
+# ============================================
+proxmox_backup_configure: true
+proxmox_backup_schedules: []
+  # - vmid: "100"
+  #   storage: local
+  #   schedule: "0 2 * * *"  # Daily at 2 AM
+  #   mode: snapshot  # snapshot, suspend, stop
+  #   compression: zstd
+  #   retention:
+  #     keep_last: 7
+  #     keep_hourly: 0
+  #     keep_daily: 7
+  #     keep_weekly: 4
+  #     keep_monthly: 3
+  #     keep_yearly: 1
+
+# Proxmox Backup Server integration
+proxmox_pbs_enabled: false
+proxmox_pbs_server: ""
+proxmox_pbs_datastore: ""
+proxmox_pbs_username: ""
+proxmox_pbs_password: ""
+proxmox_pbs_fingerprint: ""
+
+# ============================================
+# Security Configuration
+# ============================================
+proxmox_security_hardening: true
+
+# SSH Configuration
+proxmox_ssh_port: 22
+proxmox_ssh_permit_root_login: "prohibit-password"
+proxmox_ssh_password_authentication: false
+proxmox_ssh_pubkey_authentication: true
+proxmox_ssh_authorized_keys: []
+  # - "ssh-rsa AAAAB3... user@host"
+
+# Firewall Configuration
+proxmox_firewall_enabled: true
+proxmox_firewall_log_level: info  # nolog, emerg, alert, crit, err, warning, notice, info, debug
+proxmox_firewall_default_input_policy: DROP
+proxmox_firewall_default_output_policy: ACCEPT
+proxmox_firewall_default_forward_policy: DROP
+
+# Firewall rules (applied at datacenter level)
+proxmox_firewall_rules:
+  - action: ACCEPT
+    type: in
+    proto: tcp
+    dport: 22
+    comment: "SSH access"
+    enabled: 1
+  - action: ACCEPT
+    type: in
+    proto: tcp
+    dport: 8006
+    comment: "Proxmox Web UI"
+    enabled: 1
+  - action: ACCEPT
+    type: in
+    proto: tcp
+    dport: 3128
+    comment: "SPICE Proxy"
+    enabled: 1
+  - action: ACCEPT
+    type: in
+    proto: tcp
+    dport: 5900-5999
+    comment: "VNC Console"
+    enabled: 1
+  # Cluster communication ports
+  - action: ACCEPT
+    type: in
+    proto: tcp
+    dport: 5404-5405
+    comment: "Corosync (cluster)"
+    enabled: 1
+    source: "{{ proxmox_cluster_network | default('') }}"
+  - action: ACCEPT
+    type: in
+    proto: udp
+    dport: 5404-5405
+    comment: "Corosync (cluster)"
+    enabled: 1
+    source: "{{ proxmox_cluster_network | default('') }}"
+
+# IP sets for firewall
+proxmox_firewall_ipsets: []
+  # - name: management_ips
+  #   ips:
+  #     - 192.168.1.0/24
+  #     - 10.0.0.0/8
+
+# Security groups
+proxmox_firewall_security_groups: []
+  # - name: webserver
+  #   rules:
+  #     - action: ACCEPT
+  #       type: in
+  #       proto: tcp
+  #       dport: 80
+  #     - action: ACCEPT
+  #       type: in
+  #       proto: tcp
+  #       dport: 443
+
+# Two-Factor Authentication
+proxmox_2fa_enabled: false
+proxmox_2fa_type: "oath"  # oath, yubico
+proxmox_2fa_totp_issuer: "Proxmox VE"
+
+# Fail2ban integration
+proxmox_fail2ban_enabled: true
+proxmox_fail2ban_maxretry: 5
+proxmox_fail2ban_findtime: 600
+proxmox_fail2ban_bantime: 3600
+
+# Audit logging
+proxmox_audit_logging: true
+proxmox_audit_log_path: "/var/log/pve/tasks"
+
+# TLS/SSL Configuration
+proxmox_ssl_enabled: true
+proxmox_ssl_certificate_source: "self-signed"  # self-signed, acme, custom
+proxmox_ssl_acme_enabled: false
+proxmox_ssl_acme_domain: "{{ proxmox_fqdn }}"
+proxmox_ssl_acme_email: ""
+proxmox_ssl_acme_staging: false
+proxmox_ssl_custom_cert_path: ""
+proxmox_ssl_custom_key_path: ""
+proxmox_ssl_custom_chain_path: ""
+
+# System hardening
+proxmox_sysctl_hardening: true
+proxmox_sysctl_settings:
+  # Network security
+  net.ipv4.conf.all.rp_filter: 1
+  net.ipv4.conf.default.rp_filter: 1
+  net.ipv4.icmp_echo_ignore_broadcasts: 1
+  net.ipv4.conf.all.accept_source_route: 0
+  net.ipv4.conf.default.accept_source_route: 0
+  net.ipv4.conf.all.send_redirects: 0
+  net.ipv4.conf.default.send_redirects: 0
+  net.ipv4.tcp_syncookies: 1
+  net.ipv4.conf.all.log_martians: 1
+  net.ipv4.conf.default.log_martians: 1
+  net.ipv4.conf.all.accept_redirects: 0
+  net.ipv4.conf.default.accept_redirects: 0
+  net.ipv4.icmp_ignore_bogus_error_responses: 1
+  # IPv6 security
+  net.ipv6.conf.all.accept_source_route: 0
+  net.ipv6.conf.default.accept_source_route: 0
+  net.ipv6.conf.all.accept_redirects: 0
+  net.ipv6.conf.default.accept_redirects: 0
+  # Kernel hardening
+  kernel.dmesg_restrict: 1
+  kernel.kptr_restrict: 2
+  kernel.yama.ptrace_scope: 1
+
+# AppArmor/SELinux
+proxmox_apparmor_enabled: true
+proxmox_selinux_enabled: false
+proxmox_selinux_state: "enforcing"  # enforcing, permissive, disabled
+
+# ============================================
+# User and Permission Management
+# ============================================
+proxmox_users_configure: true
+proxmox_users: []
+  # - username: admin@pve
+  #   password: "{{ vault_proxmox_admin_password }}"
+  #   email: admin@example.com
+  #   firstname: Admin
+  #   lastname: User
+  #   groups: []
+  #   expire: 0
+  #   enabled: 1
+  #   comment: "Administrator account"
+
+proxmox_groups: []
+  # - name: operators
+  #   comment: "System operators"
+
+proxmox_acls: []
+  # - path: /
+  #   roles: [Administrator]
+  #   users: [admin@pve]
+  # - path: /vms
+  #   roles: [PVEVMAdmin]
+  #   groups: [operators]
+
+# API tokens
+proxmox_api_tokens: []
+  # - user: admin@pve
+  #   tokenid: automation
+  #   comment: "Ansible automation token"
+  #   expire: 0
+  #   privsep: 1
+
+# ============================================
+# High Availability (HA)
+# ============================================
+proxmox_ha_enabled: false
+proxmox_ha_groups: []
+  # - name: production
+  #   nodes: "node1:1,node2:2,node3:3"
+  #   restricted: 0
+  #   nofailback: 0
+
+proxmox_ha_resources: []
+  # - sid: vm:100
+  #   group: production
+  #   max_restart: 3
+  #   max_relocate: 3
+  #   state: started
+
+# ============================================
+# SDN (Software Defined Network)
+# ============================================
+proxmox_sdn_enabled: false
+proxmox_sdn_zones: []
+  # - zone: localnetwork
+  #   type: simple
+  #   bridge: vmbr0
+
+proxmox_sdn_vnets: []
+  # - vnet: vnet100
+  #   zone: localnetwork
+  #   tag: 100
+
+proxmox_sdn_subnets: []
+  # - subnet: 10.0.100.0/24
+  #   vnet: vnet100
+  #   gateway: 10.0.100.1
+  #   snat: 1
+
+# ============================================
+# Monitoring and Logging
+# ============================================
+proxmox_monitoring_enabled: true
+proxmox_syslog_remote_enabled: false
+proxmox_syslog_remote_server: ""
+proxmox_syslog_remote_port: 514
+proxmox_syslog_remote_protocol: "udp"  # udp, tcp
+
+# Email notifications
+proxmox_email_enabled: false
+proxmox_email_from: "proxmox@{{ proxmox_domain }}"
+proxmox_email_to: "root@{{ proxmox_domain }}"
+proxmox_email_server: "localhost"
+proxmox_email_port: 25
+
+# ============================================
+# Performance Tuning
+# ============================================
+proxmox_performance_tuning: false
+proxmox_cpu_governor: "performance"  # performance, powersave, ondemand
+proxmox_transparent_hugepages: "madvise"  # always, madvise, never
+proxmox_swappiness: 10
+proxmox_dirty_ratio: 10
+proxmox_dirty_background_ratio: 5
+
+# ============================================
+# Kernel Configuration
+# ============================================
+proxmox_kernel_version: "default"  # default, latest, specific version
+proxmox_kernel_modules_load: []
+  # - vfio
+  # - vfio_iommu_type1
+  # - vfio_pci
+
+proxmox_kernel_modules_blacklist: []
+  # - nouveau
+  # - nvidia
+
+# IOMMU/PCI Passthrough
+proxmox_iommu_enabled: false
+proxmox_iommu_type: "intel"  # intel, amd
+proxmox_pci_passthrough_devices: []
+  # - "0000:01:00.0"
+  # - "0000:01:00.1"
+
+# ============================================
+# Templates and Cloud-Init
+# ============================================
+proxmox_templates_download: false
+proxmox_templates_list: []
+  # - name: debian-12-generic
+  #   url: "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
+  #   storage: local
+  # - name: ubuntu-22.04-server
+  #   url: "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
+  #   storage: local
+
+# ============================================
+# Maintenance and Updates
+# ============================================
+proxmox_auto_updates: false
+proxmox_auto_updates_time: "02:00"
+proxmox_auto_updates_day: "*"
+proxmox_auto_reboot: false
+proxmox_auto_reboot_time: "03:00"
+
+# Package management
+proxmox_remove_subscription_notice: true  # Remove "no subscription" popup
+proxmox_packages_extra: []
+  # - qemu-guest-agent
+  # - bridge-utils
+  # - vlan
+
+# ============================================
+# Hooks and Custom Scripts
+# ============================================
+proxmox_hooks_enabled: false
+proxmox_custom_scripts: []
+  # - src: files/scripts/backup-hook.sh
+  #   dest: /usr/local/bin/backup-hook.sh
+  #   mode: '0755'
+
+# ============================================
+# Logging and Debugging
+# ============================================
+proxmox_debug_mode: false
+proxmox_log_level: "info"  # debug, info, notice, warning, error

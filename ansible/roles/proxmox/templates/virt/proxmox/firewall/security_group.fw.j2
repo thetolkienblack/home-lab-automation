@@ -1,0 +1,13 @@
+# ===========================================
+# Security Group: {{ item.name }}
+# Managed by Ansible - {{ ansible_managed }}
+# Generated on: {{ ansible_date_time.iso8601 }}
+# ===========================================
+
+[group {{ item.name }}]
+
+{% if item.rules is defined and item.rules | length > 0 %}
+{% for rule in item.rules %}
+{{ rule.action | upper }} {{ rule.type | upper }} {% if rule.source is defined %}-source {{ rule.source }}{% endif %} {% if rule.dest is defined %}-dest {{ rule.dest }}{% endif %} {% if rule.proto is defined %}-p {{ rule.proto }}{% endif %} {% if rule.dport is defined %}-dport {{ rule.dport }}{% endif %} {% if rule.sport is defined %}-sport {{ rule.sport }}{% endif %} {% if rule.comment is defined %}# {{ rule.comment }}{% endif %}
+{% endfor %}
+{% endif %}

@@ -1,0 +1,162 @@
+---
+# ===========================================
+# Proxmox VE Role - Package Installation
+# Managed by Ansible
+# ===========================================
+
+- name: "Packages | Install prerequisite packages"
+  ansible.builtin.apt:
+    name: "{{ proxmox_os_packages }}"
+    state: present
+    update_cache: true
+  register: prereq_install
+  retries: 3
+  delay: 5
+  until: prereq_install is succeeded
+
+- name: "Packages | Check if Proxmox kernel is installed"
+  ansible.builtin.shell: |
+    set -o pipefail
+    dpkg -l | grep -E 'pve-kernel' | wc -l
+  args:
+    executable: /bin/bash
+  register: pve_kernel_check
+  changed_when: false
+  failed_when: false
+
+- name: "Packages | Install Proxmox VE kernel"
+  ansible.builtin.apt:
+    name: "{{ proxmox_kernel_packages }}"
+    state: present
+  register: kernel_install
+  retries: 3
+  delay: 5
+  until: kernel_install is succeeded
+  when: pve_kernel_check.stdout | int == 0
+
+- name: "Packages | Install Proxmox VE packages"
+  ansible.builtin.apt:
+    name: "{{ proxmox_packages }}"
+    state: present
+  register: proxmox_install
+  retries: 3
+  delay: 10
+  until: proxmox_install is succeeded
+  notify:
+    - restart pveproxy
+    - restart pvedaemon
+
+- name: "Packages | Install additional packages"
+  ansible.builtin.apt:
+    name: "{{ proxmox_packages_extra }}"
+    state: present
+  when: proxmox_packages_extra | length > 0
+  register: extra_packages
+  retries: 3
+  delay: 5
+  until: extra_packages is succeeded
+
+- name: "Packages | Load kernel modules"
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ proxmox_kernel_modules_load }}"
+  when: proxmox_kernel_modules_load | length > 0
+
+- name: "Packages | Configure kernel modules to load at boot"
+  ansible.builtin.lineinfile:
+    path: /etc/modules
+    line: "{{ item }}"
+    state: present
+  loop: "{{ proxmox_kernel_modules_load }}"
+  when: proxmox_kernel_modules_load | length > 0
+
+- name: "Packages | Blacklist kernel modules"
+  ansible.builtin.copy:
+    dest: "/etc/modprobe.d/blacklist-{{ item }}.conf"
+    content: |
+      # Managed by Ansible
+      blacklist {{ item }}
+    mode: '0644'
+  loop: "{{ proxmox_kernel_modules_blacklist }}"
+  when: proxmox_kernel_modules_blacklist | length > 0
+
+- name: "Packages | Configure IOMMU for PCI passthrough"
+  block:
+    - name: "Packages | Detect IOMMU type"
+      ansible.builtin.set_fact:
+        detected_iommu_type: "{{ 'intel' if 'GenuineIntel' in ansible_processor else 'amd' }}"
+      when: proxmox_iommu_type == "auto"
+
+    - name: "Packages | Set IOMMU type"
+      ansible.builtin.set_fact:
+        iommu_type_final: "{{ proxmox_iommu_type if proxmox_iommu_type != 'auto' else detected_iommu_type }}"
+
+    - name: "Packages | Configure GRUB for IOMMU"
+      ansible.builtin.lineinfile:
+        path: /etc/default/grub
+        regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+        line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet {{ iommu_type_final }}_iommu=on iommu=pt"'
+        backup: true
+      notify: update grub
+
+    - name: "Packages | Configure VFIO modules"
+      ansible.builtin.copy:
+        dest: /etc/modules-load.d/vfio.conf
+        content: |
+          # Managed by Ansible
+          vfio
+          vfio_iommu_type1
+          vfio_pci
+          vfio_virqfd
+        mode: '0644'
+  when: proxmox_iommu_enabled | bool
+
+- name: "Packages | Remove subscription notice"
+  block:
+    - name: "Packages | Check if proxmoxlib.js exists"
+      ansible.builtin.stat:
+        path: /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+      register: proxmoxlib_file
+
+    - name: "Packages | Backup proxmoxlib.js"
+      ansible.builtin.copy:
+        src: /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+        dest: /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js.backup
+        remote_src: true
+        mode: preserve
+      when: proxmoxlib_file.stat.exists
+
+    - name: "Packages | Patch subscription notice"
+      ansible.builtin.replace:
+        path: /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+        regexp: "if \\(res === null \\|\\| res === undefined \\|\\| \\!res \\|\\| res\\.data\\.status\\.toLowerCase\\(\\) \\!== 'active'\\) \\{"
+        replace: "if (false) {"
+        backup: true
+      when: proxmoxlib_file.stat.exists
+      notify: restart pveproxy
+  when: proxmox_remove_subscription_notice | bool
+
+- name: "Packages | Ensure Proxmox services are enabled and started"
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - pvedaemon
+    - pveproxy
+    - pvestatd
+  ignore_errors: true
+
+- name: "Packages | Check if reboot is required for kernel"
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: reboot_required
+  when: kernel_install.changed
+
+- name: "Packages | Display reboot notice"
+  ansible.builtin.debug:
+    msg: "NOTICE: System reboot is required to load new Proxmox kernel"
+  when:
+    - kernel_install.changed or (reboot_required.stat.exists | default(false))
+    - not proxmox_auto_reboot

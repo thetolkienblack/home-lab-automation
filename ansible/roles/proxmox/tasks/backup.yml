@@ -1,0 +1,118 @@
+---
+# ===========================================
+# Proxmox VE Role - Backup Configuration
+# Managed by Ansible
+# ===========================================
+
+- name: "Backup | Configure backup schedules"
+  block:
+    - name: "Backup | Create backup jobs via vzdump"
+      ansible.builtin.template:
+        src: virt/proxmox/pve/vzdump.cron.j2
+        dest: /etc/cron.d/vzdump
+        mode: '0644'
+      when: proxmox_backup_schedules | length > 0
+
+    - name: "Backup | Configure vzdump.conf"
+      ansible.builtin.template:
+        src: virt/proxmox/pve/vzdump.conf.j2
+        dest: /etc/vzdump.conf
+        mode: '0644'
+        backup: true
+  when:
+    - proxmox_backup_configure | bool
+    - proxmox_is_installed | bool
+
+- name: "Backup | Configure Proxmox Backup Server integration"
+  block:
+    - name: "Backup | Add PBS storage"
+      ansible.builtin.command: >
+        pvesm add pbs {{ proxmox_pbs_server | regex_replace('[^a-zA-Z0-9_-]', '_') }}
+        --server {{ proxmox_pbs_server }}
+        --datastore {{ proxmox_pbs_datastore }}
+        --username {{ proxmox_pbs_username }}
+        --password {{ proxmox_pbs_password }}
+        {% if proxmox_pbs_fingerprint %}--fingerprint {{ proxmox_pbs_fingerprint }}{% endif %}
+      register: pbs_add
+      changed_when: pbs_add.rc == 0
+      failed_when: false
+      no_log: true
+
+    - name: "Backup | Verify PBS connection"
+      ansible.builtin.command: pvesm status --storage {{ proxmox_pbs_server | regex_replace('[^a-zA-Z0-9_-]', '_') }}
+      register: pbs_status
+      changed_when: false
+      failed_when: false
+
+    - name: "Backup | Display PBS status"
+      ansible.builtin.debug:
+        msg: "Proxmox Backup Server connection: {{ 'Success' if pbs_status.rc == 0 else 'Failed' }}"
+  when:
+    - proxmox_pbs_enabled | bool
+    - proxmox_backup_configure | bool
+    - proxmox_is_installed | bool
+
+- name: "Backup | Create backup notification script"
+  ansible.builtin.copy:
+    dest: /usr/local/bin/backup-notify.sh
+    content: |
+      #!/bin/bash
+      # Managed by Ansible
+      # Proxmox backup notification script
+
+      TASK_ID="$1"
+      TASK_TYPE="$2"
+      TASK_STATUS="$3"
+      TASK_OUTPUT="$4"
+
+      if [ "$TASK_STATUS" = "OK" ]; then
+        echo "Backup completed successfully: $TASK_ID"
+      else
+        echo "Backup failed: $TASK_ID"
+        echo "$TASK_OUTPUT"
+      fi
+
+      {% if proxmox_email_enabled %}
+      # Send email notification
+      echo "$TASK_OUTPUT" | mail -s "Proxmox Backup $TASK_STATUS - $TASK_ID" {{ proxmox_email_to }}
+      {% endif %}
+    mode: '0755'
+  when:
+    - proxmox_backup_configure | bool
+    - proxmox_is_installed | bool
+
+- name: "Backup | Configure backup hooks"
+  block:
+    - name: "Backup | Create hook scripts directory"
+      ansible.builtin.file:
+        path: /etc/pve/vzdump-hooks
+        state: directory
+        mode: '0755'
+
+    - name: "Backup | Copy custom hook scripts"
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "{{ item.mode }}"
+      loop: "{{ proxmox_custom_scripts }}"
+      when: proxmox_custom_scripts | length > 0
+  when:
+    - proxmox_hooks_enabled | bool
+    - proxmox_backup_configure | bool
+    - proxmox_is_installed | bool
+
+- name: "Backup | Test backup configuration"
+  ansible.builtin.command: vzdump --help
+  register: vzdump_check
+  changed_when: false
+  failed_when: false
+  when: proxmox_is_installed | bool
+
+- name: "Backup | Display backup configuration status"
+  ansible.builtin.debug:
+    msg:
+      - "=== Backup Configuration Summary ==="
+      - "Backup schedules configured: {{ proxmox_backup_schedules | length }}"
+      - "PBS integration: {{ 'Enabled' if proxmox_pbs_enabled else 'Disabled' }}"
+      - "Backup hooks: {{ 'Enabled' if proxmox_hooks_enabled else 'Disabled' }}"
+  when: proxmox_backup_configure | bool

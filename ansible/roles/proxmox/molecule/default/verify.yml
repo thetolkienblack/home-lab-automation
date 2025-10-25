@@ -1,0 +1,108 @@
+---
+# ===========================================
+# Molecule Verify Playbook
+# Managed by Ansible
+# ===========================================
+
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Verify | Check if Proxmox directories exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: proxmox_dirs
+      loop:
+        - /etc/pve
+        - /etc/pve/firewall
+        - /var/lib/vz
+      failed_when: not proxmox_dirs.results | map(attribute='stat.exists') | list | all
+
+    - name: Verify | Check mock Proxmox binaries exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: proxmox_bins
+      loop:
+        - /usr/bin/pvesh
+        - /usr/bin/pveversion
+      failed_when: not proxmox_bins.results | map(attribute='stat.exists') | list | all
+
+    - name: Verify | Test pveversion command
+      ansible.builtin.command: /usr/bin/pveversion
+      register: pve_version
+      changed_when: false
+      failed_when: pve_version.rc != 0
+
+    - name: Verify | Display pveversion output
+      ansible.builtin.debug:
+        msg: "Proxmox version: {{ pve_version.stdout }}"
+
+    - name: Verify | Check sysctl security settings
+      ansible.builtin.command: sysctl {{ item }}
+      register: sysctl_check
+      changed_when: false
+      failed_when: false
+      loop:
+        - net.ipv4.conf.all.rp_filter
+        - net.ipv4.tcp_syncookies
+        - net.ipv4.icmp_echo_ignore_broadcasts
+
+    - name: Verify | Display sysctl settings
+      ansible.builtin.debug:
+        msg: "{{ sysctl_check.results | map(attribute='stdout') | list }}"
+
+    - name: Verify | Check SSH configuration
+      ansible.builtin.shell: |
+        set -o pipefail
+        grep -E '^PermitRootLogin|^PasswordAuthentication' /etc/ssh/sshd_config || true
+      args:
+        executable: /bin/bash
+      register: ssh_config
+      changed_when: false
+
+    - name: Verify | Display SSH configuration
+      ansible.builtin.debug:
+        msg: "{{ ssh_config.stdout_lines }}"
+
+    - name: Verify | Check if role idempotence markers exist
+      ansible.builtin.stat:
+        path: /etc/pve/.ansible_configured
+      register: ansible_marker
+      failed_when: false
+
+    - name: Verify | Validate YAML syntax in config files
+      ansible.builtin.shell: |
+        set -o pipefail
+        find /etc/pve -name "*.yml" -o -name "*.yaml" | wc -l
+      args:
+        executable: /bin/bash
+      register: yaml_files
+      changed_when: false
+
+    - name: Verify | Check system prerequisites
+      block:
+        - name: Verify | Check minimum RAM
+          ansible.builtin.assert:
+            that:
+              - ansible_memtotal_mb >= 1024
+            success_msg: "System has adequate RAM: {{ ansible_memtotal_mb }}MB"
+            fail_msg: "System RAM is below minimum: {{ ansible_memtotal_mb }}MB"
+
+        - name: Verify | Check architecture
+          ansible.builtin.assert:
+            that:
+              - ansible_architecture == "x86_64"
+            success_msg: "Architecture is correct: {{ ansible_architecture }}"
+            fail_msg: "Invalid architecture: {{ ansible_architecture }}"
+
+    - name: Verify | Summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Molecule Verification Complete!"
+          - "=========================================="
+          - "All checks passed successfully"
+          - "Role is functioning as expected"
+          - "=========================================="

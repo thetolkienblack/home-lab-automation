@@ -1,0 +1,59 @@
+---
+# ===========================================
+# Proxmox VE Role - Debian-specific Variables
+# Managed by Ansible
+# ===========================================
+
+# Debian/Ubuntu specific package names
+proxmox_os_packages:
+  - gnupg
+  - software-properties-common
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - wget
+
+# Proxmox repository configuration
+proxmox_repo_base_url: "http://download.proxmox.com/debian/pve"
+proxmox_repo_key_url: "https://enterprise.proxmox.com/debian/proxmox-release-{{ ansible_distribution_release }}.gpg"
+proxmox_repo_key_id: "7BF2812E8A6E88E0"
+
+# Repository list files
+proxmox_repo_files:
+  enterprise: "/etc/apt/sources.list.d/pve-enterprise.list"
+  no_subscription: "/etc/apt/sources.list.d/pve-no-subscription.list"
+  test: "/etc/apt/sources.list.d/pvetest.list"
+  ceph: "/etc/apt/sources.list.d/ceph.list"
+
+# Kernel packages
+proxmox_kernel_packages:
+  - "pve-kernel-{{ ansible_kernel | regex_replace('^(\\d+\\.\\d+).*', '\\1') }}"
+  - pve-headers
+
+# Service manager
+proxmox_service_manager: "systemd"
+
+# Network configuration
+proxmox_network_config_file: "/etc/network/interfaces"
+proxmox_network_config_backup: "/etc/network/interfaces.backup"
+
+# Firewall backend
+proxmox_firewall_backend: "iptables"
+
+# System paths
+proxmox_apt_preferences: "/etc/apt/preferences.d/proxmox"
+proxmox_apt_sources_dir: "/etc/apt/sources.list.d"
+
+# Postfix configuration (for email notifications)
+proxmox_postfix_config: "/etc/postfix/main.cf"
+proxmox_postfix_service: "postfix"
+
+# AppArmor
+proxmox_apparmor_service: "apparmor"
+proxmox_apparmor_profiles_dir: "/etc/apparmor.d"
+
+# Fail2ban
+proxmox_fail2ban_service: "fail2ban"
+proxmox_fail2ban_config_dir: "/etc/fail2ban"
+proxmox_fail2ban_jail_local: "/etc/fail2ban/jail.local"
+proxmox_fail2ban_filter_dir: "/etc/fail2ban/filter.d"

@@ -1,0 +1,84 @@
+---
+# ===========================================
+# Molecule Configuration for Proxmox Role
+# Managed by Ansible
+# ===========================================
+
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../requirements.yml
+
+driver:
+  name: docker
+
+platforms:
+  - name: proxmox-debian-12
+    image: geerlingguy/docker-debian12-ansible:latest
+    command: /lib/systemd/systemd
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    networks:
+      - name: proxmox-test-network
+    groups:
+      - proxmox_nodes
+
+  - name: proxmox-debian-11
+    image: geerlingguy/docker-debian11-ansible:latest
+    command: /lib/systemd/systemd
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    networks:
+      - name: proxmox-test-network
+    groups:
+      - proxmox_nodes
+
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      interpreter_python: auto_silent
+      callback_whitelist: profile_tasks, timer, yaml
+      stdout_callback: yaml
+    ssh_connection:
+      pipelining: true
+  inventory:
+    group_vars:
+      all:
+        proxmox_cluster_enabled: false
+        proxmox_security_hardening: true
+        proxmox_firewall_enabled: true
+        proxmox_is_installed: false
+  playbooks:
+    converge: converge.yml
+    verify: verify.yml
+
+verifier:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - lint
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - side_effect
+    - verify
+    - cleanup
+    - destroy
+
+lint: |
+  set -e
+  yamllint .
+  ansible-lint

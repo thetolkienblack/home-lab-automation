@@ -1,0 +1,214 @@
+---
+# ===========================================
+# Proxmox VE Role - Cluster Configuration
+# Managed by Ansible
+# ===========================================
+
+- name: "Cluster | Check if node is already in a cluster"
+  ansible.builtin.stat:
+    path: /etc/pve/corosync.conf
+  register: cluster_config_exists
+
+- name: "Cluster | Get cluster status"
+  ansible.builtin.command: pvecm status
+  register: cluster_status
+  changed_when: false
+  failed_when: false
+  when: cluster_config_exists.stat.exists
+
+- name: "Cluster | Set cluster membership fact"
+  ansible.builtin.set_fact:
+    node_in_cluster: "{{ cluster_config_exists.stat.exists and cluster_status.rc == 0 }}"
+
+- name: "Cluster | Display current cluster status"
+  ansible.builtin.debug:
+    msg: "Node is {{ 'already' if node_in_cluster else 'not' }} in a cluster"
+
+- name: "Cluster | Create new cluster"
+  block:
+    - name: "Cluster | Verify not already in cluster"
+      ansible.builtin.assert:
+        that:
+          - not node_in_cluster
+        fail_msg: "Node is already part of a cluster. Cannot create new cluster."
+        success_msg: "Node is not in a cluster. Proceeding with cluster creation."
+
+    - name: "Cluster | Create Proxmox cluster"
+      ansible.builtin.command: >
+        pvecm create {{ proxmox_cluster_name }}
+        --bindnet0_addr {{ proxmox_cluster_bindnet_addr }}
+        {{ '--link1 ' + proxmox_cluster_link1_addr if proxmox_cluster_link1_addr | length > 0 else '' }}
+      register: cluster_create_result
+      changed_when: cluster_create_result.rc == 0
+      failed_when: cluster_create_result.rc != 0
+
+    - name: "Cluster | Wait for cluster to initialize"
+      ansible.builtin.wait_for:
+        timeout: 30
+
+    - name: "Cluster | Verify cluster creation"
+      ansible.builtin.command: pvecm status
+      register: cluster_verify
+      changed_when: false
+      failed_when: cluster_verify.rc != 0
+
+    - name: "Cluster | Display cluster information"
+      ansible.builtin.debug:
+        msg: "{{ cluster_verify.stdout_lines }}"
+
+    - name: "Cluster | Get cluster join information"
+      ansible.builtin.command: pvecm updatecerts --force
+      changed_when: false
+
+    - name: "Cluster | Display join instructions"
+      ansible.builtin.debug:
+        msg:
+          - "Cluster '{{ proxmox_cluster_name }}' created successfully!"
+          - "To join other nodes to this cluster, run on those nodes:"
+          - "pvecm add {{ ansible_default_ipv4.address }} -use_ssh"
+  when:
+    - proxmox_cluster_create | bool
+    - not proxmox_cluster_join | bool
+
+- name: "Cluster | Join existing cluster"
+  block:
+    - name: "Cluster | Verify not already in cluster"
+      ansible.builtin.assert:
+        that:
+          - not node_in_cluster
+        fail_msg: "Node is already part of a cluster. Cannot join another cluster."
+        success_msg: "Node is not in a cluster. Proceeding with cluster join."
+
+    - name: "Cluster | Verify master node is reachable"
+      ansible.builtin.wait_for:
+        host: "{{ proxmox_cluster_master_node }}"
+        port: 22
+        timeout: 10
+        state: started
+
+    - name: "Cluster | Test SSH connectivity to master node"
+      ansible.builtin.command: >
+        ssh -o StrictHostKeyChecking=no
+        -o BatchMode=yes
+        root@{{ proxmox_cluster_master_node }}
+        'pvecm status'
+      register: master_connectivity
+      changed_when: false
+      failed_when: false
+      delegate_to: localhost
+
+    - name: "Cluster | Join cluster using SSH"
+      ansible.builtin.command: >
+        pvecm add {{ proxmox_cluster_master_node }}
+        --use_ssh
+        {{ '--link0 ' + proxmox_cluster_link0_addr if proxmox_cluster_link0_addr | length > 0 else '' }}
+        {{ '--link1 ' + proxmox_cluster_link1_addr if proxmox_cluster_link1_addr | length > 0 else '' }}
+      register: cluster_join_result
+      changed_when: cluster_join_result.rc == 0
+      failed_when: cluster_join_result.rc != 0
+      environment:
+        SSH_AUTH_SOCK: "{{ lookup('env', 'SSH_AUTH_SOCK') }}"
+
+    - name: "Cluster | Wait for cluster synchronization"
+      ansible.builtin.wait_for:
+        timeout: 60
+
+    - name: "Cluster | Verify cluster membership"
+      ansible.builtin.command: pvecm status
+      register: cluster_verify_join
+      changed_when: false
+      failed_when: cluster_verify_join.rc != 0
+
+    - name: "Cluster | Display cluster status after join"
+      ansible.builtin.debug:
+        msg: "{{ cluster_verify_join.stdout_lines }}"
+
+    - name: "Cluster | Get cluster nodes list"
+      ansible.builtin.command: pvecm nodes
+      register: cluster_nodes
+      changed_when: false
+
+    - name: "Cluster | Display cluster nodes"
+      ansible.builtin.debug:
+        msg: "{{ cluster_nodes.stdout_lines }}"
+  when:
+    - proxmox_cluster_join | bool
+    - not proxmox_cluster_create | bool
+
+- name: "Cluster | Configure cluster network (if in cluster)"
+  block:
+    - name: "Cluster | Set cluster network in datacenter.cfg"
+      ansible.builtin.lineinfile:
+        path: /etc/pve/datacenter.cfg
+        regexp: '^migration:'
+        line: "migration: secure,network={{ proxmox_cluster_bindnet_addr | ipaddr('network/prefix') }}"
+        state: present
+        create: true
+        mode: '0640'
+      when: proxmox_cluster_bindnet_addr | length > 0
+
+    - name: "Cluster | Configure corosync to use knet transport"
+      ansible.builtin.replace:
+        path: /etc/pve/corosync.conf
+        regexp: 'transport: udp'
+        replace: 'transport: knet'
+        backup: true
+      notify: restart corosync
+      when: cluster_config_exists.stat.exists
+  when: node_in_cluster
+
+- name: "Cluster | Configure High Availability"
+  block:
+    - name: "Cluster | Create HA groups"
+      ansible.builtin.command: >
+        ha-manager groupadd {{ item.name }}
+        --nodes {{ item.nodes }}
+        {{ '--restricted ' + (item.restricted | string) if item.restricted is defined else '' }}
+        {{ '--nofailback ' + (item.nofailback | string) if item.nofailback is defined else '' }}
+        --comment "{{ item.comment | default('Managed by Ansible') }}"
+      loop: "{{ proxmox_ha_groups }}"
+      register: ha_group_result
+      changed_when: ha_group_result.rc == 0
+      failed_when: false
+
+    - name: "Cluster | Configure HA resources"
+      ansible.builtin.command: >
+        ha-manager add {{ item.sid }}
+        {{ '--group ' + item.group if item.group is defined else '' }}
+        {{ '--max_restart ' + (item.max_restart | string) if item.max_restart is defined else '' }}
+        {{ '--max_relocate ' + (item.max_relocate | string) if item.max_relocate is defined else '' }}
+        {{ '--state ' + item.state if item.state is defined else '' }}
+        --comment "{{ item.comment | default('Managed by Ansible') }}"
+      loop: "{{ proxmox_ha_resources }}"
+      register: ha_resource_result
+      changed_when: ha_resource_result.rc == 0
+      failed_when: false
+  when:
+    - proxmox_ha_enabled | bool
+    - node_in_cluster
+    - proxmox_ha_groups | length > 0 or proxmox_ha_resources | length > 0
+
+- name: "Cluster | Enable cluster services"
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - corosync
+    - pve-cluster
+  when: node_in_cluster
+  ignore_errors: true
+
+- name: "Cluster | Verify cluster quorum"
+  ansible.builtin.command: pvecm status
+  register: final_cluster_status
+  changed_when: false
+  failed_when: false
+  when: node_in_cluster
+
+- name: "Cluster | Display final cluster status"
+  ansible.builtin.debug:
+    msg: "{{ final_cluster_status.stdout_lines }}"
+  when:
+    - node_in_cluster
+    - final_cluster_status.rc == 0
