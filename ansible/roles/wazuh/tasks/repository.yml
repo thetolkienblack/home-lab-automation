@@ -1,0 +1,30 @@
+---
+# Configure Wazuh repository
+
+- name: Add Wazuh GPG key (Debian)
+  ansible.builtin.get_url:
+    url: "{{ wazuh_apt_key_url }}"
+    dest: /usr/share/keyrings/wazuh.gpg
+    mode: "0644"
+  when: ansible_os_family == "Debian"
+  tags: [wazuh, repository]
+
+- name: Add Wazuh APT repository (Debian)
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/wazuh.gpg] {{ wazuh_apt_repository.split()[1] }} {{ wazuh_apt_repository.split()[2] }} {{ wazuh_apt_repository.split()[3] }}"
+    state: present
+    filename: wazuh
+    update_cache: true
+  when: ansible_os_family == "Debian"
+  tags: [wazuh, repository]
+
+- name: Add Wazuh YUM repository (RHEL)
+  ansible.builtin.yum_repository:
+    name: wazuh
+    description: Wazuh repository
+    baseurl: "{{ wazuh_yum_repository_url }}"
+    gpgcheck: true
+    enabled: true
+    gpgkey: "{{ wazuh_apt_key_url }}"
+  when: ansible_os_family == "RedHat"
+  tags: [wazuh, repository]

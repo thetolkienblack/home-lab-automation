@@ -1,0 +1,36 @@
+---
+# Prerequisites for Wazuh installation
+
+- name: Install required system packages
+  ansible.builtin.package:
+    name: "{{ wazuh_required_packages }}"
+    state: present
+  tags: [wazuh, prerequisites]
+
+- name: Create Wazuh SSL certificates directory
+  ansible.builtin.file:
+    path: "{{ wazuh_ssl_cert_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: wazuh_ssl_enabled | bool
+  tags: [wazuh, prerequisites]
+
+- name: Check if Docker is installed
+  ansible.builtin.command:
+    cmd: docker --version
+  register: wazuh_docker_check
+  changed_when: false
+  failed_when: false
+  when: wazuh_monitor_docker | bool
+  tags: [wazuh, prerequisites]
+
+- name: Check if Trivy is installed
+  ansible.builtin.command:
+    cmd: trivy --version
+  register: wazuh_trivy_check
+  changed_when: false
+  failed_when: false
+  when: wazuh_trivy_integration | bool
+  tags: [wazuh, prerequisites]

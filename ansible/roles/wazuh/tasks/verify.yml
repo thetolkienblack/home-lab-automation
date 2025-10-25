@@ -1,0 +1,48 @@
+---
+# Verify Wazuh installation
+
+- name: Check Wazuh Manager status
+  ansible.builtin.systemd:
+    name: wazuh-manager
+  register: wazuh_manager_status
+  when: wazuh_install_manager | bool
+  tags: [wazuh, verify]
+
+- name: Check Wazuh Indexer status
+  ansible.builtin.systemd:
+    name: wazuh-indexer
+  register: wazuh_indexer_status
+  when: wazuh_install_indexer | bool
+  tags: [wazuh, verify]
+
+- name: Check Wazuh Dashboard status
+  ansible.builtin.systemd:
+    name: wazuh-dashboard
+  register: wazuh_dashboard_status
+  when: wazuh_install_dashboard | bool
+  tags: [wazuh, verify]
+
+- name: Check Wazuh Agent status
+  ansible.builtin.systemd:
+    name: wazuh-agent
+  register: wazuh_agent_status
+  when: wazuh_install_agent | bool
+  tags: [wazuh, verify]
+
+- name: Display verification results
+  ansible.builtin.debug:
+    msg: |
+      === Wazuh Installation Verification ===
+      {% if wazuh_install_manager | bool %}
+      Manager: {{ wazuh_manager_status.status.ActiveState | default('N/A') }}
+      {% endif %}
+      {% if wazuh_install_indexer | bool %}
+      Indexer: {{ wazuh_indexer_status.status.ActiveState | default('N/A') }}
+      {% endif %}
+      {% if wazuh_install_dashboard | bool %}
+      Dashboard: {{ wazuh_dashboard_status.status.ActiveState | default('N/A') }}
+      {% endif %}
+      {% if wazuh_install_agent | bool %}
+      Agent: {{ wazuh_agent_status.status.ActiveState | default('N/A') }}
+      {% endif %}
+  tags: [wazuh, verify]

@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+# Trivy-Wazuh Integration Script
+import json
+import socket
+import sys
+
+WAZUH_SOCKET = '/var/ossec/queue/sockets/queue'
+
+def send_to_wazuh(data):
+    try:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        sock.connect(WAZUH_SOCKET)
+        sock.send(json.dumps(data).encode())
+        sock.close()
+    except Exception as e:
+        print(f"Error sending to Wazuh: {e}", file=sys.stderr)
+
+def parse_trivy_report(report_path):
+    with open(report_path, 'r') as f:
+        report = json.load(f)
+    for result in report.get('Results', []):
+        for vuln in result.get('Vulnerabilities', []):
+            if vuln.get('Severity') in {{ wazuh_trivy_severity_levels | to_json }}:
+                event = {
+                    'trivy': {
+                        'vulnerability_id': vuln.get('VulnerabilityID'),
+                        'pkg_name': vuln.get('PkgName'),
+                        'severity': vuln.get('Severity'),
+                        'title': vuln.get('Title', 'N/A'),
+                        'description': vuln.get('Description', 'N/A')[:200],
+                        'target': result.get('Target')
+                    }
+                }
+                send_to_wazuh(event)
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        print("Usage: trivy-wazuh-integration.py <trivy-report.json>")
+        sys.exit(1)
+    parse_trivy_report(sys.argv[1])

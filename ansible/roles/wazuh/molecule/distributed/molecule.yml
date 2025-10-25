@@ -1,0 +1,88 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: wazuh-indexer-01
+    image: geerlingguy/docker-debian12-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - wazuh_indexer
+
+  - name: wazuh-indexer-02
+    image: geerlingguy/docker-debian12-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - wazuh_indexer
+
+  - name: wazuh-manager-01
+    image: geerlingguy/docker-debian12-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - wazuh_manager
+
+  - name: wazuh-dashboard-01
+    image: geerlingguy/docker-debian12-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - wazuh_dashboard
+
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      callbacks_enabled: profile_tasks,timer,yaml
+      stdout_callback: yaml
+  inventory:
+    group_vars:
+      all:
+        wazuh_version: "4.9.0"
+        wazuh_disable_updates: true
+      wazuh_indexer:
+        wazuh_install_mode: indexer
+        wazuh_indexer_cluster_type: cluster
+        wazuh_indexer_cluster_name: wazuh-cluster
+        wazuh_indexer_heap_size_min: 2g
+        wazuh_indexer_heap_size_max: 2g
+        wazuh_indexer_discovery_seed_hosts:
+          - wazuh-indexer-01
+          - wazuh-indexer-02
+        wazuh_indexer_cluster_initial_master_nodes:
+          - wazuh-indexer-01
+          - wazuh-indexer-02
+      wazuh_manager:
+        wazuh_install_mode: manager
+        wazuh_manager_email_notification: true
+        wazuh_manager_email_to: "admin@example.com"
+        wazuh_manager_vulnerability_detection: true
+        wazuh_manager_active_response: true
+        wazuh_indexer_ip: "172.17.0.2"
+      wazuh_dashboard:
+        wazuh_install_mode: dashboard
+        wazuh_dashboard_password: "DistributedTest123!"
+        wazuh_dashboard_ssl_enabled: true
+        wazuh_indexer_ip: "172.17.0.2"
+
+verifier:
+  name: ansible

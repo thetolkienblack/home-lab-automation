@@ -1,0 +1,180 @@
+---
+- name: Verify Wazuh Indexer Cluster
+  hosts: wazuh_indexer
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check if Wazuh Indexer is installed
+      ansible.builtin.stat:
+        path: /usr/share/wazuh-indexer/bin/opensearch
+      register: indexer_binary
+
+    - name: Verify Wazuh Indexer binary exists
+      ansible.builtin.assert:
+        that:
+          - indexer_binary.stat.exists
+        fail_msg: "Wazuh Indexer binary not found"
+        success_msg: "Wazuh Indexer binary exists"
+
+    - name: Check Wazuh Indexer service status
+      ansible.builtin.systemd:
+        name: wazuh-indexer
+      register: indexer_service
+
+    - name: Verify Wazuh Indexer service is running
+      ansible.builtin.assert:
+        that:
+          - indexer_service.status.ActiveState == "active"
+        fail_msg: "Wazuh Indexer service is not active"
+        success_msg: "Wazuh Indexer service is active"
+
+    - name: Read Indexer configuration
+      ansible.builtin.slurp:
+        path: /etc/wazuh-indexer/opensearch.yml
+      register: indexer_config_content
+
+    - name: Verify cluster configuration
+      ansible.builtin.assert:
+        that:
+          - "'cluster.name: wazuh-cluster' in (indexer_config_content.content | b64decode)"
+          - "'discovery.seed_hosts' in (indexer_config_content.content | b64decode)"
+        fail_msg: "Cluster configuration not properly set"
+        success_msg: "Cluster configuration is correct"
+
+    - name: Check indexer port is listening
+      ansible.builtin.wait_for:
+        port: 9200
+        timeout: 10
+
+- name: Verify Wazuh Manager
+  hosts: wazuh_manager
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check if Wazuh Manager is installed
+      ansible.builtin.stat:
+        path: /var/ossec/bin/wazuh-control
+      register: manager_binary
+
+    - name: Verify Wazuh Manager binary exists
+      ansible.builtin.assert:
+        that:
+          - manager_binary.stat.exists
+        fail_msg: "Wazuh Manager binary not found"
+        success_msg: "Wazuh Manager binary exists"
+
+    - name: Check Wazuh Manager service status
+      ansible.builtin.systemd:
+        name: wazuh-manager
+      register: manager_service
+
+    - name: Verify Wazuh Manager service is running
+      ansible.builtin.assert:
+        that:
+          - manager_service.status.ActiveState == "active"
+        fail_msg: "Wazuh Manager service is not active"
+        success_msg: "Wazuh Manager service is active"
+
+    - name: Read Manager configuration
+      ansible.builtin.slurp:
+        path: /var/ossec/etc/ossec.conf
+      register: manager_config_content
+
+    - name: Verify Manager features are enabled
+      ansible.builtin.assert:
+        that:
+          - "'<vulnerability-detector>' in (manager_config_content.content | b64decode)"
+          - "'<email_notification>yes</email_notification>' in (manager_config_content.content | b64decode)"
+        fail_msg: "Manager features not properly configured"
+        success_msg: "Manager features are configured"
+
+    - name: Check Docker monitoring is configured
+      ansible.builtin.command:
+        cmd: id wazuh
+      register: manager_wazuh_user
+      changed_when: false
+
+    - name: Verify wazuh user has docker access
+      ansible.builtin.assert:
+        that:
+          - "'docker' in manager_wazuh_user.stdout"
+        fail_msg: "Docker monitoring not configured"
+        success_msg: "Docker monitoring is configured"
+
+    - name: Verify Trivy integration scripts exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: trivy_scripts
+      loop:
+        - /usr/local/bin/trivy-wazuh-integration.py
+        - /usr/local/bin/trivy-scan-wazuh.sh
+
+    - name: Assert Trivy scripts are present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.mode == '0755'
+        fail_msg: "Trivy integration script {{ item.item }} missing or not executable"
+        success_msg: "Trivy integration scripts are configured"
+      loop: "{{ trivy_scripts.results }}"
+
+- name: Verify Wazuh Dashboard
+  hosts: wazuh_dashboard
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check if Wazuh Dashboard is installed
+      ansible.builtin.stat:
+        path: /usr/share/wazuh-dashboard/bin/opensearch-dashboards
+      register: dashboard_binary
+
+    - name: Verify Wazuh Dashboard binary exists
+      ansible.builtin.assert:
+        that:
+          - dashboard_binary.stat.exists
+        fail_msg: "Wazuh Dashboard binary not found"
+        success_msg: "Wazuh Dashboard binary exists"
+
+    - name: Check Wazuh Dashboard service status
+      ansible.builtin.systemd:
+        name: wazuh-dashboard
+      register: dashboard_service
+
+    - name: Verify Wazuh Dashboard service is running
+      ansible.builtin.assert:
+        that:
+          - dashboard_service.status.ActiveState == "active"
+        fail_msg: "Wazuh Dashboard service is not active"
+        success_msg: "Wazuh Dashboard service is active"
+
+    - name: Check dashboard configuration file
+      ansible.builtin.stat:
+        path: /etc/wazuh-dashboard/opensearch_dashboards.yml
+      register: dashboard_config
+
+    - name: Verify dashboard configuration exists
+      ansible.builtin.assert:
+        that:
+          - dashboard_config.stat.exists
+        fail_msg: "Dashboard configuration not found"
+        success_msg: "Dashboard configuration exists"
+
+    - name: Check dashboard SSL certificate
+      ansible.builtin.stat:
+        path: /etc/wazuh-dashboard/certs/wazuh-dashboard.pem
+      register: dashboard_ssl
+
+    - name: Verify SSL is configured
+      ansible.builtin.assert:
+        that:
+          - dashboard_ssl.stat.exists
+        fail_msg: "Dashboard SSL not configured"
+        success_msg: "Dashboard SSL is configured"
+
+    - name: Check dashboard port is listening
+      ansible.builtin.wait_for:
+        port: 443
+        timeout: 10

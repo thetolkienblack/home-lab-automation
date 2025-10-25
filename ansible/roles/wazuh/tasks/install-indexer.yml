@@ -1,0 +1,45 @@
+---
+# Install Wazuh Indexer
+
+- name: Install Wazuh Indexer
+  ansible.builtin.package:
+    name: "{{ wazuh_indexer_package }}={{ wazuh_version }}-1"
+    state: present
+  tags: [wazuh, indexer]
+
+- name: Hold Wazuh Indexer package
+  ansible.builtin.dpkg_selections:
+    name: "{{ wazuh_indexer_package }}"
+    selection: hold
+  when:
+    - ansible_os_family == "Debian"
+    - wazuh_hold_packages | bool
+  tags: [wazuh, indexer]
+
+- name: Configure Wazuh Indexer
+  ansible.builtin.template:
+    src: indexer.yml.j2
+    dest: /etc/wazuh-indexer/opensearch.yml
+    owner: wazuh-indexer
+    group: wazuh-indexer
+    mode: "0660"
+  notify: restart wazuh-indexer
+  tags: [wazuh, indexer]
+
+- name: Set JVM options
+  ansible.builtin.template:
+    src: indexer-jvm.options.j2
+    dest: /etc/wazuh-indexer/jvm.options
+    owner: root
+    group: wazuh-indexer
+    mode: "0660"
+  notify: restart wazuh-indexer
+  tags: [wazuh, indexer]
+
+- name: Enable and start Wazuh Indexer
+  ansible.builtin.systemd:
+    name: wazuh-indexer
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [wazuh, indexer]

@@ -1,0 +1,95 @@
+<!-- Wazuh Manager Configuration -->
+<ossec_config>
+  <global>
+    <jsonout_output>yes</jsonout_output>
+    <email_notification>{{ 'yes' if wazuh_manager_email_notification else 'no' }}</email_notification>
+    {% if wazuh_manager_email_notification %}
+    <email_to>{{ wazuh_manager_email_to }}</email_to>
+    <smtp_server>{{ wazuh_manager_smtp_server }}</smtp_server>
+    <email_from>{{ wazuh_manager_email_from }}</email_from>
+    {% endif %}
+    <logall>{{ 'yes' if wazuh_manager_logall else 'no' }}</logall>
+    <logall_json>{{ 'yes' if wazuh_manager_logall_json else 'no' }}</logall_json>
+  </global>
+
+  <alerts>
+    <log_alert_level>3</log_alert_level>
+    <email_alert_level>12</email_alert_level>
+  </alerts>
+
+  <remote>
+    <connection>secure</connection>
+    <port>{{ wazuh_manager_port }}</port>
+    <protocol>{{ wazuh_agent_protocol }}</protocol>
+  </remote>
+
+  {% if wazuh_manager_vulnerability_detection %}
+  <vulnerability-detector>
+    <enabled>yes</enabled>
+    <interval>{{ wazuh_manager_vuln_db_update_interval }}</interval>
+    <run_on_start>yes</run_on_start>
+    <provider name="canonical">
+      <enabled>yes</enabled>
+      <os>trusty</os>
+      <os>xenial</os>
+      <os>bionic</os>
+      <os>focal</os>
+      <os>jammy</os>
+      <update_interval>3600</update_interval>
+    </provider>
+    <provider name="redhat">
+      <enabled>yes</enabled>
+      <update_from_year>2010</update_from_year>
+      <update_interval>3600</update_interval>
+    </provider>
+  </vulnerability-detector>
+  {% endif %}
+
+  {% if wazuh_manager_active_response %}
+  <active-response>
+    <disabled>no</disabled>
+    <ca_store>/var/ossec/etc/wpk_root.pem</ca_store>
+    <ca_verification>yes</ca_verification>
+  </active-response>
+  {% endif %}
+
+  {% if wazuh_manager_cluster_enabled %}
+  <cluster>
+    <name>{{ wazuh_manager_cluster_name }}</name>
+    <node_name>{{ wazuh_manager_cluster_node_name }}</node_name>
+    <node_type>{{ wazuh_manager_cluster_node_type }}</node_type>
+    <key>{{ wazuh_manager_cluster_key }}</key>
+    <port>{{ wazuh_manager_cluster_port }}</port>
+    <bind_addr>0.0.0.0</bind_addr>
+    <nodes>
+      <node>NODE_IP</node>
+    </nodes>
+    <hidden>no</hidden>
+    <disabled>no</disabled>
+  </cluster>
+  {% endif %}
+
+  <ruleset>
+    <decoder_dir>ruleset/decoders</decoder_dir>
+    <rule_dir>ruleset/rules</rule_dir>
+    <rule_exclude>0215-policy_rules.xml</rule_exclude>
+    <list>etc/lists/audit-keys</list>
+    <list>etc/lists/amazon/aws-eventnames</list>
+  </ruleset>
+
+  <auth>
+    <disabled>no</disabled>
+    <port>1515</port>
+    <use_source_ip>{{ 'yes' if wazuh_agent_auth_use_source_ip else 'no' }}</use_source_ip>
+    <force_insert>yes</force_insert>
+    <force_time>0</force_time>
+    <purge>yes</purge>
+    <use_password>{{ 'yes' if wazuh_agent_auth_method == 'password' else 'no' }}</use_password>
+    <ssl_agent_ca></ssl_agent_ca>
+    <ssl_verify_host>no</ssl_verify_host>
+    <ssl_manager_cert></ssl_manager_cert>
+    <ssl_manager_key></ssl_manager_key>
+    <ssl_auto_negotiate>no</ssl_auto_negotiate>
+  </auth>
+
+</ossec_config>

@@ -28,6 +28,9 @@ mock_modules:
   - community.general.modprobe
   - ansible.posix.firewalld
   - ansible.posix.sysctl
+  - community.crypto.openssl_privatekey
+  - community.crypto.openssl_csr
+  - community.crypto.x509_certificate
 
 mock_roles:
   - common
@@ -39,3 +42,4 @@ mock_roles:
   - cadvisor
   - k3s
   - trivy
+  - wazuh

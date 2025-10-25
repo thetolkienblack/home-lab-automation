@@ -1,0 +1,12 @@
+# Wazuh Indexer Configuration
+network.host: "0.0.0.0"
+node.name: "{{ wazuh_indexer_node_name }}"
+cluster.name: "{{ wazuh_indexer_cluster_name }}"
+cluster.initial_master_nodes: ["{{ wazuh_indexer_node_name }}"]
+discovery.seed_hosts: {{ wazuh_indexer_discovery_seed_hosts | to_json }}
+plugins.security.ssl.http.enabled: true
+plugins.security.ssl.transport.enabled: true
+plugins.security.nodes_dn:
+- "CN={{ wazuh_indexer_node_name }},OU=Wazuh,O={{ wazuh_ssl_organization }},L={{ wazuh_ssl_locality }},ST={{ wazuh_ssl_state }},C={{ wazuh_ssl_country }}"
+plugins.security.audit.type: internal_opensearch
+cluster.routing.allocation.disk.threshold_enabled: false

@@ -1,0 +1,48 @@
+---
+# Install Wazuh Agent
+
+- name: Install Wazuh Agent
+  ansible.builtin.package:
+    name: "{{ wazuh_agent_package }}={{ wazuh_version }}-1"
+    state: present
+  environment:
+    WAZUH_MANAGER: "{{ wazuh_agent_manager_ip }}"
+    WAZUH_AGENT_NAME: "{{ wazuh_agent_name }}"
+  tags: [wazuh, agent]
+
+- name: Hold Wazuh Agent package
+  ansible.builtin.dpkg_selections:
+    name: "{{ wazuh_agent_package }}"
+    selection: hold
+  when:
+    - ansible_os_family == "Debian"
+    - wazuh_hold_packages | bool
+  tags: [wazuh, agent]
+
+- name: Configure Wazuh Agent
+  ansible.builtin.template:
+    src: agent-ossec.conf.j2
+    dest: "{{ wazuh_config_dir }}/ossec.conf"
+    owner: root
+    group: "{{ wazuh_group }}"
+    mode: "0640"
+    backup: true
+  notify: restart wazuh-agent
+  tags: [wazuh, agent]
+
+- name: Register agent with manager (password method)
+  ansible.builtin.command:
+    cmd: "/var/ossec/bin/agent-auth -m {{ wazuh_agent_manager_ip }} -P {{ wazuh_agent_auth_password }} -A {{ wazuh_agent_name }}"
+  when:
+    - wazuh_agent_auth_method == 'password'
+    - wazuh_agent_auth_password | length > 0
+  changed_when: true
+  tags: [wazuh, agent, register]
+
+- name: Enable and start Wazuh Agent
+  ansible.builtin.systemd:
+    name: wazuh-agent
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [wazuh, agent]

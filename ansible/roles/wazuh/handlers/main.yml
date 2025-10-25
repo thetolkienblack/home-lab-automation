@@ -1,0 +1,26 @@
+---
+# Handlers for Wazuh role
+
+- name: Restart wazuh-manager
+  ansible.builtin.systemd:
+    name: wazuh-manager
+    state: restarted
+    daemon_reload: true
+
+- name: Restart wazuh-indexer
+  ansible.builtin.systemd:
+    name: wazuh-indexer
+    state: restarted
+    daemon_reload: true
+
+- name: Restart wazuh-dashboard
+  ansible.builtin.systemd:
+    name: wazuh-dashboard
+    state: restarted
+    daemon_reload: true
+
+- name: Restart wazuh-agent
+  ansible.builtin.systemd:
+    name: wazuh-agent
+    state: restarted
+    daemon_reload: true

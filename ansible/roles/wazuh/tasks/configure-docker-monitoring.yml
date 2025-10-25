@@ -1,0 +1,44 @@
+---
+# Configure Docker monitoring for Wazuh Agent
+
+- name: Create Docker monitoring configuration
+  ansible.builtin.template:
+    src: local_rules_docker.xml.j2
+    dest: "{{ wazuh_config_dir }}/rules/local_rules_docker.xml"
+    owner: root
+    group: "{{ wazuh_group }}"
+    mode: "0640"
+  notify: restart wazuh-agent
+  tags: [wazuh, docker]
+
+- name: Configure Docker listener module
+  ansible.builtin.template:
+    src: docker-listener.xml.j2
+    dest: "{{ wazuh_config_dir }}/shared/docker-listener.xml"
+    owner: root
+    group: "{{ wazuh_group }}"
+    mode: "0640"
+  notify: restart wazuh-agent
+  tags: [wazuh, docker]
+
+- name: Add wazuh user to docker group
+  ansible.builtin.user:
+    name: "{{ wazuh_user }}"
+    groups: docker
+    append: true
+  notify: restart wazuh-agent
+  tags: [wazuh, docker]
+
+- name: Configure Docker log collection
+  ansible.builtin.blockinfile:
+    path: "{{ wazuh_config_dir }}/ossec.conf"
+    marker: "<!-- {mark} ANSIBLE MANAGED BLOCK - DOCKER LOGS -->"
+    block: |
+      <localfile>
+        <log_format>json</log_format>
+        <location>{{ wazuh_docker_log_path }}</location>
+      </localfile>
+    insertafter: "<ossec_config>"
+  when: wazuh_docker_log_collection | bool
+  notify: restart wazuh-agent
+  tags: [wazuh, docker]

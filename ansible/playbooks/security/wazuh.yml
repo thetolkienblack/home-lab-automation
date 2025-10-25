@@ -1,0 +1,221 @@
+---
+- name: Deploy Wazuh SIEM (All-in-One)
+  hosts: wazuh_servers
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Verify installation mode is set
+      ansible.builtin.assert:
+        that:
+          - wazuh_install_mode is defined
+          - wazuh_install_mode in ['all-in-one', 'distributed', 'manager', 'indexer', 'dashboard', 'agent']
+        fail_msg: "wazuh_install_mode must be one of: all-in-one, distributed, manager, indexer, dashboard, agent"
+        success_msg: "Installation mode: {{ wazuh_install_mode }}"
+
+    - name: Verify dashboard password is set for dashboard installations
+      ansible.builtin.assert:
+        that:
+          - wazuh_dashboard_password is defined
+          - wazuh_dashboard_password | length >= 8
+        fail_msg: "wazuh_dashboard_password must be defined and at least 8 characters"
+        success_msg: "Dashboard password is properly configured"
+      when: wazuh_install_mode in ['all-in-one', 'dashboard'] or wazuh_install_dashboard | default(false)
+
+    - name: Verify manager IP is set for agent installations
+      ansible.builtin.assert:
+        that:
+          - wazuh_agent_manager_ip is defined
+          - wazuh_agent_manager_ip | ansible.utils.ipaddr
+        fail_msg: "wazuh_agent_manager_ip must be defined and a valid IP address for agent installations"
+        success_msg: "Manager IP configured: {{ wazuh_agent_manager_ip }}"
+      when: wazuh_install_mode == 'agent' or wazuh_install_agent | default(false)
+
+  roles:
+    - role: wazuh
+      vars:
+        wazuh_install_mode: all-in-one
+        wazuh_dashboard_password: "SecurePassword123!"
+        wazuh_manager_email_notification: true
+        wazuh_manager_email_to: "admin@example.com"
+        wazuh_monitor_docker: true
+        wazuh_trivy_integration: true
+
+  post_tasks:
+    - name: Display Wazuh access information
+      ansible.builtin.debug:
+        msg:
+          - "==================================================================="
+          - "Wazuh SIEM Installation Complete"
+          - "==================================================================="
+          - "Dashboard URL: https://{{ ansible_default_ipv4.address }}:{{ wazuh_dashboard_port }}"
+          - "API URL: https://{{ ansible_default_ipv4.address }}:55000"
+          - "Manager Port: 1514 (agents), 1515 (enrollment)"
+          - ""
+          - "Default Credentials:"
+          - "  Username: {{ wazuh_dashboard_username }}"
+          - "  Password: {{ wazuh_dashboard_password }}"
+          - ""
+          - "Configuration Files:"
+          - "  Manager: /var/ossec/etc/ossec.conf"
+          - "  Indexer: /etc/wazuh-indexer/opensearch.yml"
+          - "  Dashboard: /etc/wazuh-dashboard/opensearch_dashboards.yml"
+          - ""
+          - "Log Files:"
+          - "  Manager: /var/ossec/logs/ossec.log"
+          - "  Indexer: /var/log/wazuh-indexer/wazuh-cluster.log"
+          - "  Dashboard: /var/log/wazuh-dashboard/wazuh-dashboard.log"
+          - ""
+          - "Service Management:"
+          - "  systemctl status wazuh-manager"
+          - "  systemctl status wazuh-indexer"
+          - "  systemctl status wazuh-dashboard"
+          - ""
+          - "Docker Monitoring: {{ 'Enabled' if wazuh_monitor_docker else 'Disabled' }}"
+          - "Trivy Integration: {{ 'Enabled' if wazuh_trivy_integration else 'Disabled' }}"
+          - "==================================================================="
+      when: wazuh_install_mode in ['all-in-one', 'dashboard'] or wazuh_install_dashboard | default(false)
+
+    - name: Display agent registration information
+      ansible.builtin.debug:
+        msg:
+          - "==================================================================="
+          - "Wazuh Agent Installation Complete"
+          - "==================================================================="
+          - "Manager IP: {{ wazuh_agent_manager_ip }}"
+          - "Authentication Method: {{ wazuh_agent_auth_method }}"
+          - ""
+          - "Agent Status:"
+          - "  systemctl status wazuh-agent"
+          - ""
+          - "Agent Control:"
+          - "  /var/ossec/bin/agent_control -l"
+          - ""
+          - "Docker Monitoring: {{ 'Enabled' if wazuh_monitor_docker else 'Disabled' }}"
+          - "Trivy Integration: {{ 'Enabled' if wazuh_trivy_integration else 'Disabled' }}"
+          - "==================================================================="
+      when: wazuh_install_mode == 'agent' or wazuh_install_agent | default(false)
+
+- name: Deploy Wazuh SIEM (Distributed - Indexer)
+  hosts: wazuh_indexer
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Verify cluster configuration for multi-node setup
+      ansible.builtin.assert:
+        that:
+          - wazuh_indexer_cluster_type == 'cluster'
+          - wazuh_indexer_discovery_seed_hosts is defined
+          - wazuh_indexer_discovery_seed_hosts | length > 0
+        fail_msg: "For distributed indexer, cluster_type must be 'cluster' and seed_hosts must be defined"
+        success_msg: "Indexer cluster configuration validated"
+      when: groups['wazuh_indexer'] | length > 1
+
+  roles:
+    - role: wazuh
+      vars:
+        wazuh_install_mode: indexer
+        wazuh_indexer_cluster_type: cluster
+        wazuh_indexer_heap_size_min: 2g
+        wazuh_indexer_heap_size_max: 2g
+
+- name: Deploy Wazuh SIEM (Distributed - Manager)
+  hosts: wazuh_manager
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: wazuh
+      vars:
+        wazuh_install_mode: manager
+        wazuh_manager_email_notification: true
+        wazuh_manager_email_to: "admin@example.com"
+        wazuh_manager_vulnerability_detection: true
+        wazuh_manager_active_response: true
+
+- name: Deploy Wazuh SIEM (Distributed - Dashboard)
+  hosts: wazuh_dashboard
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Verify dashboard password is configured
+      ansible.builtin.assert:
+        that:
+          - wazuh_dashboard_password is defined
+          - wazuh_dashboard_password | length >= 8
+        fail_msg: "wazuh_dashboard_password must be defined and at least 8 characters"
+        success_msg: "Dashboard password is properly configured"
+
+  roles:
+    - role: wazuh
+      vars:
+        wazuh_install_mode: dashboard
+        wazuh_dashboard_password: "SecurePassword123!"
+        wazuh_dashboard_ssl_enabled: true
+
+  post_tasks:
+    - name: Display dashboard access information
+      ansible.builtin.debug:
+        msg:
+          - "==================================================================="
+          - "Wazuh Dashboard Installation Complete"
+          - "==================================================================="
+          - "Dashboard URL: https://{{ ansible_default_ipv4.address }}:{{ wazuh_dashboard_port }}"
+          - ""
+          - "Default Credentials:"
+          - "  Username: {{ wazuh_dashboard_username }}"
+          - "  Password: {{ wazuh_dashboard_password }}"
+          - ""
+          - "IMPORTANT: Change the default password immediately!"
+          - "==================================================================="
+
+- name: Deploy Wazuh Agents
+  hosts: wazuh_agents
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Verify manager configuration for agents
+      ansible.builtin.assert:
+        that:
+          - wazuh_agent_manager_ip is defined
+          - wazuh_agent_manager_ip | ansible.utils.ipaddr
+          - wazuh_agent_auth_method is defined
+          - wazuh_agent_auth_method in ['password', 'certificate']
+        fail_msg: "Agent requires valid manager IP and authentication method"
+        success_msg: "Agent configuration validated"
+
+    - name: Verify authentication credentials
+      ansible.builtin.assert:
+        that:
+          - wazuh_agent_auth_password is defined
+          - wazuh_agent_auth_password | length >= 8
+        fail_msg: "wazuh_agent_auth_password required for password authentication"
+        success_msg: "Agent authentication configured"
+      when: wazuh_agent_auth_method == 'password'
+
+  roles:
+    - role: wazuh
+      vars:
+        wazuh_install_mode: agent
+        wazuh_agent_manager_ip: "192.168.1.100"
+        wazuh_agent_auth_method: password
+        wazuh_agent_auth_password: "agent-password"
+        wazuh_monitor_docker: true
+        wazuh_trivy_integration: true
+
+  post_tasks:
+    - name: Verify agent connectivity
+      ansible.builtin.command:
+        cmd: /var/ossec/bin/agent-auth -m {{ wazuh_agent_manager_ip }}
+      register: wazuh_agent_connectivity
+      changed_when: false
+      failed_when: false
+
+    - name: Display agent status
+      ansible.builtin.debug:
+        msg:
+          - "Agent connectivity status: {{ 'Connected' if wazuh_agent_connectivity.rc == 0 else 'Connection failed' }}"
+          - "Check logs: /var/ossec/logs/ossec.log"

@@ -1,0 +1,33 @@
+---
+galaxy_info:
+  author: Sidney
+  description: Install and configure Wazuh SIEM - Manager, Indexer, Dashboard, and Agent
+  company: Home Lab
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+  galaxy_tags:
+    - security
+    - wazuh
+    - siem
+    - monitoring
+    - docker
+    - containers
+    - vulnerability
+    - ids
+
+dependencies:
+  - role: docker
+  - role: trivy

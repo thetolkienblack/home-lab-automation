@@ -5,6 +5,7 @@ Ansible automation for homelab infrastructure management with security hardening
 ## Features
 
 - **Security Hardening**: SSH, firewall (UFW/firewalld), fail2ban, automatic updates
+- **SIEM & Security Monitoring**: Wazuh comprehensive security information and event management
 - **Vulnerability Scanning**: Trivy automated container and image vulnerability scanning
 - **Docker Management**: Installation, configuration, and stack deployment
 - **Kubernetes**: k3s lightweight Kubernetes with Calico CNI support
@@ -67,6 +68,9 @@ ansible-playbook playbooks/kubernetes/k3s-server.yml
 # Deploy Trivy vulnerability scanner
 ansible-playbook playbooks/security/trivy.yml
 
+# Deploy Wazuh SIEM
+ansible-playbook playbooks/security/wazuh.yml
+
 # Configure NTP
 ansible-playbook playbooks/system/ntp_timezone_config.yml
 
@@ -102,6 +106,7 @@ ansible-playbook playbooks/maintenance/system_maintenance.yml
 │   ├── k3s/                    # Kubernetes (k3s) with Calico CNI
 │   ├── cadvisor/               # Container monitoring
 │   ├── trivy/                  # Vulnerability scanning
+│   ├── wazuh/                  # SIEM and security monitoring
 │   ├── security_hardening/     # Security configuration
 │   ├── tailscale/              # Tailscale VPN
 │   ├── ntp/                    # Time synchronization
@@ -216,6 +221,31 @@ Automated vulnerability scanner for containers and filesystems with daily scanni
       - postgres:15
 ```
 
+### wazuh
+Comprehensive SIEM (Security Information and Event Management) with Manager, Indexer, Dashboard, and Agent components. Includes Docker monitoring and Trivy vulnerability integration.
+
+```yaml
+# All-in-one installation
+- hosts: wazuh_servers
+  roles:
+    - wazuh
+  vars:
+    wazuh_install_mode: all-in-one
+    wazuh_dashboard_password: "SecurePassword123!"
+    wazuh_monitor_docker: true
+    wazuh_trivy_integration: true
+
+# Agent installation
+- hosts: monitored_servers
+  roles:
+    - wazuh
+  vars:
+    wazuh_install_mode: agent
+    wazuh_agent_manager_ip: "192.168.1.100"
+    wazuh_agent_auth_password: "agent-password"
+    wazuh_monitor_docker: true
+```
+
 ## Testing with Molecule
 
 ```bash
@@ -314,6 +344,21 @@ ansible-playbook playbooks/security/trivy.yml
 
 # View scan reports
 ssh host "ls -lh /var/log/trivy/"
+```
+
+### Deploy Wazuh SIEM
+```bash
+# Deploy all-in-one Wazuh server
+ansible-playbook playbooks/security/wazuh.yml
+
+# Deploy Wazuh agents on monitored hosts
+ansible-playbook playbooks/security/wazuh.yml --limit wazuh_agents
+
+# Access dashboard
+echo "https://$(ansible wazuh_servers -m debug -a 'var=ansible_default_ipv4.address' | grep address | awk '{print $2}' | tr -d '\"'):443"
+
+# Check agent status on manager
+ssh wazuh-server "/var/ossec/bin/agent_control -l"
 ```
 
 ### Update SSH Keys

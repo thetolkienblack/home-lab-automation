@@ -1,0 +1,60 @@
+---
+# Generate SSL certificates for Wazuh components
+
+- name: Install OpenSSL
+  ansible.builtin.package:
+    name: openssl
+    state: present
+  tags: [wazuh, ssl]
+
+- name: Generate private key for components
+  community.crypto.openssl_privatekey:
+    path: "{{ wazuh_ssl_cert_dir }}/{{ item }}.key"
+    size: 2048
+  loop:
+    - indexer
+    - manager
+    - dashboard
+  when: wazuh_ssl_generate_self_signed | bool
+  tags: [wazuh, ssl]
+
+- name: Generate CSR for components
+  community.crypto.openssl_csr:
+    path: "{{ wazuh_ssl_cert_dir }}/{{ item }}.csr"
+    privatekey_path: "{{ wazuh_ssl_cert_dir }}/{{ item }}.key"
+    country_name: "{{ wazuh_ssl_country }}"
+    state_or_province_name: "{{ wazuh_ssl_state }}"
+    locality_name: "{{ wazuh_ssl_locality }}"
+    organization_name: "{{ wazuh_ssl_organization }}"
+    common_name: "{{ wazuh_ssl_common_name }}"
+  loop:
+    - indexer
+    - manager
+    - dashboard
+  when: wazuh_ssl_generate_self_signed | bool
+  tags: [wazuh, ssl]
+
+- name: Generate self-signed certificate
+  community.crypto.x509_certificate:
+    path: "{{ wazuh_ssl_cert_dir }}/{{ item }}.crt"
+    privatekey_path: "{{ wazuh_ssl_cert_dir }}/{{ item }}.key"
+    csr_path: "{{ wazuh_ssl_cert_dir }}/{{ item }}.csr"
+    provider: selfsigned
+    selfsigned_not_after: "+{{ wazuh_ssl_cert_validity_days }}d"
+  loop:
+    - indexer
+    - manager
+    - dashboard
+  when: wazuh_ssl_generate_self_signed | bool
+  tags: [wazuh, ssl]
+
+- name: Set certificate permissions
+  ansible.builtin.file:
+    path: "{{ wazuh_ssl_cert_dir }}/{{ item.file }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - {file: "*.key", mode: "0600"}
+    - {file: "*.crt", mode: "0644"}
+  tags: [wazuh, ssl]

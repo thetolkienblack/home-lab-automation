@@ -1,0 +1,21 @@
+---
+# Debian-specific variables for Wazuh
+
+wazuh_required_packages:
+  - apt-transport-https
+  - gnupg
+  - curl
+  - lsb-release
+
+wazuh_manager_package: wazuh-manager
+wazuh_indexer_package: wazuh-indexer
+wazuh_dashboard_package: wazuh-dashboard
+wazuh_agent_package: wazuh-agent
+
+# OpenSCAP packages
+wazuh_openscap_packages:
+  - libopenscap8
+  - xsltproc
+
+# Osquery package
+wazuh_osquery_package: osquery
