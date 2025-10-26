@@ -1,0 +1,67 @@
+---
+# k3s role - Main tasks orchestration
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family | lower }}.yml"
+  tags: [k3s, always]
+
+- name: Validate k3s mode
+  ansible.builtin.assert:
+    that:
+      - k3s_mode in ['server', 'agent', 'combined']
+    fail_msg: "k3s_mode must be 'server', 'agent', or 'combined'"
+    success_msg: "k3s mode {{ k3s_mode }} is valid"
+  tags: [k3s, validate]
+
+- name: Validate CNI selection
+  ansible.builtin.assert:
+    that:
+      - k3s_cni in ['calico', 'flannel']
+    fail_msg: "k3s_cni must be 'calico' or 'flannel'"
+    success_msg: "CNI {{ k3s_cni }} is valid"
+  tags: [k3s, validate]
+
+- name: Set k3s mode facts
+  ansible.builtin.set_fact:
+    k3s_server_enabled: "{{ k3s_mode in ['server', 'combined'] }}"
+    k3s_agent_enabled: "{{ k3s_mode in ['agent', 'combined'] }}"
+  tags: [k3s, always]
+
+- name: Include prerequisite tasks
+  ansible.builtin.include_tasks: prerequisites.yml
+  tags: [k3s, prerequisites]
+
+- name: Include k3s server installation
+  ansible.builtin.include_tasks: install-server.yml
+  when: k3s_server_enabled | bool
+  tags: [k3s, server, install]
+
+- name: Include k3s agent installation
+  ansible.builtin.include_tasks: install-agent.yml
+  when:
+    - k3s_agent_enabled | bool
+    - k3s_mode == 'agent'
+  tags: [k3s, agent, install]
+
+- name: Include Calico CNI installation
+  ansible.builtin.include_tasks: install-calico.yml
+  when:
+    - k3s_server_enabled | bool
+    - k3s_cni == 'calico'
+  tags: [k3s, calico, cni]
+
+- name: Include kubectl configuration
+  ansible.builtin.include_tasks: configure-kubectl.yml
+  when:
+    - k3s_configure_kubectl | bool
+    - k3s_server_enabled | bool
+  tags: [k3s, kubectl]
+
+- name: Include firewall configuration
+  ansible.builtin.include_tasks: firewall.yml
+  when: k3s_configure_firewall | bool
+  tags: [k3s, firewall]
+
+- name: Include verification tasks
+  ansible.builtin.include_tasks: verify.yml
+  tags: [k3s, verify]

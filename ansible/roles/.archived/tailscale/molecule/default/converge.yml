@@ -1,0 +1,21 @@
+---
+# Molecule converge playbook for tailscale role
+# Note: We skip authentication in tests since we don't have valid auth keys
+- name: Converge
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Update apt cache (Debian)
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+  roles:
+    - role: tailscale
+      vars:
+        tailscale_require_auth_key: false  # Skip auth requirement in tests
+        tailscale_service_state: stopped  # Don't start service without auth
+        tailscale_service_enabled: false

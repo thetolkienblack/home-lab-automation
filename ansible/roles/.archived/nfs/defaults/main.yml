@@ -1,0 +1,54 @@
+---
+# defaults file for nfs
+
+# NFS role mode: 'server', 'client', or 'both'
+nfs_mode: 'both'
+
+# NFS version to use (3 or 4)
+nfs_version: 4
+
+# NFS Server Configuration
+nfs_server_enabled: true
+nfs_exports: []
+# Example NFS exports:
+# - path: /srv/nfs/shared
+#   clients:
+#     - host: "192.168.1.0/24"
+#       options: "rw,sync,no_subtree_check,no_root_squash"
+#     - host: "10.0.0.0/8"
+#       options: "ro,sync,no_subtree_check"
+#   owner: root
+#   group: root
+#   mode: '0755'
+#   create: true
+
+# NFS Client Configuration
+nfs_client_enabled: true
+nfs_mounts: []
+# Example NFS mounts:
+# - path: /mnt/nfs/shared
+#   src: "192.168.1.100:/srv/nfs/shared"
+#   fstype: nfs4
+#   opts: "rw,sync,hard,intr"
+#   state: mounted
+#   owner: root
+#   group: root
+#   mode: '0755'
+
+# Service management
+nfs_service_state: started
+nfs_service_enabled: true
+
+# Firewall configuration
+nfs_configure_firewall: true
+nfs_firewall_zones:
+  - public
+
+# NFSv4 specific settings
+nfs_idmapd_domain: "{{ ansible_domain | default('localdomain') }}"
+
+# Performance tuning (optional)
+nfs_server_threads: 8
+nfs_enable_udp: false
+nfs_enable_v3: false
+nfs_enable_v4: true

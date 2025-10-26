@@ -1,0 +1,12 @@
+---
+# RHEL/CentOS Tailscale repository setup
+- name: Add Tailscale repository (Red Hat/CentOS/Fedora)
+  ansible.builtin.yum_repository:
+    name: tailscale-stable
+    description: "Tailscale stable"
+    baseurl: "{{ tailscale_repo_baseurl }}"
+    gpgkey: "{{ tailscale_repo_gpgkey }}"
+    gpgcheck: true
+    repo_gpgcheck: true
+    enabled: true
+  tags: [tailscale, rhel, repository]

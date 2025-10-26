@@ -1,0 +1,11 @@
+---
+# RedHat-specific variables for k3s
+
+# Required system packages
+k3s_system_packages: "{{ k3s_required_packages_redhat }}"
+
+# Firewall package
+k3s_firewall_package: firewalld
+
+# Service manager
+k3s_service_manager: systemd

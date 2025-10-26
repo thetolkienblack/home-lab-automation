@@ -1,45 +1,24 @@
 ---
-# Playbook to configure NFS servers and clients
+# Playbook to configure NFS servers and clients (Using Community Role)
+# Uses geerlingguy.nfs
 #
 # Usage examples:
-#
-# Configure NFS servers:
 #   ansible-playbook -i inventories/production.yml playbooks/storage/nfs.yml --tags nfs-server
-#
-# Configure NFS clients:
 #   ansible-playbook -i inventories/production.yml playbooks/storage/nfs.yml --tags nfs-client
-#
-# Configure both:
-#   ansible-playbook -i inventories/production.yml playbooks/storage/nfs.yml
 
-- name: Configure NFS servers
-  hosts: nfs_servers
+- name: Configure NFS servers and clients
+  hosts: nfs_servers,nfs_clients
   become: true
+  gather_facts: true
   tags:
     - nfs
-    - nfs-server
     - storage
 
-  vars:
-    nfs_mode: server
+  pre_tasks:
+    - name: Set NFS exports for servers
+      ansible.builtin.set_fact:
+        nfs_exports: "{{ nfs_exports | default([]) }}"
+      when: inventory_hostname in groups['nfs_servers']
 
-  tasks:
-    - name: Include NFS role for servers
-      ansible.builtin.include_role:
-        name: nfs
-
-- name: Configure NFS clients
-  hosts: nfs_clients
-  become: true
-  tags:
-    - nfs
-    - nfs-client
-    - storage
-
-  vars:
-    nfs_mode: client
-
-  tasks:
-    - name: Include NFS role for clients
-      ansible.builtin.include_role:
-        name: nfs
+  roles:
+    - role: geerlingguy.nfs
