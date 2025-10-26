@@ -1,0 +1,69 @@
+# CrowdSec Log Acquisition Configuration
+# {{ ansible_managed }}
+
+{% if crowdsec_final_log_sources is defined %}
+{% for source in crowdsec_final_log_sources %}
+---
+source: {{ source.source }}
+{% if source.filenames is defined %}
+filenames:
+{% for filename in source.filenames %}
+  - {{ filename }}
+{% endfor %}
+{% endif %}
+{% if source.journalctl_filter is defined %}
+journalctl_filter:
+{% for filter in source.journalctl_filter %}
+  - {{ filter }}
+{% endfor %}
+{% endif %}
+{% if source.labels is defined %}
+labels:
+{% for key, value in source.labels.items() %}
+  {{ key }}: {{ value }}
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% else %}
+{% for source in crowdsec_log_sources %}
+---
+source: {{ source.source }}
+{% if source.filenames is defined %}
+filenames:
+{% for filename in source.filenames %}
+  - {{ filename }}
+{% endfor %}
+{% endif %}
+{% if source.journalctl_filter is defined %}
+journalctl_filter:
+{% for filter in source.journalctl_filter %}
+  - {{ filter }}
+{% endfor %}
+{% endif %}
+{% if source.labels is defined %}
+labels:
+{% for key, value in source.labels.items() %}
+  {{ key }}: {{ value }}
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if crowdsec_custom_log_sources | length > 0 %}
+{% for source in crowdsec_custom_log_sources %}
+---
+source: {{ source.source }}
+{% if source.filenames is defined %}
+filenames:
+{% for filename in source.filenames %}
+  - {{ filename }}
+{% endfor %}
+{% endif %}
+{% if source.labels is defined %}
+labels:
+{% for key, value in source.labels.items() %}
+  {{ key }}: {{ value }}
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}

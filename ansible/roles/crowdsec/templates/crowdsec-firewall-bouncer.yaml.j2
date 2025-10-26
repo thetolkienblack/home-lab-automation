@@ -1,0 +1,37 @@
+# CrowdSec Firewall Bouncer Configuration
+# {{ ansible_managed }}
+
+mode: {{ crowdsec_firewall_bouncer_mode }}
+pid_dir: /var/run/
+update_frequency: 10s
+daemonize: true
+log_mode: file
+log_dir: /var/log/
+log_level: info
+log_compression: true
+log_max_size: 100
+log_max_backups: 3
+log_max_age: 30
+api_url: {{ crowdsec_lapi_url }}
+api_key: {{ crowdsec_firewall_bouncer_api_key | default('') }}
+disable_ipv6: false
+deny_action: {{ crowdsec_firewall_bouncer_deny_action }}
+deny_log: {{ crowdsec_firewall_bouncer_deny_log | lower }}
+{% if crowdsec_firewall_bouncer_mode == 'nftables' %}
+nftables:
+  ipv4:
+    enabled: true
+    set-only: false
+    table: crowdsec
+    chain: crowdsec-chain
+  ipv6:
+    enabled: false
+    set-only: false
+    table: crowdsec6
+    chain: crowdsec6-chain
+{% elif crowdsec_firewall_bouncer_mode == 'iptables' %}
+iptables:
+  enabled: true
+{% endif %}
+blacklists_ipv4: crowdsec-blacklists
+blacklists_ipv6: crowdsec6-blacklists

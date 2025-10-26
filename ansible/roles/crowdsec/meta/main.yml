@@ -1,0 +1,44 @@
+---
+galaxy_info:
+  role_name: crowdsec
+  namespace: graylock
+  author: Sidney
+  description: Comprehensive CrowdSec IDS/IPS deployment with central LAPI, agents, and bouncers
+  company: Graylock Homelab
+  license: MIT
+  min_ansible_version: "2.14"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+        - noble
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+
+  galaxy_tags:
+    - security
+    - ids
+    - ips
+    - crowdsec
+    - firewall
+    - docker
+    - kubernetes
+    - monitoring
+    - protection
+    - detection
+
+dependencies: []
+
+collections:
+  - community.general
+  - ansible.posix
+  - community.docker
+  - kubernetes.core

@@ -1,0 +1,103 @@
+# CrowdSec Main Configuration
+# {{ ansible_managed }}
+
+common:
+  daemonize: false
+  pid_dir: /var/run/
+  log_media: {{ crowdsec_log_mode }}
+  log_level: {{ crowdsec_log_level }}
+{% if crowdsec_log_mode == 'file' %}
+  log_dir: {{ crowdsec_log_dir }}
+  log_max_size: {{ crowdsec_log_max_size }}
+  log_max_age: {{ crowdsec_log_max_age }}
+  log_max_backups: {{ crowdsec_log_max_backups }}
+  compress_logs: {{ crowdsec_log_compress | lower }}
+{% endif %}
+  working_dir: .
+
+config_paths:
+  config_dir: {{ _crowdsec_config_dir }}
+  data_dir: {{ _crowdsec_data_dir }}
+  simulation_path: {{ _crowdsec_simulation_file }}
+  hub_dir: {{ _crowdsec_config_dir }}/hub/
+  index_path: {{ _crowdsec_config_dir }}/hub/.index.json
+  notification_dir: {{ _crowdsec_config_dir }}/notifications/
+  plugin_dir: {{ _crowdsec_config_dir }}/notifications/
+
+crowdsec_service:
+  acquisition_path: {{ _crowdsec_acquis_file }}
+  parser_routines: {{ crowdsec_max_parsers }}
+{% if crowdsec_mode == 'lapi' %}
+  acquisition_dir: {{ _crowdsec_config_dir }}/acquis.d/
+{% endif %}
+  bucket_routines: 1
+  output_routines: 1
+
+cscli:
+  output: human
+
+{% if crowdsec_db_type is defined %}
+db_config:
+  log_level: info
+{% if crowdsec_db_type == 'sqlite' %}
+  type: sqlite
+  db_path: {{ crowdsec_db_path }}
+  flush:
+    max_items: 5000
+    max_age: 7d
+{% elif crowdsec_db_type == 'postgresql' %}
+  type: postgresql
+  user: {{ crowdsec_db_user }}
+  password: {{ crowdsec_db_password }}
+  db_name: {{ crowdsec_db_name }}
+  host: {{ crowdsec_db_host }}
+  port: {{ crowdsec_db_port }}
+  sslmode: {{ crowdsec_db_ssl_mode }}
+  flush:
+    max_items: 5000
+    max_age: 7d
+{% elif crowdsec_db_type == 'mysql' %}
+  type: mysql
+  user: {{ crowdsec_db_user }}
+  password: {{ crowdsec_db_password }}
+  db_name: {{ crowdsec_db_name }}
+  host: {{ crowdsec_db_host }}
+  port: {{ crowdsec_db_port }}
+  flush:
+    max_items: 5000
+    max_age: 7d
+{% endif %}
+{% endif %}
+
+api:
+  client:
+    insecure_skip_verify: false
+    credentials_path: {{ _crowdsec_local_api_credentials }}
+  server:
+{% if crowdsec_mode == 'lapi' %}
+    log_level: info
+    listen_uri: 0.0.0.0:{{ crowdsec_lapi_port }}
+{% if crowdsec_lapi_tls_enabled %}
+    tls:
+      cert_file: {{ crowdsec_lapi_tls_cert_path }}
+      key_file: {{ crowdsec_lapi_tls_key_path }}
+{% endif %}
+    profiles_path: {{ _crowdsec_profiles_file }}
+    online_client:
+{% if crowdsec_capi_enabled %}
+      credentials_path: {{ _crowdsec_online_api_credentials }}
+{% else %}
+      enabled: false
+{% endif %}
+{% else %}
+    # LAPI disabled on agent
+    enabled: false
+{% endif %}
+
+{% if crowdsec_prometheus_enabled %}
+prometheus:
+  enabled: true
+  level: full
+  listen_addr: 127.0.0.1:{{ crowdsec_prometheus_port }}
+  listen_port: {{ crowdsec_prometheus_port }}
+{% endif %}

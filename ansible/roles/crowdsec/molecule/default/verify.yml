@@ -1,0 +1,66 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Check if CrowdSec is installed
+      ansible.builtin.command: crowdsec -version
+      register: crowdsec_version
+      changed_when: false
+
+    - name: Display CrowdSec version
+      ansible.builtin.debug:
+        var: crowdsec_version.stdout
+
+    - name: Check if CrowdSec service is running
+      ansible.builtin.service_facts:
+
+    - name: Assert CrowdSec service is running
+      ansible.builtin.assert:
+        that:
+          - "'crowdsec.service' in ansible_facts.services or 'crowdsec' in ansible_facts.services"
+          - "ansible_facts.services['crowdsec.service'].state == 'running' or ansible_facts.services['crowdsec'].state == 'running'"
+        fail_msg: "CrowdSec service is not running"
+        success_msg: "CrowdSec service is running"
+
+    - name: Check CrowdSec configuration file exists
+      ansible.builtin.stat:
+        path: /etc/crowdsec/config.yaml
+      register: config_file
+
+    - name: Assert configuration file exists
+      ansible.builtin.assert:
+        that:
+          - config_file.stat.exists
+        fail_msg: "CrowdSec configuration file not found"
+        success_msg: "CrowdSec configuration file exists"
+
+    - name: Check installed collections
+      ansible.builtin.command: cscli collections list
+      register: collections_list
+      changed_when: false
+
+    - name: Display installed collections
+      ansible.builtin.debug:
+        var: collections_list.stdout_lines
+
+    - name: Verify common collections are installed
+      ansible.builtin.assert:
+        that:
+          - "'crowdsecurity/linux' in collections_list.stdout"
+          - "'crowdsecurity/sshd' in collections_list.stdout"
+        fail_msg: "Common collections not installed"
+        success_msg: "Common collections installed successfully"
+
+    - name: Check CrowdSec metrics (LAPI only)
+      ansible.builtin.command: cscli metrics
+      register: metrics
+      changed_when: false
+      failed_when: false
+      when: crowdsec_mode == 'lapi'
+
+    - name: Display metrics (LAPI only)
+      ansible.builtin.debug:
+        var: metrics.stdout_lines
+      when: crowdsec_mode == 'lapi'

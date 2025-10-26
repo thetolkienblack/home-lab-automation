@@ -1,0 +1,64 @@
+---
+# Deploy CrowdSec on Kubernetes using Helm
+
+- name: Add CrowdSec Helm repository
+  kubernetes.core.helm_repository:
+    name: crowdsec
+    repo_url: "{{ crowdsec_kubernetes_helm_repo }}"
+    state: present
+
+- name: Create CrowdSec namespace
+  kubernetes.core.k8s:
+    name: "{{ crowdsec_kubernetes_namespace }}"
+    api_version: v1
+    kind: Namespace
+    state: present
+  when: crowdsec_kubernetes_create_namespace | bool
+
+- name: Create values file for Helm chart
+  ansible.builtin.template:
+    src: kubernetes/helm-values.yaml.j2
+    dest: /tmp/crowdsec-helm-values.yaml
+    mode: '0644'
+
+- name: Deploy CrowdSec Helm chart
+  kubernetes.core.helm:
+    name: crowdsec
+    chart_ref: "{{ crowdsec_kubernetes_helm_chart }}"
+    chart_version: "{{ crowdsec_kubernetes_helm_version if crowdsec_kubernetes_helm_version != 'latest' else omit }}"
+    release_namespace: "{{ crowdsec_kubernetes_namespace }}"
+    values_files:
+      - /tmp/crowdsec-helm-values.yaml
+    create_namespace: "{{ crowdsec_kubernetes_create_namespace }}"
+    wait: true
+    timeout: 10m0s
+
+- name: Wait for CrowdSec LAPI to be ready
+  kubernetes.core.k8s_info:
+    kind: Deployment
+    name: crowdsec-lapi
+    namespace: "{{ crowdsec_kubernetes_namespace }}"
+    wait: true
+    wait_condition:
+      type: Available
+      status: "True"
+    wait_timeout: 300
+
+- name: Get CrowdSec LAPI service
+  kubernetes.core.k8s_info:
+    kind: Service
+    name: crowdsec-lapi
+    namespace: "{{ crowdsec_kubernetes_namespace }}"
+  register: crowdsec_lapi_service
+
+- name: Display CrowdSec LAPI service information
+  ansible.builtin.debug:
+    msg:
+      - "CrowdSec LAPI deployed successfully"
+      - "Service: {{ crowdsec_lapi_service.resources[0].metadata.name if crowdsec_lapi_service.resources else 'N/A' }}"
+      - "Namespace: {{ crowdsec_kubernetes_namespace }}"
+
+- name: Clean up temporary values file
+  ansible.builtin.file:
+    path: /tmp/crowdsec-helm-values.yaml
+    state: absent

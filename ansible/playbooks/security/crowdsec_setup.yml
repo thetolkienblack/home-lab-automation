@@ -1,0 +1,98 @@
+---
+# CrowdSec IDS/IPS Setup Playbook
+# This playbook deploys CrowdSec with central LAPI architecture
+
+- name: Deploy CrowdSec Central LAPI Server
+  hosts: crowdsec_lapi
+  become: true
+  gather_facts: true
+
+  vars:
+    crowdsec_mode: lapi
+    crowdsec_configure_firewall: true
+
+  pre_tasks:
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg:
+          - "Deploying CrowdSec LAPI server on {{ inventory_hostname }}"
+          - "LAPI will listen on port {{ crowdsec_lapi_port }}"
+
+  roles:
+    - role: crowdsec
+
+  post_tasks:
+    - name: Display LAPI server information
+      ansible.builtin.debug:
+        msg:
+          - "CrowdSec LAPI server deployed successfully"
+          - "LAPI URL: {{ crowdsec_lapi_url }}"
+          - "Agents should use this URL to connect"
+          - "Enrollment key: {{ crowdsec_enrollment_key | default('Not generated - check LAPI server') }}"
+
+- name: Deploy CrowdSec Agents
+  hosts: crowdsec_agents
+  become: true
+  gather_facts: true
+  serial: 5
+
+  vars:
+    crowdsec_mode: agent
+
+  pre_tasks:
+    - name: Validate LAPI server is configured
+      ansible.builtin.assert:
+        that:
+          - crowdsec_lapi_server is defined
+          - crowdsec_lapi_server | length > 0
+        fail_msg: "crowdsec_lapi_server must be defined for agents"
+        success_msg: "LAPI server: {{ crowdsec_lapi_server }}"
+
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg:
+          - "Deploying CrowdSec agent on {{ inventory_hostname }}"
+          - "Connecting to LAPI: {{ crowdsec_lapi_url }}"
+          - "Docker integration: {{ crowdsec_docker_enabled }}"
+          - "AppSec enabled: {{ crowdsec_appsec_enabled }}"
+
+  roles:
+    - role: crowdsec
+
+  post_tasks:
+    - name: Display agent deployment status
+      ansible.builtin.debug:
+        msg:
+          - "CrowdSec agent deployed on {{ inventory_hostname }}"
+          - "Connected to LAPI: {{ crowdsec_lapi_url }}"
+          - "Collections installed: {{ (crowdsec_common_collections + crowdsec_additional_collections) | length }}"
+          - "Bouncers configured: {{ crowdsec_bouncers | selectattr('enabled', 'equalto', true) | list | length }}"
+
+- name: Deploy CrowdSec on Kubernetes
+  hosts: kubernetes_masters
+  become: false
+  gather_facts: true
+
+  vars:
+    crowdsec_mode: kubernetes
+    crowdsec_kubernetes_enabled: true
+
+  pre_tasks:
+    - name: Display Kubernetes deployment information
+      ansible.builtin.debug:
+        msg:
+          - "Deploying CrowdSec on Kubernetes cluster"
+          - "Namespace: {{ crowdsec_kubernetes_namespace }}"
+          - "Helm chart: {{ crowdsec_kubernetes_helm_chart }}"
+
+  roles:
+    - role: crowdsec
+      when: crowdsec_kubernetes_enabled | bool
+
+  post_tasks:
+    - name: Display Kubernetes deployment status
+      ansible.builtin.debug:
+        msg:
+          - "CrowdSec deployed on Kubernetes"
+          - "Namespace: {{ crowdsec_kubernetes_namespace }}"
+          - "Access via kubectl: kubectl -n {{ crowdsec_kubernetes_namespace }} get pods"

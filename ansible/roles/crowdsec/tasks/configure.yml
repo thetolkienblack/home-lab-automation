@@ -1,0 +1,96 @@
+---
+# Main configuration tasks for CrowdSec
+
+- name: Ensure configuration directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ _crowdsec_config_dir }}/notifications"
+    - "{{ _crowdsec_config_dir }}/contexts"
+    - "{{ _crowdsec_config_dir }}/postoverflows"
+
+- name: Configure profiles
+  ansible.builtin.template:
+    src: profiles.yaml.j2
+    dest: "{{ _crowdsec_profiles_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart crowdsec
+
+- name: Configure simulation mode (if specified)
+  ansible.builtin.template:
+    src: simulation.yaml.j2
+    dest: "{{ _crowdsec_simulation_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart crowdsec
+
+- name: Install common collections
+  ansible.builtin.command:
+    cmd: "{{ _cscli_binary }} collections install {{ item }}"
+  loop: "{{ crowdsec_common_collections }}"
+  register: crowdsec_collection_install
+  changed_when: "'already installed' not in crowdsec_collection_install.stdout"
+  failed_when:
+    - crowdsec_collection_install.rc != 0
+    - "'already installed' not in crowdsec_collection_install.stdout"
+
+- name: Install common parsers
+  ansible.builtin.command:
+    cmd: "{{ _cscli_binary }} parsers install {{ item }}"
+  loop: "{{ crowdsec_common_parsers }}"
+  register: crowdsec_parser_install
+  changed_when: "'already installed' not in crowdsec_parser_install.stdout"
+  failed_when:
+    - crowdsec_parser_install.rc != 0
+    - "'already installed' not in crowdsec_parser_install.stdout"
+
+- name: Install additional collections
+  ansible.builtin.command:
+    cmd: "{{ _cscli_binary }} collections install {{ item }}"
+  loop: "{{ crowdsec_additional_collections }}"
+  when: crowdsec_additional_collections | length > 0
+  register: crowdsec_additional_collection_install
+  changed_when: "'already installed' not in additional_crowdsec_collection_install.stdout"
+  failed_when:
+    - additional_crowdsec_collection_install.rc != 0
+    - "'already installed' not in additional_crowdsec_collection_install.stdout"
+
+- name: Install additional parsers
+  ansible.builtin.command:
+    cmd: "{{ _cscli_binary }} parsers install {{ item }}"
+  loop: "{{ crowdsec_additional_parsers }}"
+  when: crowdsec_additional_parsers | length > 0
+  register: crowdsec_additional_parser_install
+  changed_when: "'already installed' not in additional_crowdsec_parser_install.stdout"
+  failed_when:
+    - additional_crowdsec_parser_install.rc != 0
+    - "'already installed' not in additional_crowdsec_parser_install.stdout"
+
+- name: Enable Prometheus metrics
+  ansible.builtin.lineinfile:
+    path: "{{ _crowdsec_config_file }}"
+    regexp: '^(\s*)#?\s*prometheus:'
+    line: '  prometheus:'
+    insertafter: '^prometheus:'
+  when: crowdsec_prometheus_enabled | bool
+  notify:
+    - Restart crowdsec
+
+- name: Configure Prometheus port
+  ansible.builtin.lineinfile:
+    path: "{{ _crowdsec_config_file }}"
+    regexp: '^(\s*)#?\s*listen_addr:'
+    line: '    listen_addr: 127.0.0.1:{{ crowdsec_prometheus_port }}'
+    insertafter: '^\s*prometheus:'
+  when: crowdsec_prometheus_enabled | bool
+  notify:
+    - Restart crowdsec

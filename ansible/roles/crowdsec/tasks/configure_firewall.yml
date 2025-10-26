@@ -1,0 +1,52 @@
+---
+# Configure firewall rules for CrowdSec LAPI server
+
+- name: Configure UFW firewall (Debian/Ubuntu)
+  when: ansible_os_family == 'Debian'
+  block:
+    - name: Allow LAPI port from specific IPs (UFW)
+      community.general.ufw:
+        rule: allow
+        port: "{{ crowdsec_lapi_port }}"
+        proto: tcp
+        from_ip: "{{ item }}"
+        comment: "CrowdSec LAPI"
+      loop: "{{ crowdsec_firewall_allowed_ips }}"
+      when: crowdsec_firewall_allowed_ips | length > 0
+
+    - name: Allow LAPI port from anywhere if no IPs specified (UFW)
+      community.general.ufw:
+        rule: allow
+        port: "{{ crowdsec_lapi_port }}"
+        proto: tcp
+        comment: "CrowdSec LAPI - WARNING: Open to all"
+      when: crowdsec_firewall_allowed_ips | length == 0
+
+- name: Configure firewalld (RHEL/CentOS)
+  when: ansible_os_family == 'RedHat'
+  block:
+    - name: Allow LAPI port from specific IPs (firewalld)
+      ansible.posix.firewalld:
+        port: "{{ crowdsec_lapi_port }}/tcp"
+        permanent: true
+        state: enabled
+        source: "{{ item }}"
+      loop: "{{ crowdsec_firewall_allowed_ips }}"
+      when: crowdsec_firewall_allowed_ips | length > 0
+      notify:
+        - Reload systemd
+
+    - name: Allow LAPI port from anywhere if no IPs specified (firewalld)
+      ansible.posix.firewalld:
+        port: "{{ crowdsec_lapi_port }}/tcp"
+        permanent: true
+        state: enabled
+      when: crowdsec_firewall_allowed_ips | length == 0
+      notify:
+        - Reload systemd
+
+- name: Display firewall configuration
+  ansible.builtin.debug:
+    msg:
+      - "LAPI port {{ crowdsec_lapi_port }} configured in firewall"
+      - "Allowed IPs: {{ crowdsec_firewall_allowed_ips if crowdsec_firewall_allowed_ips | length > 0 else 'ALL (not recommended)' }}"

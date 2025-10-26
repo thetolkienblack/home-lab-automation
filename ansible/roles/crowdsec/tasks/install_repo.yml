@@ -1,0 +1,50 @@
+---
+# Install CrowdSec repository
+
+- name: Install CrowdSec repository (Debian/Ubuntu)
+  when: ansible_os_family == 'Debian'
+  block:
+    - name: Install required packages for repository
+      ansible.builtin.apt:
+        name:
+          - curl
+          - gnupg
+          - apt-transport-https
+        state: present
+        update_cache: true
+
+    - name: Add CrowdSec GPG key
+      ansible.builtin.apt_key:
+        url: "{{ crowdsec_gpg_key_url }}"
+        state: present
+
+    - name: Add CrowdSec repository
+      ansible.builtin.apt_repository:
+        repo: "deb {{ crowdsec_repo_url_debian }}/any/ any main"
+        state: present
+        filename: crowdsec
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+      changed_when: false
+
+- name: Install CrowdSec repository (RHEL/CentOS)
+  when: ansible_os_family == 'RedHat'
+  block:
+    - name: Add CrowdSec repository
+      ansible.builtin.yum_repository:
+        name: crowdsec
+        description: CrowdSec Repository
+        baseurl: "{{ crowdsec_repo_url_redhat }}/el/{{ ansible_distribution_major_version }}/$basearch"
+        gpgcheck: true
+        gpgkey: "{{ crowdsec_gpg_key_url }}"
+        enabled: true
+        state: present
+
+- name: Install CrowdSec base package
+  ansible.builtin.package:
+    name: "crowdsec{{ '' if not crowdsec_version else '=' + crowdsec_version }}"
+    state: present
+  notify:
+    - Reload systemd

@@ -122,6 +122,14 @@ ansible/
   - Fail2ban integration
   - TCP wrappers
   - Sysctl tuning
+- **crowdsec** - CrowdSec IDS/IPS deployment
+  - Central LAPI server or agent mode
+  - Automatic service detection and collection installation
+  - Docker and Kubernetes integration
+  - Multiple bouncers (firewall, Traefik, blocklists)
+  - AppSec (WAF-like) protection
+  - Notification channels (Slack, Email, Webhook)
+  - PostgreSQL/MySQL/SQLite database backends
 
 ### Virtualization Roles
 - **proxmox** - Proxmox VE installation and configuration
@@ -228,7 +236,149 @@ chronyc sources
 
 ### Security Playbooks
 
-#### 2. Comprehensive Security Hardening
+#### 2. CrowdSec IDS/IPS Setup
+
+**File:** `playbooks/security/crowdsec_setup.yml`
+
+**Purpose:** Deploy CrowdSec Intrusion Detection/Prevention System with central LAPI architecture, agents, and bouncers.
+
+**Target Hosts:** `crowdsec_lapi`, `crowdsec_agents`, `kubernetes_masters`
+
+**Features:**
+- Central LAPI server for decision management
+- Automatic agent enrollment
+- Service-based collection auto-detection
+- Docker container log parsing
+- Kubernetes Helm deployment
+- Firewall and Traefik bouncers
+- AppSec (WAF) protection
+- Notification channels (Slack, Email, Webhook)
+
+**Required Variables:**
+
+```yaml
+# In group_vars/all/main.yml or host_vars
+
+# For LAPI Server
+crowdsec_mode: lapi
+crowdsec_db_type: postgresql  # or sqlite, mysql
+crowdsec_db_password: "{{ vault_crowdsec_db_password }}"
+crowdsec_configure_firewall: true
+crowdsec_firewall_allowed_ips:
+  - "192.168.1.0/24"  # Your agent network
+
+# For Agents
+crowdsec_mode: agent
+crowdsec_lapi_server: "192.168.1.100"  # Your LAPI server
+crowdsec_docker_enabled: true
+crowdsec_appsec_enabled: true
+
+# Bouncers
+crowdsec_bouncers:
+  - name: firewall
+    enabled: true
+  - name: blocklist
+    enabled: true
+  - name: traefik
+    enabled: true  # If using Traefik
+
+# Notifications
+crowdsec_slack_enabled: true
+crowdsec_slack_webhook_url: "{{ vault_slack_webhook }}"
+crowdsec_email_enabled: true
+crowdsec_email_to:
+  - security@example.com
+```
+
+**Inventory Example:**
+
+```yaml
+# inventories/production.yml
+all:
+  children:
+    crowdsec_lapi:
+      hosts:
+        crowdsec-server:
+          ansible_host: 192.168.1.100
+          crowdsec_mode: lapi
+          crowdsec_db_type: postgresql
+
+    crowdsec_agents:
+      vars:
+        crowdsec_mode: agent
+        crowdsec_lapi_server: 192.168.1.100
+        crowdsec_docker_enabled: true
+      hosts:
+        web01:
+          ansible_host: 192.168.1.10
+          crowdsec_additional_collections:
+            - crowdsecurity/traefik
+            - crowdsecurity/nginx
+        db01:
+          ansible_host: 192.168.1.20
+          crowdsec_additional_collections:
+            - crowdsecurity/postgresql
+        docker01:
+          ansible_host: 192.168.1.30
+```
+
+**Usage:**
+
+```bash
+# Deploy LAPI server first
+ansible-playbook playbooks/security/crowdsec_setup.yml -l crowdsec_lapi
+
+# Deploy agents (captures enrollment key from LAPI)
+ansible-playbook playbooks/security/crowdsec_setup.yml -l crowdsec_agents
+
+# Deploy on Kubernetes
+ansible-playbook playbooks/security/crowdsec_setup.yml -l kubernetes_masters
+
+# Deploy everything
+ansible-playbook playbooks/security/crowdsec_setup.yml
+```
+
+**Verification:**
+
+```bash
+# On LAPI server
+cscli machines list      # Show enrolled agents
+cscli bouncers list      # Show active bouncers
+cscli decisions list     # Show active decisions
+cscli metrics            # Show LAPI metrics
+
+# On Agents
+cscli metrics            # Show agent metrics
+cscli collections list   # Show installed collections
+cscli hub list           # Show available hub items
+
+# Check service status
+systemctl status crowdsec
+systemctl status crowdsec-firewall-bouncer
+
+# View logs
+journalctl -u crowdsec -f
+tail -f /var/log/crowdsec/crowdsec.log
+```
+
+**Auto-Detection:**
+
+The role automatically detects and configures collections based on:
+- Running system services (nginx, postgresql, redis, etc.)
+- Docker containers (traefik, mysql, apache, etc.)
+- Installed applications
+
+**Important Notes:**
+- ⚠️ **Deploy LAPI server first** before agents
+- ⚠️ Store sensitive data in Ansible Vault (`crowdsec_db_password`, webhook URLs, etc.)
+- ⚠️ Configure firewall rules to allow agents to reach LAPI port (default: 8080)
+- ⚠️ Test in development environment first
+- 📝 The enrollment key is auto-generated on LAPI and displayed in playbook output
+- 📝 For complete documentation, see [roles/crowdsec/README.md](roles/crowdsec/README.md)
+
+---
+
+#### 3. Comprehensive Security Hardening
 
 **File:** `playbooks/security/system_hardening.yml`
 

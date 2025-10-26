@@ -1,0 +1,91 @@
+---
+# Install and configure CrowdSec agent
+
+- name: Ensure CrowdSec directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ _crowdsec_config_dir }}"
+    - "{{ _crowdsec_data_dir }}"
+    - "{{ _crowdsec_config_dir }}/hub"
+    - "{{ crowdsec_log_dir }}"
+
+- name: Generate CrowdSec config for agent
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ _crowdsec_config_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart crowdsec
+
+- name: Generate acquisition configuration
+  ansible.builtin.template:
+    src: acquis.yaml.j2
+    dest: "{{ _crowdsec_acquis_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart crowdsec
+
+- name: Configure LAPI credentials for agent
+  ansible.builtin.template:
+    src: local_api_credentials.yaml.j2
+    dest: "{{ _crowdsec_local_api_credentials }}"
+    owner: root
+    group: root
+    mode: '0600'
+  notify:
+    - Restart crowdsec
+
+- name: Enroll agent to LAPI server
+  when: crowdsec_enrollment_key | length > 0
+  block:
+    - name: Register agent with LAPI using enrollment key
+      ansible.builtin.command:
+        cmd: "{{ _cscli_binary }} lapi register --machine {{ crowdsec_agent_name }} --token {{ crowdsec_enrollment_key }} --url {{ crowdsec_lapi_url }}"
+      register: crowdsec_agent_register
+      changed_when: "'successfully registered' in crowdsec_agent_register.stdout"
+      failed_when:
+        - crowdsec_agent_register.rc != 0
+        - "'already registered' not in crowdsec_agent_register.stderr"
+
+- name: Configure agent (manual LAPI connection - no enrollment key)
+  when: crowdsec_enrollment_key | length == 0
+  block:
+    - name: Add machine credentials manually
+      ansible.builtin.command:
+        cmd: "{{ _cscli_binary }} machines add {{ crowdsec_agent_name }} --auto --url {{ crowdsec_lapi_url }}"
+      register: crowdsec_agent_add
+      changed_when: "'successfully added' in crowdsec_agent_add.stdout"
+      failed_when:
+        - crowdsec_agent_add.rc != 0
+        - "'already exists' not in crowdsec_agent_add.stderr"
+
+    - name: Display machine credentials
+      ansible.builtin.debug:
+        msg: "Machine credentials created. Please validate this machine on the LAPI server."
+      when: crowdsec_agent_add.changed
+
+- name: Update CrowdSec hub
+  ansible.builtin.command:
+    cmd: "{{ _cscli_binary }} hub update"
+  changed_when: true
+  tags:
+    - crowdsec_hub
+
+- name: Disable LAPI on agent (security best practice)
+  ansible.builtin.lineinfile:
+    path: "{{ _crowdsec_config_file }}"
+    regexp: '^(\s*)listen_uri:'
+    line: '#\1listen_uri: 127.0.0.1:8080'
+    backrefs: true
+  when: crowdsec_agent_disable_lapi | bool
+  notify:
+    - Restart crowdsec

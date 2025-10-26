@@ -1,0 +1,135 @@
+---
+# Main task file for CrowdSec role
+
+- name: Validate crowdsec_mode
+  ansible.builtin.assert:
+    that:
+      - crowdsec_mode in ['lapi', 'agent', 'kubernetes']
+    fail_msg: "crowdsec_mode must be 'lapi', 'agent', or 'kubernetes'"
+    success_msg: "Valid crowdsec_mode: {{ crowdsec_mode }}"
+  tags:
+    - crowdsec
+    - crowdsec_validate
+
+- name: Validate LAPI server configuration for agents
+  ansible.builtin.assert:
+    that:
+      - crowdsec_lapi_server | length > 0
+    fail_msg: "crowdsec_lapi_server must be defined when crowdsec_mode is 'agent'"
+    success_msg: "LAPI server configured: {{ crowdsec_lapi_server }}"
+  when: crowdsec_mode == 'agent'
+  tags:
+    - crowdsec
+    - crowdsec_validate
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ item }}"
+  with_first_found:
+    - "{{ ansible_distribution }}-{{ ansible_distribution_major_version }}.yml"
+    - "{{ ansible_distribution }}.yml"
+    - "{{ ansible_os_family }}.yml"
+    - main.yml
+  tags:
+    - crowdsec
+    - crowdsec_install
+
+- name: Deploy CrowdSec on Kubernetes
+  ansible.builtin.include_tasks: kubernetes_helm.yml
+  when:
+    - crowdsec_mode == 'kubernetes'
+    - crowdsec_kubernetes_enabled | bool
+  tags:
+    - crowdsec
+    - crowdsec_kubernetes
+
+- name: Install and configure CrowdSec (non-kubernetes)
+  when: crowdsec_mode != 'kubernetes'
+  tags:
+    - crowdsec
+  block:
+    - name: Install CrowdSec repository
+      ansible.builtin.include_tasks: install_repo.yml
+      tags:
+        - crowdsec_install
+        - crowdsec_repo
+
+    - name: Install CrowdSec LAPI server
+      ansible.builtin.include_tasks: install_lapi.yml
+      when: crowdsec_mode == 'lapi'
+      tags:
+        - crowdsec_install
+        - crowdsec_lapi
+
+    - name: Install CrowdSec agent
+      ansible.builtin.include_tasks: install_agent.yml
+      when: crowdsec_mode == 'agent'
+      tags:
+        - crowdsec_install
+        - crowdsec_agent
+
+    - name: Configure CrowdSec
+      ansible.builtin.include_tasks: configure.yml
+      tags:
+        - crowdsec_configure
+
+    - name: Detect and configure collections
+      ansible.builtin.include_tasks: configure_collections.yml
+      when: crowdsec_auto_detect_collections | bool or crowdsec_additional_collections | length > 0
+      tags:
+        - crowdsec_collections
+
+    - name: Configure Docker integration
+      ansible.builtin.include_tasks: configure_docker.yml
+      when: crowdsec_docker_enabled | bool
+      tags:
+        - crowdsec_docker
+
+    - name: Configure and install bouncers
+      ansible.builtin.include_tasks: configure_bouncers.yml
+      when: crowdsec_bouncers | selectattr('enabled', 'equalto', true) | list | length > 0
+      tags:
+        - crowdsec_bouncers
+
+    - name: Configure notifications
+      ansible.builtin.include_tasks: configure_notifications.yml
+      when: crowdsec_notifications_enabled | bool
+      tags:
+        - crowdsec_notifications
+
+    - name: Configure AppSec
+      ansible.builtin.include_tasks: configure_appsec.yml
+      when: crowdsec_appsec_enabled | bool
+      tags:
+        - crowdsec_appsec
+
+    - name: Configure firewall rules for LAPI
+      ansible.builtin.include_tasks: configure_firewall.yml
+      when:
+        - crowdsec_mode == 'lapi'
+        - crowdsec_configure_firewall | bool
+      tags:
+        - crowdsec_firewall
+
+    - name: Ensure CrowdSec service is configured
+      ansible.builtin.service:
+        name: "{{ _crowdsec_service_name }}"
+        enabled: "{{ crowdsec_service_enabled }}"
+        state: "{{ crowdsec_service_state }}"
+      tags:
+        - crowdsec_service
+
+    - name: Display CrowdSec status
+      ansible.builtin.command:
+        cmd: "{{ _cscli_binary }} metrics"
+      register: crowdsec_metrics
+      changed_when: false
+      failed_when: false
+      tags:
+        - crowdsec_status
+
+    - name: Show CrowdSec metrics
+      ansible.builtin.debug:
+        var: crowdsec_metrics.stdout_lines
+      when: crowdsec_metrics.stdout_lines is defined
+      tags:
+        - crowdsec_status

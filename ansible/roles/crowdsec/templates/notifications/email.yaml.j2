@@ -1,0 +1,29 @@
+# CrowdSec Email Notification Configuration
+# {{ ansible_managed }}
+
+type: email
+name: email_default
+log_level: info
+
+format: |
+  CrowdSec Security Alert
+
+  Machine: {{ "{{" }} .MachineID {{ "}}" }}
+  Scenario: {{ "{{" }} .Scenario {{ "}}" }}
+  Source: {{ "{{" }} .Source.Scope {{ "}}" }} - {{ "{{" }} .Source.Value {{ "}}" }}
+  Events: {{ "{{" }} .Events | len {{ "}}" }}
+  Decision: {{ "{{" }} range .Decisions {{ "}}" }}{{ "{{" }} .Type {{ "}}" }} for {{ "{{" }} .Duration {{ "}}" }}{{ "{{" }} end {{ "}}" }}
+  Started: {{ "{{" }} .StartAt {{ "}}" }}
+  Stopped: {{ "{{" }} .StopAt {{ "}}" }}
+
+smtp_host: {{ crowdsec_email_smtp_host }}
+smtp_port: {{ crowdsec_email_smtp_port }}
+{% if crowdsec_email_smtp_username | length > 0 %}
+smtp_username: {{ crowdsec_email_smtp_username }}
+smtp_password: {{ crowdsec_email_smtp_password }}
+{% endif %}
+sender_email: {{ crowdsec_email_from }}
+receiver_emails:
+{% for email in crowdsec_email_to %}
+  - {{ email }}
+{% endfor %}
