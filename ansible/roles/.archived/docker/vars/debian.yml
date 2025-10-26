@@ -1,0 +1,8 @@
+---
+# Debian/Ubuntu specific variables
+docker_old_packages:
+  - docker
+  - docker-engine
+  - docker.io
+  - containerd
+  - runc

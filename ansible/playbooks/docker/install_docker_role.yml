@@ -1,18 +1,85 @@
 ---
-# Docker Installation Playbook (Using Role)
-# This playbook uses the docker role for installation
+# Docker Installation Playbook (Using Community Role)
+# Uses geerlingguy.docker with custom security hardening
 - name: Install and Configure Docker
   hosts: all
   become: true
   gather_facts: true
 
+  vars:
+    # geerlingguy.docker variables
+    docker_edition: "ce"
+    docker_packages:
+      - docker-{{ docker_edition }}
+      - docker-{{ docker_edition }}-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    docker_install_compose_plugin: true
+    docker_users: []
+
+  pre_tasks:
+    - name: Apply common configuration
+      ansible.builtin.include_role:
+        name: common
+
   roles:
-    - common
-    - docker
+    - role: geerlingguy.docker
 
   post_tasks:
-    - name: Display docker and docker compose versions
+    - name: Create Docker configuration directory
+      ansible.builtin.file:
+        path: /etc/docker
+        state: directory
+        mode: '0755'
+
+    - name: Configure Docker daemon with security hardening
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        mode: '0644'
+        content: |
+          {
+            "log-driver": "json-file",
+            "log-opts": {
+              "max-size": "10m",
+              "max-file": "3"
+            },
+            "storage-driver": "overlay2",
+            "live-restore": true,
+            "userland-proxy": false,
+            "no-new-privileges": true,
+            "icc": false,
+            "userns-remap": "default",
+            "default-ulimits": {
+              "nofile": {
+                "Name": "nofile",
+                "Hard": 65536,
+                "Soft": 65536
+              }
+            }
+          }
+      notify: Restart docker
+
+    - name: Create custom Docker network
+      community.docker.docker_network:
+        name: homelab
+        state: present
+
+    - name: Display docker installation summary
       ansible.builtin.debug:
         msg: |
-          Docker installation complete!
+          Docker installation complete with security hardening!
+          Security features enabled:
+          - User namespace remapping (userns-remap)
+          - No new privileges
+          - Inter-container communication disabled
+          - Log rotation (10MB, 3 files)
+          - Increased ulimits for file descriptors
+          Custom network 'homelab' created.
           Run 'docker --version' and 'docker compose version' to verify.
+
+  handlers:
+    - name: Restart docker
+      ansible.builtin.service:
+        name: docker
+        state: restarted
