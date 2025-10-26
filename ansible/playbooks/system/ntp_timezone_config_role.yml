@@ -1,14 +1,34 @@
 ---
-# NTP and Timezone Configuration Playbook (Using Role)
-# This playbook uses the ntp role for time synchronization
+# NTP and Timezone Configuration Playbook (Using Community Role)
+# Uses linux-system-roles.timesync for time synchronization
 - name: Configure NTP Time Synchronization and Timezone
   hosts: all
   become: true
   gather_facts: true
 
+  vars:
+    # linux-system-roles.timesync variables
+    timesync_ntp_servers:
+      - hostname: "{{ ntp_servers[0] | default('0.pool.ntp.org') }}"
+        iburst: true
+      - hostname: "{{ ntp_servers[1] | default('1.pool.ntp.org') }}"
+        iburst: true
+      - hostname: "{{ ntp_servers[2] | default('2.pool.ntp.org') }}"
+        iburst: true
+      - hostname: "{{ ntp_servers[3] | default('3.pool.ntp.org') }}"
+        iburst: true
+
+  pre_tasks:
+    - name: Apply common configuration
+      ansible.builtin.include_role:
+        name: common
+
+    - name: Set timezone
+      community.general.timezone:
+        name: "{{ timezone | default('UTC') }}"
+
   roles:
-    - common
-    - ntp
+    - role: linux-system-roles.timesync
 
   post_tasks:
     - name: Display final time status
@@ -21,9 +41,3 @@
         msg: |
           === FINAL TIME CONFIGURATION ===
           {{ time_after.stdout }}
-
-          Use tags to run specific tasks:
-          --tags timezone   - Only configure timezone
-          --tags debian     - Only Debian/Ubuntu NTP setup
-          --tags rhel       - Only RHEL/CentOS NTP setup
-          --tags verify     - Only verification tasks

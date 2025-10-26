@@ -1,33 +1,39 @@
 ---
-# Tailscale Setup Playbook (Using Role)
-# This playbook uses the tailscale role for VPN mesh network configuration
+# Tailscale Setup Playbook (Using Community Role)
+# Uses artis3n.tailscale for VPN mesh network configuration
 - name: Install and Configure Tailscale
   hosts: all
   become: true
   gather_facts: true
 
+  vars:
+    # Map custom variables to artis3n.tailscale variables
+    tailscale_args: >-
+      --accept-dns={{ tailscale_accept_dns | default(true) }}
+      --accept-routes={{ tailscale_accept_routes | default(false) }}
+      --ssh={{ tailscale_ssh | default(true) }}
+      {% if tailscale_advertise_exit_node | default(false) %}--advertise-exit-node{% endif %}
+      {% if tailscale_advertise_routes | default([]) | length > 0 %}--advertise-routes={{ tailscale_advertise_routes | join(',') }}{% endif %}
+
   pre_tasks:
-    - name: Load host-specific Tailscale token from vault
+    - name: Apply common configuration
+      ansible.builtin.include_role:
+        name: common
+
+    - name: Load host-specific Tailscale auth key from vault
       ansible.builtin.set_fact:
-        tailscale_auth_key: "{{ tailscale_tokens[inventory_hostname] }}"
+        tailscale_authkey: "{{ tailscale_tokens[inventory_hostname] }}"
       when:
         - tailscale_tokens is defined
         - tailscale_tokens[inventory_hostname] is defined
       no_log: true
 
   roles:
-    - common
-    - tailscale
+    - role: artis3n.tailscale
 
   post_tasks:
     - name: Display Tailscale completion message
       ansible.builtin.debug:
         msg: |
           Tailscale configuration complete!
-
-          Use tags to run specific tasks:
-          --tags install    - Only install Tailscale
-          --tags configure  - Only configure daemon
-          --tags auth       - Only handle authentication
-
           Check status with: tailscale status
