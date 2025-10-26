@@ -1,0 +1,116 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../meta/main.yml
+
+driver:
+  name: docker
+
+platforms:
+  # Debian 12 - Server Mode
+  - name: checkmk-debian12-server
+    image: geerlingguy/docker-debian12-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - checkmk_servers
+      - debian
+
+  # Debian 12 - Agent Mode
+  - name: checkmk-debian12-agent
+    image: geerlingguy/docker-debian12-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - checkmk_agents
+      - debian
+
+  # Rocky Linux 9 - Server Mode
+  - name: checkmk-rocky9-server
+    image: geerlingguy/docker-rockylinux9-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - checkmk_servers
+      - rhel
+
+  # Rocky Linux 9 - Agent Mode
+  - name: checkmk-rocky9-agent
+    image: geerlingguy/docker-rockylinux9-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - checkmk_agents
+      - rhel
+
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      interpreter_python: auto_silent
+      callback_whitelist: profile_tasks, timer, yaml
+      stdout_callback: yaml
+    ssh_connection:
+      pipelining: false
+  inventory:
+    group_vars:
+      checkmk_servers:
+        checkmk_mode: server
+        checkmk_site_id: testsite
+        checkmk_site_name: "Test Site"
+        checkmk_admin_password: "test_password_123"
+        checkmk_automation_secret: "test_automation_secret_123"
+        checkmk_configure_firewall: false
+        checkmk_tls_enabled: true
+        checkmk_tls_self_signed: true
+        checkmk_create_automation_user: true
+      checkmk_agents:
+        checkmk_mode: agent
+        checkmk_agent_server: checkmk-debian12-server
+        checkmk_site_id: testsite
+        checkmk_automation_user: automation
+        checkmk_automation_secret: "test_automation_secret_123"
+        checkmk_configure_firewall: false
+        checkmk_tls_enabled: true
+        checkmk_docker_monitoring: false  # Disabled for testing
+      all:
+        ansible_python_interpreter: /usr/bin/python3
+  playbooks:
+    converge: converge.yml
+    verify: verify.yml
+
+verifier:
+  name: ansible
+
+scenario:
+  name: default
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - side_effect
+    - verify
+    - cleanup
+    - destroy

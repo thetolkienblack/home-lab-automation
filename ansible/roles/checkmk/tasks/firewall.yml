@@ -1,0 +1,128 @@
+---
+# Firewall Configuration for CheckMK
+
+- name: Configure UFW firewall (Debian/Ubuntu)
+  when: ansible_os_family == "Debian"
+  block:
+    - name: Ensure UFW is installed
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+      become: true
+
+    - name: Allow HTTP traffic for CheckMK server
+      community.general.ufw:
+        rule: allow
+        port: "{{ checkmk_server_http_port }}"
+        proto: tcp
+        comment: "CheckMK HTTP"
+      become: true
+      when: checkmk_mode in ['server', 'both']
+      notify: Reload UFW
+
+    - name: Allow HTTPS traffic for CheckMK server
+      community.general.ufw:
+        rule: allow
+        port: "{{ checkmk_server_https_port }}"
+        proto: tcp
+        comment: "CheckMK HTTPS"
+      become: true
+      when:
+        - checkmk_mode in ['server', 'both']
+        - checkmk_tls_enabled
+      notify: Reload UFW
+
+    - name: Allow Livestatus port for CheckMK server
+      community.general.ufw:
+        rule: allow
+        port: "{{ checkmk_server_livestatus_port }}"
+        proto: tcp
+        comment: "CheckMK Livestatus"
+      become: true
+      when: checkmk_mode in ['server', 'both']
+      notify: Reload UFW
+
+    - name: Allow CheckMK agent port from specific IPs
+      community.general.ufw:
+        rule: allow
+        port: "{{ checkmk_agent_port }}"
+        proto: tcp
+        from_ip: "{{ item }}"
+        comment: "CheckMK Agent"
+      become: true
+      when: checkmk_mode in ['agent', 'both']
+      loop: "{{ checkmk_firewall_allowed_ips }}"
+      notify: Reload UFW
+
+    - name: Enable UFW
+      community.general.ufw:
+        state: enabled
+      become: true
+
+- name: Configure firewalld (RHEL/CentOS)
+  when: ansible_os_family == "RedHat"
+  block:
+    - name: Ensure firewalld is installed
+      ansible.builtin.yum:
+        name: firewalld
+        state: present
+      become: true
+
+    - name: Ensure firewalld is started and enabled
+      ansible.builtin.service:
+        name: firewalld
+        state: started
+        enabled: true
+      become: true
+
+    - name: Allow HTTP traffic for CheckMK server
+      ansible.posix.firewalld:
+        service: http
+        permanent: true
+        immediate: true
+        state: enabled
+      become: true
+      when: checkmk_mode in ['server', 'both']
+      notify: Reload firewalld
+
+    - name: Allow HTTPS traffic for CheckMK server
+      ansible.posix.firewalld:
+        service: https
+        permanent: true
+        immediate: true
+        state: enabled
+      become: true
+      when:
+        - checkmk_mode in ['server', 'both']
+        - checkmk_tls_enabled
+      notify: Reload firewalld
+
+    - name: Allow Livestatus port for CheckMK server
+      ansible.posix.firewalld:
+        port: "{{ checkmk_server_livestatus_port }}/tcp"
+        permanent: true
+        immediate: true
+        state: enabled
+      become: true
+      when: checkmk_mode in ['server', 'both']
+      notify: Reload firewalld
+
+    - name: Create rich rule for CheckMK agent port from allowed IPs
+      ansible.posix.firewalld:
+        rich_rule: "rule family='ipv4' source address='{{ item }}' port protocol='tcp' port='{{ checkmk_agent_port }}' accept"
+        permanent: true
+        immediate: true
+        state: enabled
+      become: true
+      when: checkmk_mode in ['agent', 'both']
+      loop: "{{ checkmk_firewall_allowed_ips }}"
+      notify: Reload firewalld
+
+- name: Display firewall configuration summary
+  ansible.builtin.debug:
+    msg:
+      - "Firewall configured for CheckMK"
+      - "Mode: {{ checkmk_mode }}"
+      - "Allowed IPs: {{ checkmk_firewall_allowed_ips | join(', ') }}"
+      - "Server ports: HTTP({{ checkmk_server_http_port }}), HTTPS({{ checkmk_server_https_port }}), Livestatus({{ checkmk_server_livestatus_port }})"
+      - "Agent port: {{ checkmk_agent_port }}"

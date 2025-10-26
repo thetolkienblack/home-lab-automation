@@ -1,0 +1,150 @@
+---
+# Verification tasks for CheckMK installation
+
+- name: Verify CheckMK server installation
+  when: checkmk_mode in ['server', 'both']
+  block:
+    - name: Check if CheckMK site is running
+      ansible.builtin.command:
+        cmd: "omd status {{ checkmk_site_id }}"
+      become: true
+      register: _site_status_verify
+      changed_when: false
+
+    - name: Verify Apache is running
+      ansible.builtin.service:
+        name: "{{ 'apache2' if ansible_os_family == 'Debian' else 'httpd' }}"
+      become: true
+      register: _apache_status
+      check_mode: true
+
+    - name: Test CheckMK web interface connectivity
+      ansible.builtin.uri:
+        url: "http://localhost/{{ checkmk_site_id }}/"
+        status_code: [200, 302]
+        timeout: 10
+      register: _web_interface_check
+      failed_when: false
+
+    - name: Display server verification results
+      ansible.builtin.debug:
+        msg:
+          - "=== CheckMK Server Verification ==="
+          - "Site Status: {{ 'Running' if _site_status_verify.rc == 0 else 'Not Running' }}"
+          - "Apache Status: {{ 'Running' if _apache_status is defined else 'Unknown' }}"
+          - "Web Interface: {{ 'Accessible' if _web_interface_check.status in [200, 302] else 'Not Accessible' }}"
+          - "Web URL: http://{{ ansible_default_ipv4.address }}/{{ checkmk_site_id }}/"
+
+- name: Verify CheckMK agent installation
+  when: checkmk_mode in ['agent', 'both']
+  block:
+    - name: Check if agent socket is running
+      ansible.builtin.systemd:
+        name: check-mk-agent.socket
+      become: true
+      register: _agent_socket_status
+      check_mode: true
+
+    - name: Test agent port connectivity
+      ansible.builtin.wait_for:
+        port: "{{ checkmk_agent_port }}"
+        timeout: 5
+        state: started
+      register: _agent_port_check
+      failed_when: false
+      when: checkmk_tls_enabled
+
+    - name: Test agent output
+      ansible.builtin.command:
+        cmd: "check_mk_agent | head -n 20"
+      become: true
+      register: _agent_output_verify
+      changed_when: false
+
+    - name: Display agent verification results
+      ansible.builtin.debug:
+        msg:
+          - "=== CheckMK Agent Verification ==="
+          - "Agent Socket: {{ 'Running' if _agent_socket_status.status.ActiveState == 'active' else 'Not Running' }}"
+          - "Agent Port ({{ checkmk_agent_port }}): {{ 'Listening' if _agent_port_check.failed == false else 'Not Listening' }}"
+          - "Agent Output: {{ 'Valid' if '<<<check_mk>>>' in _agent_output_verify.stdout else 'Invalid' }}"
+          - "Registered to: {{ checkmk_agent_server if checkmk_mode == 'agent' else 'N/A (server mode)' }}"
+
+- name: Verify Docker monitoring
+  when: checkmk_docker_monitoring
+  block:
+    - name: Check if Docker plugin exists
+      ansible.builtin.stat:
+        path: "{{ _checkmk_docker_plugin_file }}"
+      register: _docker_plugin_stat_verify
+
+    - name: Test Docker plugin execution
+      ansible.builtin.command:
+        cmd: "python3 {{ _checkmk_docker_plugin_file }}"
+      become: true
+      register: _docker_plugin_verify
+      changed_when: false
+      failed_when: false
+      when: _docker_plugin_stat_verify.stat.exists
+
+    - name: Display Docker monitoring verification
+      ansible.builtin.debug:
+        msg:
+          - "=== Docker Monitoring Verification ==="
+          - "Plugin Installed: {{ 'Yes' if _docker_plugin_stat_verify.stat.exists else 'No' }}"
+          - "Plugin Working: {{ 'Yes' if _docker_plugin_verify.rc == 0 else 'No' }}"
+      when: _docker_plugin_stat_verify.stat.exists
+
+- name: Verify TLS configuration
+  when: checkmk_tls_enabled
+  block:
+    - name: Check if TLS certificate exists
+      ansible.builtin.stat:
+        path: "{{ _checkmk_tls_cert_file }}"
+      register: _tls_cert_verify
+
+    - name: Check if TLS key exists
+      ansible.builtin.stat:
+        path: "{{ _checkmk_tls_key_file }}"
+      register: _tls_key_verify
+
+    - name: Display TLS verification
+      ansible.builtin.debug:
+        msg:
+          - "=== TLS Configuration Verification ==="
+          - "Certificate: {{ 'Present' if _tls_cert_verify.stat.exists else 'Missing' }}"
+          - "Private Key: {{ 'Present' if _tls_key_verify.stat.exists else 'Missing' }}"
+
+- name: Final deployment summary
+  ansible.builtin.debug:
+    msg: |
+
+      ╔══════════════════════════════════════════════════════════╗
+      ║        CheckMK Deployment Summary                       ║
+      ╚══════════════════════════════════════════════════════════╝
+
+      Mode: {{ checkmk_mode }}
+      Version: {{ checkmk_version }}
+      Edition: {{ checkmk_edition }}
+
+      {% if checkmk_mode in ['server', 'both'] %}
+      Server Configuration:
+        - Web Interface: http://{{ ansible_default_ipv4.address }}/{{ checkmk_site_id }}/
+        - Site Name: {{ checkmk_site_name }}
+        - Site ID: {{ checkmk_site_id }}
+        - Admin User: {{ checkmk_admin_user }}
+        - TLS/SSL: {{ 'Enabled' if checkmk_tls_enabled else 'Disabled' }}
+      {% endif %}
+      {% if checkmk_mode in ['agent', 'both'] %}
+      Agent Configuration:
+        - Server: {{ checkmk_agent_server }}
+        - Hostname: {{ ansible_fqdn }}
+        - TLS Encryption: {{ 'Enabled' if checkmk_tls_enabled else 'Disabled' }}
+        - Docker Monitoring: {{ 'Enabled' if checkmk_docker_monitoring else 'Disabled' }}
+      {% endif %}
+
+      Next Steps:
+      {% if checkmk_mode in ['server', 'both'] %}  1. Access web interface and complete setup wizard{% endif %}
+      {% if checkmk_mode in ['agent', 'both'] %}  2. Verify agent registration in CheckMK server{% endif %}
+        3. Configure monitoring checks and thresholds
+        4. Set up notifications and alerting

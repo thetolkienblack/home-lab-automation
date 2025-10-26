@@ -1,0 +1,57 @@
+---
+# Molecule Converge Playbook for CheckMK Role
+
+- name: Converge - Deploy CheckMK Servers
+  hosts: checkmk_servers
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Update apt cache (Debian)
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Install systemd (if missing)
+      ansible.builtin.package:
+        name: systemd
+        state: present
+
+  roles:
+    - role: checkmk
+
+  post_tasks:
+    - name: Wait for CheckMK server to be ready
+      ansible.builtin.wait_for:
+        port: 80
+        timeout: 120
+      when: checkmk_mode in ['server', 'both']
+
+- name: Converge - Deploy CheckMK Agents
+  hosts: checkmk_agents
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Update apt cache (Debian)
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Wait for CheckMK server to be available
+      ansible.builtin.wait_for:
+        host: "{{ checkmk_agent_server }}"
+        port: 80
+        timeout: 120
+
+  roles:
+    - role: checkmk
+
+  post_tasks:
+    - name: Wait for agent to be ready
+      ansible.builtin.wait_for:
+        port: "{{ checkmk_agent_port }}"
+        timeout: 60
+      when: checkmk_tls_enabled

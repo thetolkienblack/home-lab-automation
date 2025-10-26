@@ -142,6 +142,17 @@ ansible/
   - SSL/TLS management
   - High Availability (HA) setup
 
+### Monitoring Roles
+- **checkmk** - CheckMK monitoring infrastructure
+  - Server and agent deployment
+  - Docker container monitoring (all metrics)
+  - TLS encryption for agent-server communication
+  - Self-signed certificate generation
+  - Automatic service discovery
+  - Firewall configuration
+  - Web-based monitoring interface
+  - Supports Debian/Ubuntu and RHEL/CentOS
+
 ### Maintenance Roles
 - **maintenance** - System maintenance and updates
 
@@ -378,7 +389,144 @@ The role automatically detects and configures collections based on:
 
 ---
 
-#### 3. Comprehensive Security Hardening
+#### 3. CheckMK Monitoring Setup
+
+**File:** `playbooks/monitoring/checkmk_setup.yml`
+
+**Purpose:** Deploy comprehensive CheckMK monitoring infrastructure with server and agent support, Docker container monitoring, and TLS encryption.
+
+**Target Hosts:** `checkmk_servers`, `checkmk_agents`
+
+**Features:**
+- CheckMK Raw Edition server installation
+- Automated agent deployment and registration
+- Docker container monitoring with all metrics
+- TLS encryption for agent-server communication
+- Self-signed certificate generation
+- Firewall configuration (UFW/firewalld)
+- Automatic service discovery
+- Web-based monitoring interface
+
+**Required Variables:**
+
+```yaml
+# In group_vars/all/main.yml or inventory
+
+# Server Configuration (for server hosts)
+checkmk_mode: server
+checkmk_site_id: "mainsite"
+checkmk_site_name: "Production Monitoring"
+checkmk_admin_password: "{{ vault_checkmk_admin_password }}"
+checkmk_automation_secret: "{{ vault_checkmk_automation_secret }}"
+
+# Agent Configuration (for agent hosts)
+checkmk_mode: agent
+checkmk_agent_server: "192.168.1.100"  # Your CheckMK server
+checkmk_site_id: "mainsite"
+checkmk_docker_monitoring: true
+checkmk_tls_enabled: true
+
+# Firewall
+checkmk_configure_firewall: true
+checkmk_firewall_allowed_ips:
+  - "192.168.1.0/24"
+```
+
+**Inventory Example:**
+
+```yaml
+# inventories/production.yml
+all:
+  children:
+    checkmk_servers:
+      hosts:
+        monitoring-server:
+          ansible_host: 192.168.1.100
+          checkmk_mode: server
+          checkmk_site_id: mainsite
+
+    checkmk_agents:
+      vars:
+        checkmk_mode: agent
+        checkmk_agent_server: 192.168.1.100
+        checkmk_docker_monitoring: true
+      hosts:
+        web01:
+          ansible_host: 192.168.1.10
+        db01:
+          ansible_host: 192.168.1.20
+        docker01:
+          ansible_host: 192.168.1.30
+```
+
+**Usage:**
+
+```bash
+# Deploy server first
+ansible-playbook playbooks/monitoring/checkmk_setup.yml -l checkmk_servers
+
+# Then deploy agents
+ansible-playbook playbooks/monitoring/checkmk_setup.yml -l checkmk_agents
+
+# Or deploy everything
+ansible-playbook playbooks/monitoring/checkmk_setup.yml
+
+# Deploy to specific host
+ansible-playbook playbooks/monitoring/checkmk_setup.yml -l web01
+```
+
+**Verification:**
+
+```bash
+# On server - check site status
+sudo omd status <site_id>
+
+# Access web interface
+http://<server-ip>/<site_id>/
+
+# On agent - check agent status
+sudo systemctl status check-mk-agent.socket
+sudo cmk-agent-ctl status
+
+# Test agent output
+sudo check_mk_agent | head -20
+```
+
+**Docker Monitoring:**
+
+When `checkmk_docker_monitoring: true`, the role automatically:
+- Installs mk_docker.py plugin
+- Configures Docker API access
+- Enables container metrics collection
+- Creates piggyback hosts for containers
+
+Monitored metrics include:
+- Container status and health
+- CPU and memory usage
+- Network I/O and disk I/O
+- Image and volume information
+- Docker daemon statistics
+
+**TLS Encryption:**
+
+The role automatically generates self-signed certificates and configures:
+- TLS encryption for agent-server communication
+- Agent registration with certificate trust
+- Secure API access
+- HTTPS web interface (optional)
+
+**Important Notes:**
+- ⚠️ **Deploy server before agents**
+- ⚠️ Store passwords in Ansible Vault
+- ⚠️ Ensure firewall rules allow agent-server communication
+- ⚠️ Server requires adequate resources (2GB RAM minimum)
+- 📝 Default credentials displayed during server installation
+- 📝 Agents automatically register and discover services
+- 📝 For complete documentation, see [roles/checkmk/README.md](roles/checkmk/README.md)
+
+---
+
+#### 4. Comprehensive Security Hardening
 
 **File:** `playbooks/security/system_hardening.yml`
 

@@ -1,0 +1,197 @@
+---
+# CheckMK Agent Installation Tasks
+
+- name: Construct agent download URL from server
+  ansible.builtin.set_fact:
+    _checkmk_agent_download_url_debian: "http://{{ checkmk_agent_server }}/{{ checkmk_site_id }}/check_mk/agents/check-mk-agent_{{ checkmk_version }}-1_all.deb"
+    _checkmk_agent_download_url_rhel: "http://{{ checkmk_agent_server }}/{{ checkmk_site_id }}/check_mk/agents/check-mk-agent-{{ checkmk_version }}-1.noarch.rpm"
+
+- name: Set agent download URL based on OS
+  ansible.builtin.set_fact:
+    _checkmk_agent_download_url: "{{ _checkmk_agent_download_url_debian if ansible_os_family == 'Debian' else _checkmk_agent_download_url_rhel }}"
+
+- name: Check if CheckMK agent is already installed
+  ansible.builtin.command:
+    cmd: "{{ 'dpkg -l check-mk-agent' if ansible_os_family == 'Debian' else 'rpm -q check-mk-agent' }}"
+  register: _checkmk_agent_check
+  changed_when: false
+  failed_when: false
+
+- name: Download CheckMK agent package
+  ansible.builtin.get_url:
+    url: "{{ _checkmk_agent_download_url }}"
+    dest: "/tmp/checkmk/{{ _checkmk_agent_package_name }}"
+    mode: '0644'
+  become: true
+  when: _checkmk_agent_check.rc != 0
+
+- name: Install CheckMK agent package (Debian/Ubuntu)
+  ansible.builtin.apt:
+    deb: "/tmp/checkmk/{{ _checkmk_agent_package_name }}"
+    state: present
+  become: true
+  when:
+    - ansible_os_family == "Debian"
+    - _checkmk_agent_check.rc != 0
+
+- name: Install CheckMK agent package (RHEL/CentOS)
+  ansible.builtin.package:
+    name: "/tmp/checkmk/{{ _checkmk_agent_package_name }}"
+    state: present
+  become: true
+  when:
+    - ansible_os_family == "RedHat"
+    - _checkmk_agent_check.rc != 0
+
+- name: Check if agent controller exists
+  ansible.builtin.stat:
+    path: "{{ _checkmk_agent_controller }}"
+  register: _checkmk_agent_controller_stat
+
+- name: Verify systemd version for agent controller
+  ansible.builtin.command:
+    cmd: "systemctl --version"
+  register: _systemd_version
+  changed_when: false
+  when: _checkmk_agent_controller_stat.stat.exists
+
+- name: Register agent with CheckMK server (TLS mode)
+  ansible.builtin.command:
+    cmd: >
+      {{ _checkmk_agent_controller }} register
+      --hostname {{ ansible_fqdn }}
+      --server {{ checkmk_agent_server }}
+      --site {{ checkmk_site_id }}
+      --user {{ checkmk_automation_user }}
+      --password {{ checkmk_automation_secret }}
+      --trust-cert
+  become: true
+  when:
+    - checkmk_tls_enabled
+    - _checkmk_agent_controller_stat.stat.exists
+    - _checkmk_agent_check.rc != 0
+  register: _agent_registration
+  failed_when: false
+  no_log: true
+
+- name: Display agent registration status
+  ansible.builtin.debug:
+    msg: "{{ _agent_registration.stdout_lines }}"
+  when:
+    - _agent_registration is defined
+    - _agent_registration.stdout_lines is defined
+
+- name: Enable and start CheckMK agent socket
+  ansible.builtin.systemd:
+    name: check-mk-agent.socket
+    state: started
+    enabled: true
+    daemon_reload: true
+  become: true
+
+- name: Verify agent is listening
+  ansible.builtin.wait_for:
+    port: "{{ checkmk_agent_port }}"
+    timeout: 30
+  when: checkmk_tls_enabled
+
+- name: Check agent status
+  ansible.builtin.command:
+    cmd: "{{ _checkmk_agent_controller }} status"
+  become: true
+  register: _agent_status
+  changed_when: false
+  when: _checkmk_agent_controller_stat.stat.exists
+  failed_when: false
+
+- name: Display agent status
+  ansible.builtin.debug:
+    msg: "{{ _agent_status.stdout_lines }}"
+  when:
+    - _agent_status is defined
+    - _agent_status.stdout_lines is defined
+
+- name: Test agent output
+  ansible.builtin.command:
+    cmd: "check_mk_agent"
+  become: true
+  register: _agent_test
+  changed_when: false
+  failed_when: false
+
+- name: Display agent test results
+  ansible.builtin.debug:
+    msg:
+      - "Agent is responding correctly"
+      - "Output lines: {{ _agent_test.stdout_lines | length }}"
+  when: _agent_test.rc == 0
+
+- name: Create host on CheckMK server via API
+  ansible.builtin.uri:
+    url: "http://{{ checkmk_agent_server }}/{{ checkmk_site_id }}/check_mk/api/1.0/domain-types/host_config/collections/all"
+    method: POST
+    user: "{{ checkmk_automation_user }}"
+    password: "{{ checkmk_automation_secret }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      folder: "/"
+      host_name: "{{ ansible_fqdn }}"
+      attributes:
+        ipaddress: "{{ ansible_default_ipv4.address }}"
+        site: "{{ checkmk_site_id }}"
+        tag_agent: "cmk-agent"
+    status_code: [200, 201, 204, 400]
+  when:
+    - checkmk_mode == "agent"
+    - checkmk_auto_discovery
+  register: _host_creation
+  failed_when: false
+  no_log: true
+
+- name: Trigger service discovery on CheckMK server
+  ansible.builtin.uri:
+    url: "http://{{ checkmk_agent_server }}/{{ checkmk_site_id }}/check_mk/api/1.0/domain-types/service_discovery_run/actions/start/invoke"
+    method: POST
+    user: "{{ checkmk_automation_user }}"
+    password: "{{ checkmk_automation_secret }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      host_name: "{{ ansible_fqdn }}"
+      mode: "fix_all"
+    status_code: [200, 201, 204, 302]
+  when:
+    - checkmk_mode == "agent"
+    - checkmk_auto_discovery
+    - _host_creation is defined
+  failed_when: false
+  no_log: true
+
+- name: Activate changes on CheckMK server
+  ansible.builtin.uri:
+    url: "http://{{ checkmk_agent_server }}/{{ checkmk_site_id }}/check_mk/api/1.0/domain-types/activation_run/actions/activate-changes/invoke"
+    method: POST
+    user: "{{ checkmk_automation_user }}"
+    password: "{{ checkmk_automation_secret }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      sites:
+        - "{{ checkmk_site_id }}"
+      force_foreign_changes: true
+    status_code: [200, 201, 204, 302]
+  when:
+    - checkmk_mode == "agent"
+    - checkmk_auto_discovery
+  failed_when: false
+  no_log: true
+
+- name: Display agent installation summary
+  ansible.builtin.debug:
+    msg:
+      - "CheckMK agent installation completed!"
+      - "Agent registered with: {{ checkmk_agent_server }}"
+      - "Site: {{ checkmk_site_id }}"
+      - "Hostname: {{ ansible_fqdn }}"
+      - "TLS Enabled: {{ checkmk_tls_enabled }}"

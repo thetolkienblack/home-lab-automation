@@ -1,0 +1,122 @@
+---
+# TLS Configuration for CheckMK
+
+- name: Ensure SSL certificate directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  become: true
+  loop:
+    - "{{ checkmk_tls_cert_path }}"
+    - "{{ checkmk_tls_key_path }}"
+
+- name: Check if certificate already exists
+  ansible.builtin.stat:
+    path: "{{ _checkmk_tls_cert_file }}"
+  register: _tls_cert_stat
+
+- name: Generate self-signed certificates
+  when:
+    - checkmk_tls_self_signed
+    - not _tls_cert_stat.stat.exists
+  block:
+    - name: Generate private key
+      community.crypto.openssl_privatekey:
+        path: "{{ _checkmk_tls_key_file }}"
+        size: 4096
+        mode: '0600'
+      become: true
+
+    - name: Generate certificate signing request (CSR)
+      community.crypto.openssl_csr:
+        path: "{{ _checkmk_tls_csr_file }}"
+        privatekey_path: "{{ _checkmk_tls_key_file }}"
+        country_name: "{{ checkmk_tls_country }}"
+        state_or_province_name: "{{ checkmk_tls_state }}"
+        locality_name: "{{ checkmk_tls_locality }}"
+        organization_name: "{{ checkmk_tls_organization }}"
+        organizational_unit_name: "{{ checkmk_tls_organizational_unit }}"
+        common_name: "{{ checkmk_tls_common_name }}"
+        subject_alt_name:
+          - "DNS:{{ ansible_fqdn }}"
+          - "DNS:{{ ansible_hostname }}"
+          - "IP:{{ ansible_default_ipv4.address }}"
+      become: true
+
+    - name: Generate self-signed certificate
+      community.crypto.x509_certificate:
+        path: "{{ _checkmk_tls_cert_file }}"
+        privatekey_path: "{{ _checkmk_tls_key_file }}"
+        csr_path: "{{ _checkmk_tls_csr_file }}"
+        provider: selfsigned
+        selfsigned_not_after: "+{{ checkmk_tls_cert_validity_days }}d"
+        mode: '0644'
+      become: true
+
+    - name: Display certificate information
+      ansible.builtin.debug:
+        msg:
+          - "Self-signed TLS certificate generated"
+          - "Certificate: {{ _checkmk_tls_cert_file }}"
+          - "Private Key: {{ _checkmk_tls_key_file }}"
+          - "Common Name: {{ checkmk_tls_common_name }}"
+          - "Valid for: {{ checkmk_tls_cert_validity_days }} days"
+
+- name: Configure Apache SSL/TLS (Server mode)
+  when: checkmk_mode in ['server', 'both']
+  block:
+    - name: Enable SSL module (Debian/Ubuntu)
+      ansible.builtin.command:
+        cmd: "a2enmod ssl"
+      become: true
+      when: ansible_os_family == "Debian"
+      notify: Restart Apache
+      changed_when: true
+
+    - name: Enable rewrite module (Debian/Ubuntu)
+      ansible.builtin.command:
+        cmd: "a2enmod rewrite"
+      become: true
+      when: ansible_os_family == "Debian"
+      notify: Restart Apache
+      changed_when: true
+
+    - name: Install mod_ssl (RHEL/CentOS)
+      ansible.builtin.package:
+        name: mod_ssl
+        state: present
+      become: true
+      when: ansible_os_family == "RedHat"
+
+    - name: Deploy Apache SSL configuration
+      ansible.builtin.template:
+        src: apache-ssl.conf.j2
+        dest: "{{ '/etc/apache2/sites-available/checkmk-ssl.conf' if ansible_os_family == 'Debian' else '/etc/httpd/conf.d/checkmk-ssl.conf' }}"
+        mode: '0644'
+      become: true
+      notify: Restart Apache
+
+    - name: Enable SSL site (Debian/Ubuntu)
+      ansible.builtin.command:
+        cmd: "a2ensite checkmk-ssl"
+      become: true
+      when: ansible_os_family == "Debian"
+      notify: Restart Apache
+      changed_when: true
+
+- name: Verify certificate validity
+  community.crypto.x509_certificate_info:
+    path: "{{ _checkmk_tls_cert_file }}"
+  register: _cert_info
+  become: true
+
+- name: Display certificate validity information
+  ansible.builtin.debug:
+    msg:
+      - "Certificate is valid"
+      - "Subject: {{ _cert_info.subject }}"
+      - "Issuer: {{ _cert_info.issuer }}"
+      - "Valid from: {{ _cert_info.not_before }}"
+      - "Valid until: {{ _cert_info.not_after }}"
+  when: _cert_info is defined

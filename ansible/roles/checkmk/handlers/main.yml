@@ -1,0 +1,56 @@
+---
+# CheckMK Handlers
+
+- name: Restart Apache
+  ansible.builtin.service:
+    name: "{{ 'apache2' if ansible_os_family == 'Debian' else 'httpd' }}"
+    state: restarted
+  become: true
+
+- name: Reload Apache
+  ansible.builtin.service:
+    name: "{{ 'apache2' if ansible_os_family == 'Debian' else 'httpd' }}"
+    state: reloaded
+  become: true
+
+- name: Restart CheckMK site
+  ansible.builtin.command:
+    cmd: "omd restart {{ checkmk_site_id }}"
+  become: true
+  become_user: "{{ checkmk_site_id }}"
+  changed_when: true
+
+- name: Reload CheckMK site
+  ansible.builtin.command:
+    cmd: "omd reload {{ checkmk_site_id }}"
+  become: true
+  become_user: "{{ checkmk_site_id }}"
+  changed_when: true
+
+- name: Restart CheckMK agent
+  ansible.builtin.systemd:
+    name: check-mk-agent.socket
+    state: restarted
+    daemon_reload: true
+  become: true
+
+- name: Reload UFW
+  community.general.ufw:
+    state: reloaded
+  become: true
+  when: ansible_os_family == "Debian"
+
+- name: Reload firewalld
+  ansible.builtin.service:
+    name: firewalld
+    state: reloaded
+  become: true
+  when: ansible_os_family == "RedHat"
+
+- name: Activate CheckMK changes
+  ansible.builtin.command:
+    cmd: "cmk -O"
+  become: true
+  become_user: "{{ checkmk_site_id }}"
+  changed_when: true
+  when: checkmk_mode in ['server', 'both']

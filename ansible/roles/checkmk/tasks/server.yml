@@ -1,0 +1,172 @@
+---
+# CheckMK Server Installation Tasks
+
+- name: Check if CheckMK server package is already installed
+  ansible.builtin.command:
+    cmd: "omd version"
+  register: _checkmk_version_check
+  changed_when: false
+  failed_when: false
+
+- name: Download CheckMK server package
+  ansible.builtin.get_url:
+    url: "{{ _checkmk_package_url }}"
+    dest: "/tmp/checkmk/{{ _checkmk_package_name }}"
+    mode: '0644'
+  become: true
+  when: _checkmk_version_check.rc != 0 or checkmk_version not in _checkmk_version_check.stdout
+
+- name: Verify package signature (Debian/Ubuntu)
+  ansible.builtin.command:
+    cmd: "dpkg-sig --verify /tmp/checkmk/{{ _checkmk_package_name }}"
+  become: true
+  when:
+    - ansible_os_family == "Debian"
+    - not checkmk_skip_verification
+    - _checkmk_version_check.rc != 0 or checkmk_version not in _checkmk_version_check.stdout
+  changed_when: false
+  failed_when: false
+
+- name: Verify package signature (RHEL/CentOS)
+  ansible.builtin.command:
+    cmd: "rpm -K /tmp/checkmk/{{ _checkmk_package_name }}"
+  become: true
+  when:
+    - ansible_os_family == "RedHat"
+    - not checkmk_skip_verification
+    - _checkmk_version_check.rc != 0 or checkmk_version not in _checkmk_version_check.stdout
+  changed_when: false
+
+- name: Install CheckMK server package (Debian/Ubuntu)
+  ansible.builtin.apt:
+    deb: "/tmp/checkmk/{{ _checkmk_package_name }}"
+    state: present
+  become: true
+  when:
+    - ansible_os_family == "Debian"
+    - _checkmk_version_check.rc != 0 or checkmk_version not in _checkmk_version_check.stdout
+
+- name: Install CheckMK server package (RHEL/CentOS)
+  ansible.builtin.package:
+    name: "/tmp/checkmk/{{ _checkmk_package_name }}"
+    state: present
+    disable_gpg_check: "{{ checkmk_skip_verification }}"
+  become: true
+  when:
+    - ansible_os_family == "RedHat"
+    - _checkmk_version_check.rc != 0 or checkmk_version not in _checkmk_version_check.stdout
+
+- name: Configure SELinux for Apache (RHEL/CentOS)
+  ansible.posix.seboolean:
+    name: httpd_can_network_connect
+    state: true
+    persistent: true
+  become: true
+  when:
+    - ansible_os_family == "RedHat"
+    - checkmk_selinux_enabled
+    - ansible_selinux.status == "enabled"
+
+- name: Check if CheckMK site exists
+  ansible.builtin.command:
+    cmd: "omd sites"
+  register: _checkmk_sites
+  changed_when: false
+  become: true
+
+- name: Create CheckMK site
+  ansible.builtin.command:
+    cmd: "omd create {{ checkmk_site_id }}"
+  become: true
+  when: checkmk_site_id not in _checkmk_sites.stdout
+  register: _checkmk_site_creation
+
+- name: Display initial admin credentials
+  ansible.builtin.debug:
+    msg: "{{ _checkmk_site_creation.stdout_lines }}"
+  when:
+    - _checkmk_site_creation is defined
+    - _checkmk_site_creation.changed
+
+- name: Configure CheckMK site settings
+  ansible.builtin.command:
+    cmd: "omd config {{ checkmk_site_id }} set {{ item.key }} {{ item.value }}"
+  become: true
+  loop:
+    - { key: "CORE", value: "{{ checkmk_core_type }}" }
+    - { key: "APACHE_TCP_ADDR", value: "0.0.0.0" }
+    - { key: "APACHE_TCP_PORT", value: "{{ checkmk_server_http_port }}" }
+  when: checkmk_site_id in _checkmk_sites.stdout or _checkmk_site_creation.changed
+  changed_when: true
+
+- name: Start CheckMK site
+  ansible.builtin.command:
+    cmd: "omd start {{ checkmk_site_id }}"
+  become: true
+  when: checkmk_site_id not in _checkmk_sites.stdout or _checkmk_site_creation.changed
+  changed_when: true
+
+- name: Ensure CheckMK site is running
+  ansible.builtin.command:
+    cmd: "omd status {{ checkmk_site_id }}"
+  become: true
+  changed_when: false
+  register: _checkmk_site_status
+
+- name: Display CheckMK site status
+  ansible.builtin.debug:
+    msg: "{{ _checkmk_site_status.stdout_lines }}"
+
+- name: Enable and start Apache service (Debian/Ubuntu)
+  ansible.builtin.service:
+    name: apache2
+    state: started
+    enabled: true
+  become: true
+  when: ansible_os_family == "Debian"
+
+- name: Enable and start Apache service (RHEL/CentOS)
+  ansible.builtin.service:
+    name: httpd
+    state: started
+    enabled: true
+  become: true
+  when: ansible_os_family == "RedHat"
+
+- name: Create automation user
+  ansible.builtin.command:
+    cmd: "htpasswd -b /opt/omd/sites/{{ checkmk_site_id }}/etc/htpasswd {{ checkmk_automation_user }} {{ checkmk_automation_secret }}"
+  become: true
+  become_user: "{{ checkmk_site_id }}"
+  when: checkmk_create_automation_user
+  changed_when: true
+  no_log: true
+
+- name: Configure automation user in CheckMK
+  ansible.builtin.uri:
+    url: "http://localhost/{{ checkmk_site_id }}/check_mk/api/1.0/domain-types/user_config/collections/all"
+    method: POST
+    user: "{{ checkmk_admin_user }}"
+    password: "{{ checkmk_admin_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      username: "{{ checkmk_automation_user }}"
+      fullname: "Automation User"
+      auth_option:
+        auth_type: "automation"
+        secret: "{{ checkmk_automation_secret }}"
+      contactgroups: []
+    status_code: [200, 201, 204]
+  when: checkmk_create_automation_user
+  failed_when: false
+  no_log: true
+
+- name: Display CheckMK server information
+  ansible.builtin.debug:
+    msg:
+      - "CheckMK server installation completed!"
+      - "Web Interface: http://{{ ansible_default_ipv4.address }}/{{ checkmk_site_id }}/"
+      - "Admin User: {{ checkmk_admin_user }}"
+      - "Site ID: {{ checkmk_site_id }}"
+      - "Site Name: {{ checkmk_site_name }}"
