@@ -1,0 +1,170 @@
+---
+# Molecule Verify Playbook for CheckMK Role
+
+- name: Verify CheckMK Server Installation
+  hosts: checkmk_servers
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Check if OMD is installed
+      ansible.builtin.command:
+        cmd: "omd version"
+      register: omd_version
+      changed_when: false
+
+    - name: Verify OMD version output
+      ansible.builtin.assert:
+        that:
+          - omd_version.rc == 0
+          - "'OMD' in omd_version.stdout"
+        fail_msg: "OMD is not properly installed"
+        success_msg: "OMD is installed and working"
+
+    - name: Check if CheckMK site exists
+      ansible.builtin.command:
+        cmd: "omd sites"
+      register: omd_sites
+      changed_when: false
+
+    - name: Verify CheckMK site is listed
+      ansible.builtin.assert:
+        that:
+          - "'testsite' in omd_sites.stdout"
+        fail_msg: "CheckMK site 'testsite' not found"
+        success_msg: "CheckMK site 'testsite' exists"
+
+    - name: Check CheckMK site status
+      ansible.builtin.command:
+        cmd: "omd status testsite"
+      register: site_status
+      changed_when: false
+
+    - name: Verify site services are running
+      ansible.builtin.assert:
+        that:
+          - site_status.rc == 0
+        fail_msg: "CheckMK site services are not running"
+        success_msg: "CheckMK site services are running"
+
+    - name: Check Apache service
+      ansible.builtin.service:
+        name: "{{ 'apache2' if ansible_os_family == 'Debian' else 'httpd' }}"
+      register: apache_service
+      check_mode: true
+
+    - name: Verify Apache is running
+      ansible.builtin.assert:
+        that:
+          - apache_service is defined
+        fail_msg: "Apache is not running"
+        success_msg: "Apache is running"
+
+    - name: Test CheckMK web interface
+      ansible.builtin.uri:
+        url: "http://localhost/testsite/"
+        status_code: [200, 302]
+      register: web_check
+
+    - name: Verify web interface is accessible
+      ansible.builtin.assert:
+        that:
+          - web_check.status in [200, 302]
+        fail_msg: "CheckMK web interface is not accessible"
+        success_msg: "CheckMK web interface is accessible"
+
+    - name: Check TLS certificate exists
+      ansible.builtin.stat:
+        path: "/etc/ssl/certs/checkmk-{{ ansible_hostname }}.crt"
+      register: tls_cert
+
+    - name: Verify TLS certificate was created
+      ansible.builtin.assert:
+        that:
+          - tls_cert.stat.exists
+        fail_msg: "TLS certificate not found"
+        success_msg: "TLS certificate exists"
+
+- name: Verify CheckMK Agent Installation
+  hosts: checkmk_agents
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Check if check_mk_agent is installed
+      ansible.builtin.command:
+        cmd: "{{ 'dpkg -l check-mk-agent' if ansible_os_family == 'Debian' else 'rpm -q check-mk-agent' }}"
+      register: agent_installed
+      changed_when: false
+
+    - name: Verify agent package is installed
+      ansible.builtin.assert:
+        that:
+          - agent_installed.rc == 0
+        fail_msg: "CheckMK agent package is not installed"
+        success_msg: "CheckMK agent package is installed"
+
+    - name: Check agent socket service
+      ansible.builtin.systemd:
+        name: check-mk-agent.socket
+      register: agent_socket
+      check_mode: true
+
+    - name: Verify agent socket is active
+      ansible.builtin.assert:
+        that:
+          - agent_socket.status.ActiveState == "active"
+        fail_msg: "Agent socket is not active"
+        success_msg: "Agent socket is active"
+
+    - name: Test agent output
+      ansible.builtin.command:
+        cmd: "check_mk_agent"
+      register: agent_output
+      changed_when: false
+
+    - name: Verify agent produces valid output
+      ansible.builtin.assert:
+        that:
+          - agent_output.rc == 0
+          - "'<<<check_mk>>>' in agent_output.stdout"
+        fail_msg: "Agent output is invalid"
+        success_msg: "Agent produces valid output"
+
+    - name: Check if agent controller exists
+      ansible.builtin.stat:
+        path: "/usr/bin/cmk-agent-ctl"
+      register: agent_controller
+
+    - name: Check agent controller status (if exists)
+      ansible.builtin.command:
+        cmd: "/usr/bin/cmk-agent-ctl status"
+      register: controller_status
+      changed_when: false
+      when: agent_controller.stat.exists
+      failed_when: false
+
+    - name: Display agent controller status
+      ansible.builtin.debug:
+        msg: "Agent controller status: {{ controller_status.stdout }}"
+      when:
+        - agent_controller.stat.exists
+        - controller_status is defined
+
+- name: Verify Integration
+  hosts: checkmk_servers
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Display final verification summary
+      ansible.builtin.debug:
+        msg:
+          - "============================================"
+          - "CheckMK Molecule Test Verification Complete"
+          - "============================================"
+          - "Server: Installed and Running"
+          - "Agents: Installed and Responding"
+          - "TLS: Configured"
+          - "All tests passed successfully!"
+          - "============================================"

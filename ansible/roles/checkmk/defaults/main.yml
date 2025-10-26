@@ -1,0 +1,113 @@
+---
+# CheckMK Role Configuration
+# Mode: server, agent, or both
+checkmk_mode: "agent"  # Options: server, agent, both
+
+# CheckMK Version
+checkmk_version: "2.4.0p14"
+checkmk_edition: "raw"  # Options: raw, enterprise, managed
+
+# CheckMK Server Configuration
+checkmk_site_name: "Graylock CMK"
+checkmk_site_id: "graylocksite"  # Must be alphanumeric, no spaces
+checkmk_server_address: "{{ ansible_default_ipv4.address }}"
+checkmk_admin_user: "cmkadmin"
+checkmk_admin_password: "{{ vault_checkmk_admin_password | default('changeme') }}"
+
+# Automation User Configuration
+checkmk_create_automation_user: true
+checkmk_automation_user: "automation"
+checkmk_automation_secret: "{{ vault_checkmk_automation_secret | default(lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}"
+
+# Agent Configuration
+checkmk_agent_server: ""  # IP/hostname of CheckMK server (required for agent mode)
+checkmk_agent_port: 6556
+checkmk_agent_use_legacy_pull: false  # Use legacy pull mode instead of TLS
+
+# TLS Configuration
+checkmk_tls_enabled: true
+checkmk_tls_self_signed: true
+checkmk_tls_cert_path: "/etc/ssl/certs"
+checkmk_tls_key_path: "/etc/ssl/private"
+checkmk_tls_cert_validity_days: 3650
+checkmk_tls_country: "US"
+checkmk_tls_state: "California"
+checkmk_tls_locality: "San Francisco"
+checkmk_tls_organization: "Graylock Homelab"
+checkmk_tls_organizational_unit: "IT"
+checkmk_tls_common_name: "{{ ansible_fqdn }}"
+
+# Docker Monitoring
+checkmk_docker_monitoring: true
+checkmk_docker_plugin_path: "/usr/lib/check_mk_agent/plugins"
+checkmk_docker_config_path: "/etc/check_mk"
+checkmk_docker_api_endpoint: "unix://var/run/docker.sock"
+
+# Service Discovery
+checkmk_auto_discovery: true
+checkmk_discovery_interval: "24h"
+
+# Firewall Configuration
+checkmk_configure_firewall: true
+checkmk_firewall_allowed_ips:
+  - "{{ ansible_default_ipv4.network }}/{{ ansible_default_ipv4.netmask }}"
+
+# Server Firewall Ports
+checkmk_server_http_port: 80
+checkmk_server_https_port: 443
+checkmk_server_livestatus_port: 6557
+
+# Package URLs (will be constructed based on OS)
+checkmk_package_base_url: "https://download.checkmk.com/checkmk/{{ checkmk_version }}"
+
+# Debian/Ubuntu specific
+checkmk_debian_codename: "{{ ansible_distribution_release }}"
+checkmk_debian_arch: "amd64"
+
+# RHEL/CentOS specific
+checkmk_rhel_version: "{{ ansible_distribution_major_version }}"
+
+# System requirements
+checkmk_required_packages_debian:
+  - wget
+  - gnupg
+  - apt-transport-https
+  - ca-certificates
+  - python3
+  - python3-docker  # For Docker monitoring
+
+checkmk_required_packages_rhel:
+  - wget
+  - gnupg2
+  - python3
+  - python3-docker  # For Docker monitoring
+  - epel-release
+
+# Apache Configuration (for server mode)
+checkmk_apache_enabled: true
+checkmk_apache_server_name: "{{ ansible_fqdn }}"
+
+# Email Notification Configuration
+checkmk_email_enabled: false
+checkmk_email_relay_host: "localhost"
+checkmk_email_from_address: "checkmk@{{ ansible_domain }}"
+
+# Backup Configuration
+checkmk_backup_enabled: false
+checkmk_backup_path: "/opt/omd/backups"
+checkmk_backup_retention_days: 7
+
+# Performance Settings
+checkmk_core_type: "nagios"  # Options: nagios, cmc (cmc only for enterprise)
+
+# Logging
+checkmk_log_level: "info"  # Options: debug, info, warning, error
+checkmk_log_path: "/opt/omd/sites/{{ checkmk_site_id }}/var/log"
+
+# Update and Upgrade
+checkmk_allow_downgrades: false
+checkmk_skip_verification: false
+
+# SELinux Configuration (RHEL)
+checkmk_selinux_enabled: true
+checkmk_selinux_httpd_can_network_connect: true

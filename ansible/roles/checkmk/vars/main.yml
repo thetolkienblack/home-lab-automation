@@ -1,0 +1,46 @@
+---
+# Internal variables - Do not modify
+
+# Package naming based on OS family
+_checkmk_package_name_debian: "check-mk-{{ checkmk_edition }}-{{ checkmk_version }}_0.{{ checkmk_debian_codename }}_{{ checkmk_debian_arch }}.deb"
+_checkmk_package_name_rhel: "check-mk-{{ checkmk_edition }}-{{ checkmk_version }}-el{{ checkmk_rhel_version }}-38.x86_64.rpm"
+
+_checkmk_package_name: "{{ _checkmk_package_name_debian if ansible_os_family == 'Debian' else _checkmk_package_name_rhel }}"
+
+# Package download URL
+_checkmk_package_url: "{{ checkmk_package_base_url }}/{{ _checkmk_package_name }}"
+
+# GPG Key URL
+_checkmk_gpg_key_url: "https://download.checkmk.com/checkmk/Check_MK-pubkey.gpg"
+
+# Agent package naming
+_checkmk_agent_package_name_debian: "check-mk-agent_{{ checkmk_version }}-1_all.deb"
+_checkmk_agent_package_name_rhel: "check-mk-agent-{{ checkmk_version }}-1.noarch.rpm"
+
+_checkmk_agent_package_name: "{{ _checkmk_agent_package_name_debian if ansible_os_family == 'Debian' else _checkmk_agent_package_name_rhel }}"
+
+# Service names
+_checkmk_server_service: "apache2"
+_checkmk_agent_service: "check-mk-agent@.socket"
+
+# Site user
+_checkmk_site_user: "{{ checkmk_site_id }}"
+
+# Package manager commands
+_checkmk_package_manager: "{{ 'apt' if ansible_os_family == 'Debian' else 'yum' }}"
+
+# Firewall service
+_checkmk_firewall_service: "{{ 'ufw' if ansible_os_family == 'Debian' else 'firewalld' }}"
+
+# Agent Controller binary
+_checkmk_agent_controller: "/usr/bin/cmk-agent-ctl"
+
+# TLS certificate files
+_checkmk_tls_cert_file: "{{ checkmk_tls_cert_path }}/checkmk-{{ ansible_hostname }}.crt"
+_checkmk_tls_key_file: "{{ checkmk_tls_key_path }}/checkmk-{{ ansible_hostname }}.key"
+_checkmk_tls_csr_file: "{{ checkmk_tls_cert_path }}/checkmk-{{ ansible_hostname }}.csr"
+
+# Docker monitoring plugin
+_checkmk_docker_plugin_url: "https://raw.githubusercontent.com/Checkmk/checkmk/master/agents/plugins/mk_docker.py"
+_checkmk_docker_plugin_file: "{{ checkmk_docker_plugin_path }}/mk_docker.py"
+_checkmk_docker_config_file: "{{ checkmk_docker_config_path }}/docker.cfg"

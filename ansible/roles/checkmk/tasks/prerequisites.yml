@@ -1,0 +1,99 @@
+---
+# Prerequisites for CheckMK installation
+
+- name: Update apt cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+  when: ansible_os_family == "Debian"
+
+- name: Install required packages (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ checkmk_required_packages_debian }}"
+    state: present
+  become: true
+  when: ansible_os_family == "Debian"
+
+- name: Install EPEL repository (RHEL/CentOS)
+  ansible.builtin.package:
+    name: epel-release
+    state: present
+  become: true
+  when: ansible_os_family == "RedHat"
+
+- name: Enable PowerTools repository (RHEL 8)
+  ansible.builtin.command:
+    cmd: "dnf config-manager --set-enabled powertools"
+  become: true
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_distribution_major_version == "8"
+    - ansible_distribution in ["CentOS", "Rocky", "AlmaLinux"]
+  changed_when: false
+  failed_when: false
+
+- name: Enable CodeReady Builder (RHEL 8)
+  ansible.builtin.command:
+    cmd: 'subscription-manager repos --enable "codeready-builder-for-rhel-8-x86_64-rpms"'
+  become: true
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_distribution_major_version == "8"
+    - ansible_distribution == "RedHat"
+  changed_when: false
+  failed_when: false
+
+- name: Enable CRB repository (RHEL 9)
+  ansible.builtin.command:
+    cmd: "dnf config-manager --set-enabled crb"
+  become: true
+  when:
+    - ansible_os_family == "RedHat"
+    - ansible_distribution_major_version == "9"
+  changed_when: false
+  failed_when: false
+
+- name: Install required packages (RHEL/CentOS)
+  ansible.builtin.package:
+    name: "{{ checkmk_required_packages_rhel }}"
+    state: present
+  become: true
+  when: ansible_os_family == "RedHat"
+
+- name: Create temporary directory for downloads
+  ansible.builtin.file:
+    path: /tmp/checkmk
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: Download CheckMK GPG key
+  ansible.builtin.get_url:
+    url: "{{ _checkmk_gpg_key_url }}"
+    dest: /tmp/checkmk/Check_MK-pubkey.gpg
+    mode: '0644'
+  become: true
+
+- name: Import GPG key (Debian/Ubuntu)
+  ansible.builtin.command:
+    cmd: "gpg --import /tmp/checkmk/Check_MK-pubkey.gpg"
+  become: true
+  when: ansible_os_family == "Debian"
+  changed_when: false
+  failed_when: false
+
+- name: Import GPG key (RHEL/CentOS)
+  ansible.builtin.rpm_key:
+    state: present
+    key: /tmp/checkmk/Check_MK-pubkey.gpg
+  become: true
+  when: ansible_os_family == "RedHat"
+
+- name: Ensure /opt/omd directory exists (for server mode)
+  ansible.builtin.file:
+    path: /opt/omd
+    state: directory
+    mode: '0755'
+  become: true
+  when: checkmk_mode in ['server', 'both']

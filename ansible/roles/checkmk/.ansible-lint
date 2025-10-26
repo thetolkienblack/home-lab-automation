@@ -1,0 +1,38 @@
+---
+# Ansible-lint configuration for CheckMK role
+
+profile: production
+
+exclude_paths:
+  - .cache/
+  - .github/
+  - molecule/
+  - tests/
+
+skip_list:
+  - role-name[path]  # Allow role name to be different from directory name
+  - package-latest  # Allow latest package versions during testing
+  - no-changed-when  # Some commands don't need changed_when
+  - command-instead-of-module  # Some CheckMK commands don't have modules
+  - risky-shell-pipe  # CheckMK commands may use pipes
+  - var-naming[no-role-prefix]  # Internal variables use _ prefix
+  - ignore-errors  # Used for optional includes
+  - yaml[line-length]  # Some URLs are long
+  - args[module]  # Firewall modules have experimental parameters
+  - syntax-check[unknown-module]  # Module check can fail in molecule context
+  - syntax-check[specific]  # Role resolution can fail in molecule context
+
+warn_list:
+  - experimental  # Warn about experimental features
+
+# Enable offline mode for faster linting (doesn't check galaxy)
+offline: false
+
+# Use default rules
+use_default_rules: true
+
+# Parseable output for CI/CD integration
+parseable: false
+
+# Verbosity
+verbosity: 1

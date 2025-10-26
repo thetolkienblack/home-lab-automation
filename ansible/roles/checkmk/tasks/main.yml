@@ -1,0 +1,85 @@
+---
+# CheckMK Role Main Tasks
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+  ignore_errors: true
+
+- name: Validate CheckMK mode
+  ansible.builtin.assert:
+    that:
+      - checkmk_mode in ['server', 'agent', 'both']
+    fail_msg: "checkmk_mode must be 'server', 'agent', or 'both'"
+    success_msg: "CheckMK mode is valid: {{ checkmk_mode }}"
+
+- name: Validate agent server configuration
+  ansible.builtin.assert:
+    that:
+      - checkmk_agent_server | length > 0
+    fail_msg: "checkmk_agent_server must be defined when mode is 'agent' or 'both'"
+  when: checkmk_mode in ['agent', 'both']
+
+- name: Display CheckMK deployment information
+  ansible.builtin.debug:
+    msg:
+      - "CheckMK Deployment Configuration:"
+      - "  Mode: {{ checkmk_mode }}"
+      - "  Edition: {{ checkmk_edition }}"
+      - "  Version: {{ checkmk_version }}"
+      - "  Site Name: {{ checkmk_site_name }}"
+      - "  Site ID: {{ checkmk_site_id }}"
+      - "  TLS Enabled: {{ checkmk_tls_enabled }}"
+      - "  Docker Monitoring: {{ checkmk_docker_monitoring }}"
+
+# Prerequisites
+- name: Include prerequisites tasks
+  ansible.builtin.include_tasks: prerequisites.yml
+  tags:
+    - checkmk_prerequisites
+    - checkmk_install
+
+# Server Installation
+- name: Include server installation tasks
+  ansible.builtin.include_tasks: server.yml
+  when: checkmk_mode in ['server', 'both']
+  tags:
+    - checkmk_server
+    - checkmk_install
+
+# Agent Installation
+- name: Include agent installation tasks
+  ansible.builtin.include_tasks: agent.yml
+  when: checkmk_mode in ['agent', 'both']
+  tags:
+    - checkmk_agent
+    - checkmk_install
+
+# TLS Configuration
+- name: Include TLS configuration tasks
+  ansible.builtin.include_tasks: tls.yml
+  when: checkmk_tls_enabled
+  tags:
+    - checkmk_tls
+    - checkmk_security
+
+# Docker Monitoring
+- name: Include Docker monitoring tasks
+  ansible.builtin.include_tasks: docker.yml
+  when: checkmk_docker_monitoring
+  tags:
+    - checkmk_docker
+    - checkmk_monitoring
+
+# Firewall Configuration
+- name: Include firewall configuration tasks
+  ansible.builtin.include_tasks: firewall.yml
+  when: checkmk_configure_firewall
+  tags:
+    - checkmk_firewall
+    - checkmk_security
+
+# Post-installation verification
+- name: Include verification tasks
+  ansible.builtin.include_tasks: verify.yml
+  tags:
+    - checkmk_verify

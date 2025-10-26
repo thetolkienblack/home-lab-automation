@@ -1,0 +1,142 @@
+---
+# CheckMK Monitoring Setup Playbook
+#
+# This playbook deploys CheckMK monitoring infrastructure with:
+# - Server installation and configuration
+# - Agent deployment and registration
+# - Docker container monitoring
+# - TLS encryption
+# - Firewall configuration
+#
+# Usage:
+#   Deploy server only:
+#     ansible-playbook playbooks/monitoring/checkmk_setup.yml -l checkmk_servers
+#
+#   Deploy agents only:
+#     ansible-playbook playbooks/monitoring/checkmk_setup.yml -l checkmk_agents
+#
+#   Deploy everything:
+#     ansible-playbook playbooks/monitoring/checkmk_setup.yml
+
+- name: Deploy CheckMK Monitoring Server
+  hosts: checkmk_servers
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg:
+          - "========================================="
+          - "  CheckMK Server Deployment"
+          - "========================================="
+          - "Host: {{ inventory_hostname }}"
+          - "Mode: {{ checkmk_mode }}"
+          - "Site: {{ checkmk_site_name }}"
+          - "Version: {{ checkmk_version }}"
+          - "========================================="
+
+    - name: Verify required variables are defined
+      ansible.builtin.assert:
+        that:
+          - checkmk_site_id is defined
+          - checkmk_site_name is defined
+        fail_msg: "Required variables are not defined. Check group_vars or host_vars."
+        success_msg: "All required variables are defined"
+
+  roles:
+    - role: checkmk
+
+  post_tasks:
+    - name: Display server access information
+      ansible.builtin.debug:
+        msg:
+          - ""
+          - "╔══════════════════════════════════════════════════════════╗"
+          - "║        CheckMK Server Deployed Successfully!            ║"
+          - "╚══════════════════════════════════════════════════════════╝"
+          - ""
+          - "Web Interface: http://{{ ansible_default_ipv4.address }}/{{ checkmk_site_id }}/"
+          - "{% if checkmk_tls_enabled %}HTTPS Interface: https://{{ ansible_default_ipv4.address }}/{{ checkmk_site_id }}/{% endif %}"
+          - ""
+          - "Admin User: {{ checkmk_admin_user }}"
+          - "Site ID: {{ checkmk_site_id }}"
+          - ""
+          - "Next Steps:"
+          - "  1. Access the web interface"
+          - "  2. Complete initial setup wizard"
+          - "  3. Deploy agents to monitored hosts"
+          - "  4. Configure notifications and alerting"
+          - ""
+
+- name: Deploy CheckMK Monitoring Agents
+  hosts: checkmk_agents
+  become: true
+  gather_facts: true
+  serial: 5  # Deploy agents in batches to avoid overwhelming the server
+
+  pre_tasks:
+    - name: Display agent deployment information
+      ansible.builtin.debug:
+        msg:
+          - "========================================="
+          - "  CheckMK Agent Deployment"
+          - "========================================="
+          - "Host: {{ inventory_hostname }}"
+          - "Server: {{ checkmk_agent_server }}"
+          - "Docker Monitoring: {{ checkmk_docker_monitoring }}"
+          - "========================================="
+
+    - name: Verify required variables are defined
+      ansible.builtin.assert:
+        that:
+          - checkmk_agent_server is defined
+          - checkmk_agent_server | length > 0
+        fail_msg: "checkmk_agent_server must be defined for agent deployment"
+        success_msg: "Agent server configuration is valid"
+
+    - name: Test connectivity to CheckMK server
+      ansible.builtin.wait_for:
+        host: "{{ checkmk_agent_server }}"
+        port: 80
+        timeout: 30
+      register: server_connectivity
+
+  roles:
+    - role: checkmk
+
+  post_tasks:
+    - name: Display agent deployment summary
+      ansible.builtin.debug:
+        msg:
+          - ""
+          - "Agent deployed on: {{ inventory_hostname }}"
+          - "Registered to: {{ checkmk_agent_server }}"
+          - "TLS Encryption: {{ 'Enabled' if checkmk_tls_enabled else 'Disabled' }}"
+          - "Docker Monitoring: {{ 'Enabled' if checkmk_docker_monitoring else 'Disabled' }}"
+          - ""
+
+- name: Post-Deployment Verification
+  hosts: checkmk_servers
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Display final deployment summary
+      ansible.builtin.debug:
+        msg:
+          - ""
+          - "╔══════════════════════════════════════════════════════════╗"
+          - "║      CheckMK Deployment Completed Successfully!         ║"
+          - "╚══════════════════════════════════════════════════════════╝"
+          - ""
+          - "Deployment Summary:"
+          - "  - Server(s): {{ groups['checkmk_servers'] | length if 'checkmk_servers' in groups else 0 }}"
+          - "  - Agent(s): {{ groups['checkmk_agents'] | length if 'checkmk_agents' in groups else 0 }}"
+          - ""
+          - "Access your CheckMK server:"
+          - "  http://{{ hostvars[groups['checkmk_servers'][0]]['ansible_default_ipv4']['address'] }}/{{ hostvars[groups['checkmk_servers'][0]]['checkmk_site_id'] }}/"
+          - ""
+          - "For detailed documentation, see:"
+          - "  ansible/roles/checkmk/README.md"
+          - ""

@@ -1,0 +1,105 @@
+---
+# Docker Monitoring Configuration for CheckMK
+
+- name: Check if Docker is installed
+  ansible.builtin.command:
+    cmd: "docker --version"
+  register: _docker_check
+  changed_when: false
+  failed_when: false
+
+- name: Display warning if Docker is not installed
+  ansible.builtin.debug:
+    msg: "Docker is not installed. Skipping Docker monitoring configuration."
+  when: _docker_check.rc != 0
+
+- name: Proceed with Docker monitoring configuration
+  when: _docker_check.rc == 0
+  block:
+    - name: Ensure CheckMK plugin directory exists
+      ansible.builtin.file:
+        path: "{{ checkmk_docker_plugin_path }}"
+        state: directory
+        mode: '0755'
+      become: true
+
+    - name: Ensure CheckMK config directory exists
+      ansible.builtin.file:
+        path: "{{ checkmk_docker_config_path }}"
+        state: directory
+        mode: '0755'
+      become: true
+
+    - name: Download mk_docker.py plugin
+      ansible.builtin.get_url:
+        url: "{{ _checkmk_docker_plugin_url }}"
+        dest: "{{ _checkmk_docker_plugin_file }}"
+        mode: '0755'
+      become: true
+
+    - name: Install Python Docker module (Debian/Ubuntu)
+      ansible.builtin.apt:
+        name: python3-docker
+        state: present
+      become: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install Python Docker module (RHEL/CentOS)
+      ansible.builtin.package:
+        name: python3-docker
+        state: present
+      become: true
+      when: ansible_os_family == "RedHat"
+
+    - name: Deploy Docker monitoring configuration
+      ansible.builtin.template:
+        src: docker.cfg.j2
+        dest: "{{ _checkmk_docker_config_file }}"
+        mode: '0644'
+      become: true
+      notify: Restart CheckMK agent
+
+    - name: Add check_mk user to docker group
+      ansible.builtin.user:
+        name: "{{ item }}"
+        groups: docker
+        append: true
+      become: true
+      loop:
+        - root
+      when: _docker_check.rc == 0
+
+    - name: Test Docker plugin execution
+      ansible.builtin.command:
+        cmd: "python3 {{ _checkmk_docker_plugin_file }}"
+      become: true
+      register: _docker_plugin_test
+      changed_when: false
+      failed_when: false
+
+    - name: Display Docker plugin test results
+      ansible.builtin.debug:
+        msg:
+          - "Docker monitoring plugin is working"
+          - "Found {{ _docker_plugin_test.stdout_lines | select('search', 'docker_container_status') | list | length }} containers"
+      when:
+        - _docker_plugin_test.rc == 0
+        - _docker_plugin_test.stdout_lines is defined
+
+    - name: Create piggyback directory for container monitoring
+      ansible.builtin.file:
+        path: "/var/lib/check_mk_agent/piggyback"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      become: true
+
+    - name: Display Docker monitoring setup information
+      ansible.builtin.debug:
+        msg:
+          - "Docker monitoring has been configured!"
+          - "Plugin: {{ _checkmk_docker_plugin_file }}"
+          - "Config: {{ _checkmk_docker_config_file }}"
+          - "Docker API: {{ checkmk_docker_api_endpoint }}"
+          - "Containers will appear as piggyback hosts in CheckMK"
