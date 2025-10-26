@@ -8,6 +8,9 @@
 # Node modules (Node.js)
 **/node_modules/
 
+# Ansible Modules
+**/ansible/collections/
+
 # Build output
 **/dist/
 **/build/
