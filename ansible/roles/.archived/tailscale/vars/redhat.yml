@@ -1,5 +1,0 @@
----
-# RHEL-specific variables for tailscale role
-tailscale_repo_baseurl: "https://pkgs.tailscale.com/stable/rhel/$releasever/$basearch"
-tailscale_repo_gpgkey: "https://pkgs.tailscale.com/stable/rhel/$releasever/repo.gpg"
-tailscale_daemon_config_path: "/etc/sysconfig/tailscaled"
