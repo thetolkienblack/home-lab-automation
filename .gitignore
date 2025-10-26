@@ -8,8 +8,17 @@
 # Node modules (Node.js)
 **/node_modules/
 
-# Ansible Modules
+# Ansible - Collections and roles installed via galaxy
 **/ansible/collections/
+**/ansible/roles/geerlingguy.*/
+**/ansible/roles/artis3n.*/
+**/ansible/roles/xanmanning.*/
+**/ansible/roles/linux-system-roles.*/
+
+# Ansible - Runtime files
+**/.galaxy_install_info
+**/ansible/retry/
+**/*.retry
 
 # Build output
 **/dist/

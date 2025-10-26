@@ -1,3 +1,0 @@
-chrony
-ethtool
-iproute
