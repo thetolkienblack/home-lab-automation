@@ -1,0 +1,33 @@
+---
+# common test setup tasks
+- name: Run the role only to get vars needed for validation
+  include_role:
+    name: linux-system-roles.timesync
+    public: true
+    tasks_from: set_vars.yml
+
+- name: Skip test on ostree systems if unsupported
+  meta: end_host
+  when:
+    - __timesync_ostree_unsupported | d(false)
+    - __timesync_is_ostree | d(false)
+
+- name: Ensure iproute for gathering default_ipv4 fact
+  package:
+    name: iproute  # for fact gathering for ip facts
+    state: present
+    use: "{{ (__timesync_is_ostree | d(false)) |
+             ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
+
+- name: Ensure ansible_facts used by test
+  setup:
+    gather_subset: "{{ __required_facts_subsets }}"
+  when: __required_facts |
+    difference(ansible_facts.keys() | list) | length > 0
+  vars:
+    __required_facts: "{{ __timesync_required_facts + ['default_ipv4'] }}"
+    __required_facts_subsets: "{{ ['!all', '!min'] + __required_facts }}"
+
+- name: Debug
+  debug:
+    msg: facts {{ ansible_facts | to_nice_json }}
