@@ -1,7 +1,0 @@
----
-# Handlers for tailscale role
-- name: Restart tailscaled
-  ansible.builtin.systemd:
-    name: tailscaled
-    state: restarted
-    daemon_reload: true

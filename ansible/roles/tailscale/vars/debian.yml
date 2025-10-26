@@ -1,7 +1,0 @@
----
-# Debian-specific variables for tailscale role
-tailscale_repo_key_url: "https://pkgs.tailscale.com/stable/debian/bookworm.noarmor.gpg"
-tailscale_repo_list_url: "https://pkgs.tailscale.com/stable/debian/bookworm.tailscale-keyring.list"
-tailscale_repo_keyring: "/usr/share/keyrings/tailscale-archive-keyring.gpg"
-tailscale_repo_list_file: "/etc/apt/sources.list.d/tailscale.list"
-tailscale_daemon_config_path: "/etc/default/tailscaled"
