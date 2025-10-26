@@ -1,0 +1,44 @@
+---
+# CrowdSec Service Handlers
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart crowdsec
+  ansible.builtin.service:
+    name: "{{ _crowdsec_service_name }}"
+    state: restarted
+  when: crowdsec_service_enabled | bool
+
+- name: Reload crowdsec
+  ansible.builtin.service:
+    name: "{{ _crowdsec_service_name }}"
+    state: reloaded
+  when: crowdsec_service_enabled | bool
+
+- name: Restart firewall bouncer
+  ansible.builtin.service:
+    name: "{{ _crowdsec_firewall_bouncer_service }}"
+    state: restarted
+  when:
+    - crowdsec_bouncers | selectattr('name', 'equalto', 'firewall') | selectattr('enabled', 'equalto', true) | list | length > 0
+
+- name: Restart traefik bouncer
+  ansible.builtin.service:
+    name: "{{ _crowdsec_traefik_bouncer_service }}"
+    state: restarted
+  when:
+    - crowdsec_bouncers | selectattr('name', 'equalto', 'traefik') | selectattr('enabled', 'equalto', true) | list | length > 0
+
+- name: Update crowdsec hub
+  ansible.builtin.command:
+    cmd: "{{ _cscli_binary }} hub update"
+  changed_when: true
+  when: crowdsec_auto_update_hub | bool
+
+- name: Upgrade crowdsec hub
+  ansible.builtin.command:
+    cmd: "{{ _cscli_binary }} hub upgrade"
+  changed_when: true
+  when: crowdsec_auto_update_hub | bool

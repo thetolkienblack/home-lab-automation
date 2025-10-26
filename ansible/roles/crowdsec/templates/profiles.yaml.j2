@@ -1,0 +1,39 @@
+# CrowdSec Profiles Configuration
+# {{ ansible_managed }}
+
+name: default_ip_remediation
+filters:
+  - Alert.Remediation == true && Alert.GetScope() == "Ip"
+decisions:
+  - type: ban
+    duration: {{ crowdsec_ban_duration }}
+on_success: break
+notifications:
+{% if crowdsec_slack_enabled %}
+  - slack_default
+{% endif %}
+{% if crowdsec_email_enabled %}
+  - email_default
+{% endif %}
+{% if crowdsec_webhook_enabled %}
+  - webhook_default
+{% endif %}
+
+---
+name: default_range_remediation
+filters:
+  - Alert.Remediation == true && Alert.GetScope() == "Range"
+decisions:
+  - type: ban
+    duration: {{ crowdsec_ban_duration }}
+on_success: break
+notifications:
+{% if crowdsec_slack_enabled %}
+  - slack_default
+{% endif %}
+{% if crowdsec_email_enabled %}
+  - email_default
+{% endif %}
+{% if crowdsec_webhook_enabled %}
+  - webhook_default
+{% endif %}

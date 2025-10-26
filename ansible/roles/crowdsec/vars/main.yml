@@ -1,0 +1,74 @@
+---
+# CrowdSec OS-Specific Variables
+
+# Service detection mappings for collection auto-detection
+_crowdsec_docker_services:
+  - traefik
+  - nginx
+  - apache2
+  - httpd
+  - postgresql
+  - postgres
+  - mysql
+  - mariadb
+  - redis
+  - plex
+  - adguardhome
+
+# System service names to check
+_crowdsec_system_services:
+  - nginx
+  - apache2
+  - httpd
+  - postgresql
+  - mysql
+  - mariadb-server
+  - redis-server
+  - redis
+  - traefik
+
+# Log paths for different services
+_crowdsec_log_paths:
+  nginx:
+    - /var/log/nginx/access.log
+    - /var/log/nginx/error.log
+  apache2:
+    - /var/log/apache2/access.log
+    - /var/log/apache2/error.log
+  httpd:
+    - /var/log/httpd/access_log
+    - /var/log/httpd/error_log
+  postgresql:
+    - /var/log/postgresql/*.log
+  mysql:
+    - /var/log/mysql/error.log
+    - /var/log/mysql/mysql.log
+  mariadb:
+    - /var/log/mysql/error.log
+  redis:
+    - /var/log/redis/redis-server.log
+  traefik:
+    - /var/log/traefik/access.log
+
+# CrowdSec configuration paths
+_crowdsec_config_dir: /etc/crowdsec
+_crowdsec_data_dir: /var/lib/crowdsec
+_crowdsec_config_file: "{{ _crowdsec_config_dir }}/config.yaml"
+_crowdsec_acquis_file: "{{ _crowdsec_config_dir }}/acquis.yaml"
+_crowdsec_profiles_file: "{{ _crowdsec_config_dir }}/profiles.yaml"
+_crowdsec_simulation_file: "{{ _crowdsec_config_dir }}/simulation.yaml"
+_crowdsec_local_api_credentials: "{{ _crowdsec_config_dir }}/local_api_credentials.yaml"
+_crowdsec_online_api_credentials: "{{ _crowdsec_config_dir }}/online_api_credentials.yaml"
+
+# Bouncer configuration paths
+_crowdsec_firewall_bouncer_config: /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml
+_crowdsec_traefik_bouncer_config: /etc/crowdsec/bouncers/crowdsec-traefik-bouncer.yaml
+
+# Binary paths
+_crowdsec_binary: /usr/bin/crowdsec
+_cscli_binary: /usr/bin/cscli
+
+# Service names
+_crowdsec_service_name: crowdsec
+_crowdsec_firewall_bouncer_service: crowdsec-firewall-bouncer
+_crowdsec_traefik_bouncer_service: crowdsec-traefik-bouncer

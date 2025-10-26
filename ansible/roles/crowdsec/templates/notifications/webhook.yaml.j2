@@ -1,0 +1,32 @@
+# CrowdSec Webhook Notification Configuration
+# {{ ansible_managed }}
+
+type: http
+name: webhook_default
+log_level: info
+
+format: |
+  {
+    "machine_id": "{{ "{{" }} .MachineID {{ "}}" }}",
+    "scenario": "{{ "{{" }} .Scenario {{ "}}" }}",
+    "source_scope": "{{ "{{" }} .Source.Scope {{ "}}" }}",
+    "source_value": "{{ "{{" }} .Source.Value {{ "}}" }}",
+    "events_count": {{ "{{" }} .Events | len {{ "}}" }},
+    "decisions": [
+      {{ "{{" }} range $i, $d := .Decisions {{ "}}" }}
+      {{ "{{" }} if $i {{ "}}" }},{{ "{{" }} end {{ "}}" }}
+      {
+        "type": "{{ "{{" }} $d.Type {{ "}}" }}",
+        "duration": "{{ "{{" }} $d.Duration {{ "}}" }}",
+        "value": "{{ "{{" }} $d.Value {{ "}}" }}"
+      }
+      {{ "{{" }} end {{ "}}" }}
+    ],
+    "started_at": "{{ "{{" }} .StartAt {{ "}}" }}",
+    "stopped_at": "{{ "{{" }} .StopAt {{ "}}" }}"
+  }
+
+url: {{ crowdsec_webhook_url }}
+method: {{ crowdsec_webhook_method }}
+headers:
+  Content-Type: application/json

@@ -1,0 +1,127 @@
+---
+# Configure Docker integration for CrowdSec
+
+- name: Check if Docker is installed and running
+  ansible.builtin.service_facts:
+
+- name: Verify Docker service is active
+  ansible.builtin.assert:
+    that:
+      - "'docker.service' in ansible_facts.services or 'docker' in ansible_facts.services"
+      - "ansible_facts.services['docker.service'].state == 'running' or ansible_facts.services['docker'].state == 'running'"
+    fail_msg: "Docker is not running or not installed"
+    success_msg: "Docker is running"
+  when: crowdsec_docker_enabled | bool
+
+- name: Install Docker collection
+  ansible.builtin.command:
+    cmd: "{{ _cscli_binary }} collections install crowdsecurity/docker"
+  register: crowdsec_docker_collection_install
+  changed_when: "'already installed' not in docker_crowdsec_collection_install.stdout"
+  failed_when:
+    - docker_crowdsec_collection_install.rc != 0
+    - "'already installed' not in docker_crowdsec_collection_install.stdout"
+
+- name: Ensure crowdsec user is in docker group
+  ansible.builtin.user:
+    name: crowdsec
+    groups: docker
+    append: true
+  notify:
+    - Restart crowdsec
+
+- name: Create Docker acquisition configuration
+  ansible.builtin.set_fact:
+    crowdsec_docker_acquisitions: []
+
+- name: Add Docker daemon log source
+  ansible.builtin.set_fact:
+    crowdsec_docker_acquisitions: >-
+      {{
+        crowdsec_docker_acquisitions + [{
+          'source': 'docker',
+          'container_name': [],
+          'container_id': [],
+          'labels': {
+            'type': 'docker_daemon'
+          }
+        }]
+      }}
+  when: crowdsec_docker_daemon_logs | bool
+
+- name: Add Docker container logs via socket
+  ansible.builtin.set_fact:
+    crowdsec_docker_acquisitions: >-
+      {{
+        crowdsec_docker_acquisitions + [{
+          'source': 'docker',
+          'container_name': crowdsec_docker_monitored_containers if crowdsec_docker_monitored_containers | length > 0 else [],
+          'container_id': [],
+          'docker_socket': crowdsec_docker_socket,
+          'labels': {
+            'type': 'docker_container'
+          }
+        }]
+      }}
+  when: crowdsec_docker_container_logs | bool
+
+- name: Get list of running containers for logging
+  community.docker.docker_host_info:
+  register: crowdsec_docker_containers_info
+  when:
+    - crowdsec_docker_container_logs | bool
+    - crowdsec_docker_monitored_containers | length == 0
+
+- name: Display Docker acquisition configuration
+  ansible.builtin.debug:
+    msg: "Docker acquisitions configured: {{ crowdsec_docker_acquisitions | length }} source(s)"
+
+- name: Add Docker log sources to acquisition file
+  ansible.builtin.blockinfile:
+    path: "{{ _crowdsec_acquis_file }}"
+    marker: "# {mark} ANSIBLE MANAGED - DOCKER ACQUISITION"
+    block: |
+      {% for acq in crowdsec_docker_acquisitions %}
+      ---
+      source: {{ acq.source }}
+      {% if acq.container_name is defined and acq.container_name | length > 0 %}
+      container_name:
+      {% for container in acq.container_name %}
+        - {{ container }}
+      {% endfor %}
+      {% endif %}
+      {% if acq.docker_socket is defined %}
+      docker_socket: {{ acq.docker_socket }}
+      {% endif %}
+      labels:
+        type: {{ acq.labels.type }}
+      {% endfor %}
+    create: true
+    mode: '0644'
+  notify:
+    - Restart crowdsec
+
+- name: Install Docker-specific parsers
+  ansible.builtin.command:
+    cmd: "{{ _cscli_binary }} parsers install {{ item }}"
+  loop:
+    - crowdsecurity/docker-logs
+    - crowdsecurity/syslog-logs
+  register: crowdsec_docker_parser_install
+  changed_when: "'already installed' not in docker_crowdsec_parser_install.stdout"
+  failed_when:
+    - docker_crowdsec_parser_install.rc != 0
+    - "'already installed' not in docker_crowdsec_parser_install.stdout"
+
+- name: Install Docker-specific scenarios
+  ansible.builtin.command:
+    cmd: "{{ _cscli_binary }} scenarios install {{ item }}"
+  loop:
+    - crowdsecurity/docker-bf
+    - crowdsecurity/docker-escape
+  register: crowdsec_docker_scenario_install
+  changed_when: "'already installed' not in crowdsec_docker_scenario_install.stdout"
+  failed_when:
+    - crowdsec_docker_scenario_install.rc != 0
+    - "'already installed' not in crowdsec_docker_scenario_install.stdout"
+    - "'can\\'t find' not in crowdsec_docker_scenario_install.stderr"

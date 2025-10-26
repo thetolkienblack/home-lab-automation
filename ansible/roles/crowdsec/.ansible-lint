@@ -1,0 +1,13 @@
+---
+# Ansible Lint Configuration for CrowdSec Role
+
+# Skip list for specific rules
+skip_list:
+  - var-naming[no-role-prefix]  # Internal variables prefixed with _ are intentional
+
+# Warn list - these will show as warnings but won't fail
+warn_list:
+  - no-handler  # Some debug tasks run when changed for informational purposes
+
+# Allow internal variables with underscore prefix
+var_naming_pattern: "^(crowdsec_|_)[a-z0-9_]*$"

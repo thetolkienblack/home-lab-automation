@@ -1,0 +1,123 @@
+---
+# Automatic collection detection and installation
+
+- name: Detect running system services
+  ansible.builtin.service_facts:
+  when: crowdsec_auto_detect_collections | bool
+
+- name: Detect Docker containers (if Docker is running)
+  community.docker.docker_host_info:
+  register: crowdsec_docker_info
+  failed_when: false
+  when:
+    - crowdsec_auto_detect_collections | bool
+    - crowdsec_docker_enabled | bool
+
+- name: Get list of running containers
+  community.docker.docker_container_info:
+    name: "{{ item }}"
+  register: crowdsec_container_info
+  loop: "{{ crowdsec_docker_info.containers | default([]) | map(attribute='Names') | map('first') | list }}"
+  when:
+    - crowdsec_auto_detect_collections | bool
+    - crowdsec_docker_enabled | bool
+    - crowdsec_docker_info.containers is defined
+
+- name: Initialize detected collections list
+  ansible.builtin.set_fact:
+    crowdsec_detected_collections: []
+
+- name: Detect collections from system services
+  ansible.builtin.set_fact:
+    crowdsec_detected_collections: "{{ crowdsec_detected_collections + crowdsec_service_collections[item] }}"
+  loop: "{{ _crowdsec_system_services }}"
+  when:
+    - crowdsec_auto_detect_collections | bool
+    - ansible_facts.services is defined
+    - (item + '.service') in ansible_facts.services or item in ansible_facts.services
+
+- name: Detect collections from Docker containers
+  ansible.builtin.set_fact:
+    crowdsec_detected_collections: "{{ crowdsec_detected_collections + crowdsec_service_collections[service_name] }}"
+  loop: "{{ crowdsec_container_info.results | default([]) }}"
+  loop_control:
+    loop_var: container
+  vars:
+    container_name: "{{ container.container.Name | default('') | regex_replace('^/', '') }}"
+    service_name: "{{ container_name | regex_replace('[0-9]+$', '') | regex_replace('[-_]$', '') }}"
+  when:
+    - crowdsec_auto_detect_collections | bool
+    - crowdsec_docker_enabled | bool
+    - crowdsec_container_info.results is defined
+    - service_name in crowdsec_service_collections
+
+- name: Remove duplicates from detected collections
+  ansible.builtin.set_fact:
+    crowdsec_detected_collections: "{{ crowdsec_detected_collections | unique }}"
+
+- name: Display detected collections
+  ansible.builtin.debug:
+    msg: "Auto-detected collections: {{ crowdsec_detected_collections }}"
+  when:
+    - crowdsec_auto_detect_collections | bool
+    - crowdsec_detected_collections | length > 0
+
+- name: Install detected collections
+  ansible.builtin.command:
+    cmd: "{{ _cscli_binary }} collections install {{ item }}"
+  loop: "{{ crowdsec_detected_collections }}"
+  when:
+    - crowdsec_auto_detect_collections | bool
+    - crowdsec_detected_collections | length > 0
+  register: crowdsec_detected_collection_install
+  changed_when: "'already installed' not in detected_crowdsec_collection_install.stdout"
+  failed_when:
+    - detected_crowdsec_collection_install.rc != 0
+    - "'already installed' not in detected_crowdsec_collection_install.stdout"
+    - "'can\\'t find' not in detected_crowdsec_collection_install.stderr"
+
+- name: Detect and configure service-specific log sources
+  ansible.builtin.set_fact:
+    crowdsec_detected_log_sources: []
+
+- name: Add log sources for detected services
+  ansible.builtin.set_fact:
+    crowdsec_detected_log_sources: "{{ crowdsec_detected_log_sources + [{'source': item.key, 'filenames': item.value, 'labels': {'type': item.key}}] }}"
+  loop: "{{ _crowdsec_log_paths | dict2items }}"
+  when:
+    - crowdsec_auto_detect_collections | bool
+    - (item.key + '.service') in ansible_facts.services or item.key in ansible_facts.services
+
+- name: Check if detected log files exist
+  ansible.builtin.stat:
+    path: "{{ item.1 }}"
+  register: crowdsec_log_file_check
+  loop: "{{ crowdsec_detected_log_sources | subelements('filenames') }}"
+  when:
+    - crowdsec_auto_detect_collections | bool
+    - crowdsec_detected_log_sources | length > 0
+
+- name: Filter log sources to only existing files
+  ansible.builtin.set_fact:
+    crowdsec_validated_log_sources: >-
+      {{
+        crowdsec_validated_log_sources | default([]) + [{
+          'source': item.item.0.source,
+          'filenames': [item.item.1],
+          'labels': item.item.0.labels
+        }]
+      }}
+  loop: "{{ crowdsec_log_file_check.results | default([]) }}"
+  when:
+    - crowdsec_auto_detect_collections | bool
+    - item.stat is defined
+    - item.stat.exists
+
+- name: Merge detected log sources with custom log sources
+  ansible.builtin.set_fact:
+    crowdsec_final_log_sources: "{{ crowdsec_log_sources + crowdsec_custom_log_sources + (crowdsec_validated_log_sources | default([])) }}"
+
+- name: Display final log sources
+  ansible.builtin.debug:
+    msg: "Configured log sources: {{ crowdsec_final_log_sources | map(attribute='source') | list }}"
+  when: crowdsec_final_log_sources is defined

@@ -1,0 +1,41 @@
+# CrowdSec Kubernetes Helm Values
+# {{ ansible_managed }}
+
+{{ crowdsec_kubernetes_helm_values | to_nice_yaml }}
+
+# Additional CrowdSec LAPI configuration
+lapi:
+  env:
+    - name: ENROLL_KEY
+      value: "{{ crowdsec_console_enrollment_key }}"
+    - name: ENROLL_INSTANCE_NAME
+      value: "{{ crowdsec_agent_name }}"
+
+  persistentVolume:
+    config:
+      enabled: true
+      accessModes:
+        - ReadWriteOnce
+    data:
+      enabled: true
+      accessModes:
+        - ReadWriteOnce
+
+# Agent configuration
+agent:
+  acquisition:
+    - namespace: ""
+      podName: ""
+      program: ""
+
+  env:
+    - name: COLLECTIONS
+      value: "{{ (crowdsec_common_collections + crowdsec_additional_collections) | join(' ') }}"
+    - name: PARSERS
+      value: "{{ (crowdsec_common_parsers + crowdsec_additional_parsers) | join(' ') }}"
+
+# Metrics
+metrics:
+  enabled: {{ crowdsec_prometheus_enabled | lower }}
+  serviceMonitor:
+    enabled: {{ crowdsec_prometheus_enabled | lower }}

@@ -1,0 +1,353 @@
+---
+# CrowdSec Role Default Variables
+
+# =============================================================================
+# Deployment Mode
+# =============================================================================
+# Mode: 'lapi' for central LAPI server, 'agent' for agents, 'kubernetes' for Kubernetes
+crowdsec_mode: agent
+
+# =============================================================================
+# LAPI Server Configuration
+# =============================================================================
+# Central LAPI server hostname or IP (required for agents)
+crowdsec_lapi_server: ""
+crowdsec_lapi_port: 8080
+crowdsec_lapi_url: "http://{{ crowdsec_lapi_server }}:{{ crowdsec_lapi_port }}"
+
+# LAPI TLS Configuration
+crowdsec_lapi_tls_enabled: false
+crowdsec_lapi_tls_cert_path: "/etc/crowdsec/ssl/cert.pem"
+crowdsec_lapi_tls_key_path: "/etc/crowdsec/ssl/key.pem"
+
+# =============================================================================
+# Agent Enrollment
+# =============================================================================
+# Enrollment key for agents (can be pre-configured in vault or auto-generated)
+crowdsec_enrollment_key: ""
+crowdsec_auto_generate_enrollment_key: true
+
+# Agent name (defaults to hostname)
+crowdsec_agent_name: "{{ ansible_hostname }}"
+
+# =============================================================================
+# Database Configuration (LAPI only)
+# =============================================================================
+crowdsec_db_type: sqlite  # sqlite, mysql, postgresql
+crowdsec_db_path: /var/lib/crowdsec/data/crowdsec.db
+
+# PostgreSQL/MySQL settings (if applicable)
+crowdsec_db_host: localhost
+crowdsec_db_port: 5432  # 5432 for PostgreSQL, 3306 for MySQL
+crowdsec_db_name: crowdsec
+crowdsec_db_user: crowdsec
+crowdsec_db_password: ""  # Store in vault
+crowdsec_db_ssl_mode: disable
+
+# =============================================================================
+# Collections and Scenarios
+# =============================================================================
+# Auto-detect collections based on installed services
+crowdsec_auto_detect_collections: true
+
+# Common collections installed on all hosts
+crowdsec_common_collections:
+  - crowdsecurity/linux
+  - crowdsecurity/sshd
+  - crowdsecurity/base-http-scenarios
+
+# Additional collections (auto-detected or manually specified)
+crowdsec_additional_collections: []
+# Example manual configuration:
+# crowdsec_additional_collections:
+#   - crowdsecurity/traefik
+#   - crowdsecurity/nginx
+#   - crowdsecurity/apache2
+#   - crowdsecurity/postgresql
+#   - crowdsecurity/mysql
+#   - crowdsecurity/redis
+#   - crowdsecurity/docker
+
+# Collections for specific services (used for auto-detection)
+crowdsec_service_collections:
+  traefik:
+    - crowdsecurity/traefik
+  nginx:
+    - crowdsecurity/nginx
+  apache2:
+    - crowdsecurity/apache2
+  httpd:
+    - crowdsecurity/apache2
+  postgresql:
+    - crowdsecurity/postgresql
+  mysql:
+    - crowdsecurity/mysql
+  mariadb:
+    - crowdsecurity/mysql
+  redis:
+    - crowdsecurity/redis
+  docker:
+    - crowdsecurity/docker
+  plex:
+    - crowdsecurity/plex
+  adguard:
+    - crowdsecurity/adguardhome
+  adguardhome:
+    - crowdsecurity/adguardhome
+
+# =============================================================================
+# Parsers Configuration
+# =============================================================================
+# Auto-detect parsers based on log sources
+crowdsec_auto_detect_parsers: true
+
+# Common parsers installed on all hosts
+crowdsec_common_parsers:
+  - crowdsecurity/syslog-logs
+  - crowdsecurity/geoip-enrich
+
+# Additional parsers
+crowdsec_additional_parsers: []
+
+# =============================================================================
+# Docker Integration
+# =============================================================================
+# Enable Docker log parsing
+crowdsec_docker_enabled: true
+
+# Parse Docker daemon logs
+crowdsec_docker_daemon_logs: true
+crowdsec_docker_daemon_log_path: /var/log/docker.log
+
+# Parse all container logs via Docker socket
+crowdsec_docker_container_logs: true
+crowdsec_docker_socket: /var/run/docker.sock
+
+# Specific containers to monitor (empty = all)
+crowdsec_docker_monitored_containers: []
+
+# =============================================================================
+# AppSec Configuration
+# =============================================================================
+# Enable Application Security (WAF-like protection)
+crowdsec_appsec_enabled: true
+
+# AppSec rules
+crowdsec_appsec_collections:
+  - crowdsecurity/appsec-generic-rules
+  - crowdsecurity/appsec-virtual-patching
+  - crowdsecurity/appsec-crs
+
+# =============================================================================
+# Bouncers Configuration
+# =============================================================================
+# Bouncers to install (firewall-bouncer is mandatory for blocking)
+crowdsec_bouncers:
+  - name: firewall
+    enabled: true
+    package: crowdsec-firewall-bouncer
+  - name: blocklist
+    enabled: true
+    collections:
+      - crowdsecurity/blocklist-nets
+      - crowdsecurity/blocklist-net-seclists
+  - name: traefik
+    enabled: false
+    package: crowdsec-traefik-bouncer
+
+# Firewall bouncer configuration
+crowdsec_firewall_bouncer_mode: nftables  # iptables or nftables
+crowdsec_firewall_bouncer_default_action: DROP
+crowdsec_firewall_bouncer_deny_action: DROP
+crowdsec_firewall_bouncer_deny_log: true
+crowdsec_firewall_bouncer_supported_actions:
+  - ban
+  - unban
+
+# Traefik bouncer configuration
+crowdsec_traefik_bouncer_address: 0.0.0.0:8080
+crowdsec_traefik_bouncer_update_frequency: 10s
+
+# Bouncer API keys (auto-generated if not provided)
+crowdsec_bouncer_keys: {}
+# Example:
+# crowdsec_bouncer_keys:
+#   firewall: "your-api-key"
+#   traefik: "your-api-key"
+
+# =============================================================================
+# Notification Channels
+# =============================================================================
+crowdsec_notifications_enabled: true
+
+# Slack notifications
+crowdsec_slack_enabled: false
+crowdsec_slack_webhook_url: ""
+crowdsec_slack_channel: "#security"
+
+# Email notifications
+crowdsec_email_enabled: false
+crowdsec_email_smtp_host: localhost
+crowdsec_email_smtp_port: 25
+crowdsec_email_smtp_username: ""
+crowdsec_email_smtp_password: ""
+crowdsec_email_from: "crowdsec@{{ ansible_fqdn }}"
+crowdsec_email_to: []
+
+# Webhook notifications
+crowdsec_webhook_enabled: false
+crowdsec_webhook_url: ""
+crowdsec_webhook_method: POST
+
+# Custom notification profiles
+crowdsec_notification_profiles: []
+
+# =============================================================================
+# Log Acquisition
+# =============================================================================
+# System logs to monitor
+crowdsec_log_sources:
+  - source: syslog
+    labels:
+      type: syslog
+    filenames:
+      - /var/log/syslog
+      - /var/log/messages
+  - source: auth
+    labels:
+      type: syslog
+    filenames:
+      - /var/log/auth.log
+      - /var/log/secure
+
+# Additional custom log sources
+crowdsec_custom_log_sources: []
+
+# =============================================================================
+# CrowdSec Security Intelligence
+# =============================================================================
+# Enable CrowdSec Central API (CAPI) for threat intelligence
+crowdsec_capi_enabled: true
+
+# Register to CrowdSec console for enhanced features
+crowdsec_console_enabled: false
+crowdsec_console_enrollment_key: ""
+
+# =============================================================================
+# Kubernetes Configuration (K3s, K8s, EKS, GKE, AKS, etc.)
+# =============================================================================
+# Kubernetes deployment via Helm
+crowdsec_kubernetes_enabled: false
+crowdsec_kubernetes_namespace: crowdsec
+crowdsec_kubernetes_helm_repo: https://crowdsecurity.github.io/helm-charts
+crowdsec_kubernetes_helm_chart: crowdsec/crowdsec
+crowdsec_kubernetes_helm_version: latest
+crowdsec_kubernetes_create_namespace: true
+
+# Kubernetes Helm values
+crowdsec_kubernetes_helm_values:
+  lapi:
+    replicas: 1
+    persistentVolume:
+      enabled: true
+      size: 10Gi
+  agent:
+    enabled: true
+    acquisition:
+      - namespace: ""
+        podName: ""
+        program: ""
+
+# =============================================================================
+# Performance and Tuning
+# =============================================================================
+crowdsec_api_max_concurrency: 10
+crowdsec_api_max_retries: 3
+crowdsec_bucket_flush_interval: 10s
+crowdsec_max_parsers: 100
+
+# Prometheus metrics
+crowdsec_prometheus_enabled: true
+crowdsec_prometheus_port: 6060
+
+# =============================================================================
+# Security Settings
+# =============================================================================
+# Disable LAPI server on agents (security best practice)
+crowdsec_agent_disable_lapi: true
+
+# Enable online API for agents
+crowdsec_agent_enable_capi: true
+
+# Automatic ban duration
+crowdsec_ban_duration: 4h
+
+# Decision types
+crowdsec_decision_types:
+  - ban
+  - throttle
+
+# =============================================================================
+# Update and Maintenance
+# =============================================================================
+# Auto-update hub collections and scenarios
+crowdsec_auto_update_hub: true
+crowdsec_update_hub_interval: 24h
+
+# Enable automatic upgrades
+crowdsec_auto_upgrade: false
+
+# =============================================================================
+# Logging
+# =============================================================================
+crowdsec_log_level: info  # trace, debug, info, warning, error
+crowdsec_log_mode: file  # file, stdout
+crowdsec_log_dir: /var/log/crowdsec
+crowdsec_log_max_size: 100
+crowdsec_log_max_age: 30
+crowdsec_log_max_backups: 3
+crowdsec_log_compress: true
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+crowdsec_service_enabled: true
+crowdsec_service_state: started
+
+# =============================================================================
+# Firewall Configuration
+# =============================================================================
+# Allow CrowdSec LAPI port in firewall (for LAPI server)
+crowdsec_configure_firewall: true
+crowdsec_firewall_allowed_ips: []  # Empty = allow from anywhere (not recommended)
+# Example:
+# crowdsec_firewall_allowed_ips:
+#   - 192.168.1.0/24
+#   - 10.0.0.0/8
+
+# =============================================================================
+# Package Repository
+# =============================================================================
+crowdsec_repo_url_debian: https://packagecloud.io/crowdsec/crowdsec
+crowdsec_repo_url_redhat: https://packagecloud.io/crowdsec/crowdsec
+crowdsec_gpg_key_url: https://packagecloud.io/crowdsec/crowdsec/gpgkey
+
+# Package version (empty = latest)
+crowdsec_version: ""
+
+# =============================================================================
+# Blocklists Configuration
+# =============================================================================
+# Enable community blocklists
+crowdsec_blocklists_enabled: true
+
+# Blocklist update frequency
+crowdsec_blocklist_update_interval: 24h
+
+# Custom blocklists
+crowdsec_custom_blocklists: []
+# Example:
+# crowdsec_custom_blocklists:
+#   - name: "custom-blocklist"
+#     url: "https://example.com/blocklist.txt"
+#     type: "ip"

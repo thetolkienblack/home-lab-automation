@@ -1,0 +1,19 @@
+# CrowdSec Slack Notification Configuration
+# {{ ansible_managed }}
+
+type: slack
+name: slack_default
+log_level: info
+
+format: |
+  :warning: *CrowdSec Alert - {{ "{{" }} .MachineID {{ "}}" }}*
+
+  *Scenario:* {{ "{{" }} .Source.Scope {{ "}}" }} - {{ "{{" }} .Source.Value {{ "}}" }}
+  *Reason:* {{ "{{" }} .Scenario {{ "}}" }}
+  *Events Count:* {{ "{{" }} .Events | len {{ "}}" }}
+  *Decision:* {{ "{{" }} range .Decisions {{ "}}" }}{{ "{{" }} .Type {{ "}}" }} for {{ "{{" }} .Duration {{ "}}" }}{{ "{{" }} end {{ "}}" }}
+  *Started:* {{ "{{" }} .StartAt {{ "}}" }}
+  *Stopped:* {{ "{{" }} .StopAt {{ "}}" }}
+
+slack_webhook_url: {{ crowdsec_slack_webhook_url }}
+channel: "{{ crowdsec_slack_channel }}"

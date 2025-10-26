@@ -1,0 +1,71 @@
+---
+# Configure notification channels for CrowdSec
+
+- name: Ensure notifications directory exists
+  ansible.builtin.file:
+    path: "{{ _crowdsec_config_dir }}/notifications"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Configure Slack notifications
+  when: crowdsec_slack_enabled | bool and crowdsec_slack_webhook_url | length > 0
+  block:
+    - name: Create Slack notification configuration
+      ansible.builtin.template:
+        src: notifications/slack.yaml.j2
+        dest: "{{ _crowdsec_config_dir }}/notifications/slack.yaml"
+        owner: root
+        group: root
+        mode: '0600'
+      notify:
+        - Restart crowdsec
+
+- name: Configure email notifications
+  when: crowdsec_email_enabled | bool and crowdsec_email_to | length > 0
+  block:
+    - name: Create email notification configuration
+      ansible.builtin.template:
+        src: notifications/email.yaml.j2
+        dest: "{{ _crowdsec_config_dir }}/notifications/email.yaml"
+        owner: root
+        group: root
+        mode: '0600'
+      notify:
+        - Restart crowdsec
+
+- name: Configure webhook notifications
+  when: crowdsec_webhook_enabled | bool and crowdsec_webhook_url | length > 0
+  block:
+    - name: Create webhook notification configuration
+      ansible.builtin.template:
+        src: notifications/webhook.yaml.j2
+        dest: "{{ _crowdsec_config_dir }}/notifications/webhook.yaml"
+        owner: root
+        group: root
+        mode: '0600'
+      notify:
+        - Restart crowdsec
+
+- name: Configure custom notification profiles
+  when: crowdsec_notification_profiles | length > 0
+  block:
+    - name: Create custom notification profiles
+      ansible.builtin.template:
+        src: notifications/custom.yaml.j2
+        dest: "{{ _crowdsec_config_dir }}/notifications/{{ item.name }}.yaml"
+        owner: root
+        group: root
+        mode: '0600'
+      loop: "{{ crowdsec_notification_profiles }}"
+      notify:
+        - Restart crowdsec
+
+- name: Display notification configuration status
+  ansible.builtin.debug:
+    msg:
+      - "Slack notifications: {{ 'enabled' if crowdsec_slack_enabled else 'disabled' }}"
+      - "Email notifications: {{ 'enabled' if crowdsec_email_enabled else 'disabled' }}"
+      - "Webhook notifications: {{ 'enabled' if crowdsec_webhook_enabled else 'disabled' }}"
+      - "Custom profiles: {{ crowdsec_notification_profiles | length }}"

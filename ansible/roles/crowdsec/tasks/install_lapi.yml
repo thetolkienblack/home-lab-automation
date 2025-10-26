@@ -1,0 +1,180 @@
+---
+# Install and configure CrowdSec LAPI server
+
+- name: Ensure CrowdSec directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ _crowdsec_config_dir }}"
+    - "{{ _crowdsec_data_dir }}"
+    - "{{ _crowdsec_config_dir }}/bouncers"
+    - "{{ _crowdsec_config_dir }}/hub"
+    - "{{ _crowdsec_config_dir }}/notifications"
+    - "{{ crowdsec_log_dir }}"
+
+- name: Create CrowdSec TLS directory (if TLS enabled)
+  ansible.builtin.file:
+    path: "{{ _crowdsec_config_dir }}/ssl"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+  when: crowdsec_lapi_tls_enabled | bool
+
+- name: Configure database (PostgreSQL)
+  when: crowdsec_db_type == 'postgresql'
+  block:
+    - name: Install PostgreSQL client
+      ansible.builtin.package:
+        name:
+          - "{{ 'postgresql-client' if ansible_os_family == 'Debian' else 'postgresql' }}"
+        state: present
+
+    - name: Create database
+      community.postgresql.postgresql_db:
+        name: "{{ crowdsec_db_name }}"
+        state: present
+      delegate_to: "{{ crowdsec_db_host }}"
+      when: crowdsec_db_host == 'localhost'
+
+    - name: Create database user
+      community.postgresql.postgresql_user:
+        name: "{{ crowdsec_db_user }}"
+        password: "{{ crowdsec_db_password }}"
+        db: "{{ crowdsec_db_name }}"
+        priv: ALL
+        state: present
+      delegate_to: "{{ crowdsec_db_host }}"
+      when: crowdsec_db_host == 'localhost'
+
+- name: Configure database (MySQL/MariaDB)
+  when: crowdsec_db_type == 'mysql'
+  block:
+    - name: Install MySQL client
+      ansible.builtin.package:
+        name:
+          - "{{ 'default-mysql-client' if ansible_os_family == 'Debian' else 'mysql' }}"
+        state: present
+
+    - name: Create database
+      community.mysql.mysql_db:
+        name: "{{ crowdsec_db_name }}"
+        state: present
+      delegate_to: "{{ crowdsec_db_host }}"
+      when: crowdsec_db_host == 'localhost'
+
+    - name: Create database user
+      community.mysql.mysql_user:
+        name: "{{ crowdsec_db_user }}"
+        password: "{{ crowdsec_db_password }}"
+        priv: "{{ crowdsec_db_name }}.*:ALL"
+        state: present
+      delegate_to: "{{ crowdsec_db_host }}"
+      when: crowdsec_db_host == 'localhost'
+
+- name: Generate CrowdSec config for LAPI
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ _crowdsec_config_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart crowdsec
+
+- name: Generate acquisition configuration
+  ansible.builtin.template:
+    src: acquis.yaml.j2
+    dest: "{{ _crowdsec_acquis_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart crowdsec
+
+- name: Generate profiles configuration
+  ansible.builtin.template:
+    src: profiles.yaml.j2
+    dest: "{{ _crowdsec_profiles_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart crowdsec
+
+- name: Initialize LAPI server
+  ansible.builtin.command:
+    cmd: "{{ _cscli_binary }} machines add {{ crowdsec_agent_name }}-lapi --auto"
+  register: crowdsec_lapi_init
+  changed_when: "'already exists' not in crowdsec_lapi_init.stderr"
+  failed_when:
+    - crowdsec_lapi_init.rc != 0
+    - "'already exists' not in crowdsec_lapi_init.stderr"
+
+- name: Update CrowdSec hub
+  ansible.builtin.command:
+    cmd: "{{ _cscli_binary }} hub update"
+  changed_when: true
+  tags:
+    - crowdsec_hub
+
+- name: Register to CrowdSec console (if enabled)
+  ansible.builtin.command:
+    cmd: "{{ _cscli_binary }} console enroll {{ crowdsec_console_enrollment_key }}"
+  when:
+    - crowdsec_console_enabled | bool
+    - crowdsec_console_enrollment_key | length > 0
+  register: crowdsec_console_enroll
+  changed_when: "'already enrolled' not in crowdsec_console_enroll.stdout"
+  failed_when:
+    - crowdsec_console_enroll.rc != 0
+    - "'already enrolled' not in crowdsec_console_enroll.stdout"
+
+- name: Generate enrollment keys for agents
+  when: crowdsec_auto_generate_enrollment_key | bool and (crowdsec_enrollment_key | length == 0)
+  block:
+    - name: Create papi key for agent enrollment
+      ansible.builtin.command:
+        cmd: "{{ _cscli_binary }} papi key create --name agent-enrollment-{{ ansible_date_time.epoch }}"
+      register: crowdsec_enrollment_key_output
+      changed_when: true
+
+    - name: Extract enrollment key
+      ansible.builtin.set_fact:
+        crowdsec_enrollment_key: "{{ crowdsec_enrollment_key_output.stdout_lines[-1] | regex_search('Key: (.+)', '\\1') | first }}"
+      when: crowdsec_enrollment_key_output.stdout_lines is defined
+
+    - name: Display enrollment key
+      ansible.builtin.debug:
+        msg: "Generated enrollment key: {{ crowdsec_enrollment_key }}"
+
+- name: Configure LAPI firewall port
+  when: crowdsec_configure_firewall | bool
+  block:
+    - name: Allow LAPI port through firewall (UFW - Debian)
+      community.general.ufw:
+        rule: allow
+        port: "{{ crowdsec_lapi_port }}"
+        proto: tcp
+        from_ip: "{{ item }}"
+      loop: "{{ crowdsec_firewall_allowed_ips }}"
+      when:
+        - ansible_os_family == 'Debian'
+        - crowdsec_firewall_allowed_ips | length > 0
+
+    - name: Allow LAPI port through firewall (firewalld - RHEL)
+      ansible.posix.firewalld:
+        port: "{{ crowdsec_lapi_port }}/tcp"
+        permanent: true
+        state: enabled
+        source: "{{ item }}"
+      loop: "{{ crowdsec_firewall_allowed_ips }}"
+      when:
+        - ansible_os_family == 'RedHat'
+        - crowdsec_firewall_allowed_ips | length > 0
+      notify:
+        - Reload systemd

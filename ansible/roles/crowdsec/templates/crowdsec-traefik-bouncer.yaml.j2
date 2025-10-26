@@ -1,0 +1,14 @@
+# CrowdSec Traefik Bouncer Configuration
+# {{ ansible_managed }}
+
+crowdsec_lapi_url: {{ crowdsec_lapi_url }}
+crowdsec_lapi_key: {{ crowdsec_traefik_bouncer_api_key | default('') }}
+crowdsec_update_frequency: {{ crowdsec_traefik_bouncer_update_frequency }}
+port: {{ crowdsec_traefik_bouncer_address.split(':')[1] }}
+log_level: info
+log_mode: file
+log_dir: /var/log/
+log_max_size: 100
+log_max_backups: 3
+log_max_age: 30
+compress_logs: true
