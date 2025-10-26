@@ -2,6 +2,18 @@
 
 Comprehensive Ansible automation framework for managing home lab and production infrastructure with a security-first approach. Supports multi-OS environments (Debian/Ubuntu, RHEL/CentOS) with playbooks for system configuration, security hardening, networking, and virtualization.
 
+## Recent Updates
+
+**Community Role Migration (2025):**
+Five custom roles have been replaced with well-maintained community alternatives to reduce maintenance burden while maintaining all functionality:
+- Docker → [geerlingguy.docker](https://galaxy.ansible.com/geerlingguy/docker) (v7.5.3) with enhanced security hardening
+- NTP → [linux-system-roles.timesync](https://galaxy.ansible.com/linux-system-roles/timesync) (v1.11.0, Red Hat certified)
+- Tailscale → [artis3n.tailscale](https://galaxy.ansible.com/artis3n/tailscale) (v5.0.1)
+- NFS → [geerlingguy.nfs](https://galaxy.ansible.com/geerlingguy/nfs) (v2.1.0)
+- k3s → [xanmanning.k3s](https://galaxy.ansible.com/xanmanning/k3s) (v3.3.0)
+
+Original custom roles are preserved in `roles/.archived/` for reference.
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)
@@ -95,13 +107,21 @@ ansible/
 │   ├── system/           # System templates
 │   ├── security/         # Security templates
 │   └── virt/             # Virtualization templates
-├── roles/                # Custom Ansible roles
+├── roles/                # Ansible roles
+│   ├── .archived/        # Archived custom roles (replaced by community roles)
+│   │   ├── docker/       # Replaced by geerlingguy.docker
+│   │   ├── ntp/          # Replaced by linux-system-roles.timesync
+│   │   ├── tailscale/    # Replaced by artis3n.tailscale
+│   │   ├── nfs/          # Replaced by geerlingguy.nfs
+│   │   └── k3s/          # Replaced by xanmanning.k3s
 │   ├── proxmox/          # Proxmox VE role
 │   ├── common/           # Common tasks
-│   ├── docker/           # Docker setup
-│   ├── ntp/              # NTP configuration
 │   ├── security_hardening/ # Security hardening
-│   └── tailscale/        # Tailscale VPN
+│   ├── geerlingguy.docker/      # Community Docker role
+│   ├── linux-system-roles.timesync/ # Community NTP role
+│   ├── artis3n.tailscale/       # Community Tailscale role
+│   ├── geerlingguy.nfs/         # Community NFS role
+│   └── xanmanning.k3s/          # Community k3s role
 └── ansible.cfg           # Ansible configuration
 ```
 
@@ -109,11 +129,25 @@ ansible/
 
 ## Available Roles
 
-### Infrastructure Roles
+### Infrastructure Roles (Community)
+- **geerlingguy.docker** (v7.5.3) - Docker installation and management
+  - Replaces custom docker role
+  - Extended with security hardening (userns-remap, no-new-privileges, etc.)
+- **linux-system-roles.timesync** (v1.11.0) - NTP time synchronization
+  - Replaces custom ntp role
+  - Red Hat certified role with chrony/ntp/timesyncd support
+- **artis3n.tailscale** (v5.0.1) - Tailscale VPN setup and configuration
+  - Replaces custom tailscale role
+  - Most popular Tailscale role with OAuth2 support
+- **geerlingguy.nfs** (v2.1.0) - NFS server/client configuration
+  - Replaces custom nfs role
+  - Battle-tested role with 7.7M downloads
+- **xanmanning.k3s** (v3.3.0) - K3s Kubernetes cluster deployment
+  - Replaces custom k3s role
+  - Official-like role from PyratLabs
+
+### Infrastructure Roles (Custom)
 - **common** - Common system configuration and utilities
-- **docker** - Docker installation and management
-- **ntp** - NTP time synchronization configuration
-- **tailscale** - Tailscale VPN setup and configuration
 
 ### Security Roles
 - **security_hardening** - Comprehensive system security hardening
