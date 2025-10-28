@@ -1,0 +1,27 @@
+# {{ ansible_managed }}
+# Prometheus Alert Rules
+
+groups:
+  - name: prometheus_alerts
+    interval: {{ prometheus_global_evaluation_interval }}
+    rules:
+{% for rule in prometheus_alert_rules %}
+      - alert: {{ rule.alert }}
+        expr: {{ rule.expr }}
+{% if rule.for is defined %}
+        for: {{ rule.for }}
+{% endif %}
+{% if rule.labels is defined %}
+        labels:
+{% for label, value in rule.labels.items() %}
+          {{ label }}: {{ value }}
+{% endfor %}
+{% endif %}
+{% if rule.annotations is defined %}
+        annotations:
+{% for annotation, value in rule.annotations.items() %}
+          {{ annotation }}: {{ value | replace('"', '\\"') }}
+{% endfor %}
+{% endif %}
+
+{% endfor %}

@@ -1,0 +1,79 @@
+---
+# Playbook for deploying Alertmanager only
+# This playbook deploys only the Alertmanager service
+#
+# Usage:
+#   ansible-playbook -i inventories/production playbooks/monitoring/alertmanager.yml
+#   ansible-playbook -i inventories/production playbooks/monitoring/alertmanager.yml --tags alertmanager
+#
+# Variables can be overridden in inventory or with --extra-vars:
+#   ansible-playbook ... --extra-vars "alertmanager_web_listen_address=0.0.0.0:9093"
+
+- name: Deploy Alertmanager
+  hosts: alertmanager_servers
+  become: true
+  gather_facts: true
+
+  vars:
+    # Install only Alertmanager
+    prometheus_stack_install_prometheus: false
+    prometheus_stack_install_alertmanager: true
+    prometheus_stack_install_node_exporter: false
+    prometheus_stack_install_blackbox_exporter: false
+
+    # Alertmanager-specific configuration
+    alertmanager_web_listen_address: "0.0.0.0:9093"
+    alertmanager_cluster_listen_address: "0.0.0.0:9094"
+
+  pre_tasks:
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg:
+          - "Deploying Alertmanager to: {{ inventory_hostname }}"
+          - "OS Family: {{ ansible_os_family }}"
+          - "Web Listen Address: {{ alertmanager_web_listen_address }}"
+          - "Cluster Listen Address: {{ alertmanager_cluster_listen_address }}"
+
+    - name: Validate host requirements
+      ansible.builtin.assert:
+        that:
+          - ansible_os_family in ['Debian', 'RedHat']
+          - ansible_service_mgr == 'systemd'
+        fail_msg: "Host does not meet requirements (Debian/RedHat with systemd)"
+
+    - name: Validate Alertmanager configuration
+      ansible.builtin.assert:
+        that:
+          - alertmanager_receivers is defined
+          - alertmanager_receivers | length > 0
+        fail_msg: "At least one Alertmanager receiver must be configured"
+
+  roles:
+    - role: prometheus_stack
+      tags:
+        - alertmanager
+        - monitoring
+
+  post_tasks:
+    - name: Display Alertmanager access information
+      ansible.builtin.debug:
+        msg:
+          - "Alertmanager has been successfully deployed!"
+          - "Web UI: http://{{ ansible_default_ipv4.address }}:{{ alertmanager_web_listen_address.split(':')[1] | default('9093') }}"
+          - "Configuration: {{ alertmanager_config_dir }}/alertmanager.yml"
+          - "Templates: {{ alertmanager_config_dir }}/templates/"
+          - "Data Directory: {{ alertmanager_db_dir }}"
+
+    - name: Wait for Alertmanager to be accessible
+      ansible.builtin.uri:
+        url: "http://localhost:{{ alertmanager_web_listen_address.split(':')[1] | default('9093') }}/-/ready"
+        method: GET
+        status_code: 200
+      retries: 10
+      delay: 5
+      register: alertmanager_ready
+      until: alertmanager_ready.status == 200
+
+    - name: Display success message
+      ansible.builtin.debug:
+        msg: "Alertmanager is ready and accepting connections!"

@@ -1,0 +1,21 @@
+---
+# RedHat family specific variables
+
+# Package names
+prometheus_package: prometheus
+alertmanager_package: alertmanager
+node_exporter_package: node_exporter
+blackbox_exporter_package: blackbox_exporter
+
+# Firewall service
+firewall_service: firewalld
+
+# System paths
+prometheus_system_user: prometheus
+prometheus_system_group: prometheus
+alertmanager_system_user: alertmanager
+alertmanager_system_group: alertmanager
+node_exporter_system_user: node_exporter
+node_exporter_system_group: node_exporter
+blackbox_exporter_system_user: blackbox_exporter
+blackbox_exporter_system_group: blackbox_exporter

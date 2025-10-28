@@ -1,0 +1,41 @@
+---
+galaxy_info:
+  author: Sidney
+  description: Complete Prometheus monitoring stack with Alertmanager, Node Exporter, and Blackbox Exporter
+  company: Home Lab
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+    - name: Debian
+      versions:
+        - bookworm
+        - trixie
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - monitoring
+    - prometheus
+    - alertmanager
+    - metrics
+    - observability
+    - nodeexporter
+    - blackboxexporter
+
+dependencies:
+  - role: prometheus.prometheus.prometheus
+    when: prometheus_stack_install_prometheus | bool
+  - role: prometheus.prometheus.alertmanager
+    when: prometheus_stack_install_alertmanager | bool
+  - role: prometheus.prometheus.node_exporter
+    when: prometheus_stack_install_node_exporter | bool
+  - role: prometheus.prometheus.blackbox_exporter
+    when: prometheus_stack_install_blackbox_exporter | bool
+
+collections:
+  - prometheus.prometheus
+  - community.crypto
+  - ansible.posix

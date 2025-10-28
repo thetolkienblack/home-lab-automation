@@ -1,0 +1,204 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Verify Prometheus service is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['prometheus.service'] is defined
+          - ansible_facts.services['prometheus.service'].state == 'running'
+        fail_msg: "Prometheus service is not running"
+        success_msg: "Prometheus service is running"
+
+    - name: Verify Alertmanager service is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['alertmanager.service'] is defined
+          - ansible_facts.services['alertmanager.service'].state == 'running'
+        fail_msg: "Alertmanager service is not running"
+        success_msg: "Alertmanager service is running"
+
+    - name: Verify Node Exporter service is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['node_exporter.service'] is defined
+          - ansible_facts.services['node_exporter.service'].state == 'running'
+        fail_msg: "Node Exporter service is not running"
+        success_msg: "Node Exporter service is running"
+
+    - name: Verify Blackbox Exporter service is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['blackbox_exporter.service'] is defined
+          - ansible_facts.services['blackbox_exporter.service'].state == 'running'
+        fail_msg: "Blackbox Exporter service is not running"
+        success_msg: "Blackbox Exporter service is running"
+
+    - name: Check Prometheus is responding on HTTP
+      ansible.builtin.uri:
+        url: http://localhost:9090/-/ready
+        method: GET
+        status_code: 200
+      retries: 5
+      delay: 5
+      register: prometheus_http_check
+      until: prometheus_http_check.status == 200
+
+    - name: Check Alertmanager is responding on HTTP
+      ansible.builtin.uri:
+        url: http://localhost:9093/-/ready
+        method: GET
+        status_code: 200
+      retries: 5
+      delay: 5
+      register: alertmanager_http_check
+      until: alertmanager_http_check.status == 200
+
+    - name: Check Node Exporter metrics endpoint
+      ansible.builtin.uri:
+        url: http://localhost:9100/metrics
+        method: GET
+        status_code: 200
+      retries: 3
+      delay: 3
+      register: node_exporter_http_check
+      until: node_exporter_http_check.status == 200
+
+    - name: Verify Node Exporter returns metrics
+      ansible.builtin.assert:
+        that:
+          - "'node_' in node_exporter_http_check.content"
+        fail_msg: "Node Exporter is not returning valid metrics"
+        success_msg: "Node Exporter is returning valid metrics"
+
+    - name: Check Blackbox Exporter metrics endpoint
+      ansible.builtin.uri:
+        url: http://localhost:9115/metrics
+        method: GET
+        status_code: 200
+      retries: 3
+      delay: 3
+      register: blackbox_exporter_http_check
+      until: blackbox_exporter_http_check.status == 200
+
+    - name: Verify Blackbox Exporter returns metrics
+      ansible.builtin.assert:
+        that:
+          - "'blackbox_' in blackbox_exporter_http_check.content"
+        fail_msg: "Blackbox Exporter is not returning valid metrics"
+        success_msg: "Blackbox Exporter is returning valid metrics"
+
+    - name: Verify Prometheus configuration file exists
+      ansible.builtin.stat:
+        path: /etc/prometheus/prometheus.yml
+      register: prometheus_config
+
+    - name: Assert Prometheus configuration exists
+      ansible.builtin.assert:
+        that:
+          - prometheus_config.stat.exists
+          - prometheus_config.stat.isreg
+        fail_msg: "Prometheus configuration file does not exist"
+        success_msg: "Prometheus configuration file exists"
+
+    - name: Verify Alertmanager configuration file exists
+      ansible.builtin.stat:
+        path: /etc/alertmanager/alertmanager.yml
+      register: alertmanager_config
+
+    - name: Assert Alertmanager configuration exists
+      ansible.builtin.assert:
+        that:
+          - alertmanager_config.stat.exists
+          - alertmanager_config.stat.isreg
+        fail_msg: "Alertmanager configuration file does not exist"
+        success_msg: "Alertmanager configuration file exists"
+
+    - name: Verify Blackbox Exporter configuration file exists
+      ansible.builtin.stat:
+        path: /etc/blackbox_exporter/blackbox.yml
+      register: blackbox_config
+
+    - name: Assert Blackbox Exporter configuration exists
+      ansible.builtin.assert:
+        that:
+          - blackbox_config.stat.exists
+          - blackbox_config.stat.isreg
+        fail_msg: "Blackbox Exporter configuration file does not exist"
+        success_msg: "Blackbox Exporter configuration file exists"
+
+    - name: Verify alert rules file exists
+      ansible.builtin.stat:
+        path: /etc/prometheus/rules/alerts.yml
+      register: alert_rules
+
+    - name: Assert alert rules file exists
+      ansible.builtin.assert:
+        that:
+          - alert_rules.stat.exists
+          - alert_rules.stat.isreg
+        fail_msg: "Alert rules file does not exist"
+        success_msg: "Alert rules file exists"
+
+    - name: Check Prometheus targets
+      ansible.builtin.uri:
+        url: http://localhost:9090/api/v1/targets
+        method: GET
+        status_code: 200
+        return_content: true
+      register: prometheus_targets
+
+    - name: Verify Prometheus is scraping targets
+      ansible.builtin.assert:
+        that:
+          - prometheus_targets.json.data.activeTargets | length > 0
+        fail_msg: "Prometheus has no active targets"
+        success_msg: "Prometheus has {{ prometheus_targets.json.data.activeTargets | length }} active target(s)"
+
+    - name: Check Prometheus configuration status
+      ansible.builtin.uri:
+        url: http://localhost:9090/api/v1/status/config
+        method: GET
+        status_code: 200
+        return_content: true
+      register: prometheus_config_status
+
+    - name: Verify Prometheus configuration is loaded
+      ansible.builtin.assert:
+        that:
+          - prometheus_config_status.json.status == 'success'
+        fail_msg: "Prometheus configuration is not loaded successfully"
+        success_msg: "Prometheus configuration is loaded successfully"
+
+    - name: Check Alertmanager status
+      ansible.builtin.uri:
+        url: http://localhost:9093/api/v2/status
+        method: GET
+        status_code: 200
+        return_content: true
+      register: alertmanager_status
+
+    - name: Verify Alertmanager cluster status
+      ansible.builtin.assert:
+        that:
+          - alertmanager_status.json.cluster is defined
+        fail_msg: "Alertmanager cluster status is not available"
+        success_msg: "Alertmanager cluster status is available"
+
+    - name: Display verification summary
+      ansible.builtin.debug:
+        msg:
+          - "=== Prometheus Stack Verification Summary ==="
+          - "Prometheus: RUNNING ({{ prometheus_http_check.status }})"
+          - "Alertmanager: RUNNING ({{ alertmanager_http_check.status }})"
+          - "Node Exporter: RUNNING ({{ node_exporter_http_check.status }})"
+          - "Blackbox Exporter: RUNNING ({{ blackbox_exporter_http_check.status }})"
+          - "Active Targets: {{ prometheus_targets.json.data.activeTargets | length }}"
+          - "Configuration Status: {{ prometheus_config_status.json.status | upper }}"
+          - "=== All Checks Passed ==="

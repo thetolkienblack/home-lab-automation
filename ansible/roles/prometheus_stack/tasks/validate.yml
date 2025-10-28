@@ -1,0 +1,50 @@
+---
+# Validation tasks
+
+- name: Validate OS family
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family in ['Debian', 'RedHat']
+    fail_msg: "This role only supports Debian and RedHat family operating systems"
+    success_msg: "OS family {{ ansible_os_family }} is supported"
+
+- name: Validate retention settings
+  ansible.builtin.assert:
+    that:
+      - prometheus_storage_retention is defined
+      - prometheus_storage_retention | length > 0
+    fail_msg: "prometheus_storage_retention must be defined"
+    success_msg: "Retention settings are valid"
+  when: prometheus_stack_install_prometheus | bool
+
+- name: Validate Alertmanager receivers
+  ansible.builtin.assert:
+    that:
+      - alertmanager_receivers is defined
+      - alertmanager_receivers | length > 0
+    fail_msg: "At least one alertmanager receiver must be defined"
+    success_msg: "Alertmanager receivers are configured"
+  when: prometheus_stack_install_alertmanager | bool
+
+- name: Validate TLS configuration
+  ansible.builtin.assert:
+    that:
+      - prometheus_stack_tls_server_config.cert_file is defined
+      - prometheus_stack_tls_server_config.key_file is defined
+    fail_msg: "TLS cert_file and key_file must be defined when TLS is enabled"
+    success_msg: "TLS configuration is valid"
+  when: prometheus_stack_enable_tls | bool
+
+- name: Check if promtool is available
+  ansible.builtin.command: which promtool
+  register: promtool_check
+  changed_when: false
+  failed_when: false
+  when: prometheus_stack_install_prometheus | bool
+
+- name: Warn if promtool not found
+  ansible.builtin.debug:
+    msg: "WARNING: promtool not found. Configuration validation will be skipped."
+  when:
+    - prometheus_stack_install_prometheus | bool
+    - promtool_check.rc != 0

@@ -1,0 +1,31 @@
+---
+- name: Prepare
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Install required packages for Debian
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - python3-pip
+        state: present
+        update_cache: true
+      when: ansible_os_family == 'Debian'
+
+    - name: Install required packages for RedHat
+      ansible.builtin.dnf:
+        name:
+          - ca-certificates
+          - gnupg2
+          - python3-pip
+        state: present
+      when: ansible_os_family == 'RedHat'
+
+    - name: Install Python dependencies
+      ansible.builtin.pip:
+        name:
+          - jmespath
+        state: present

@@ -1,0 +1,159 @@
+---
+# Main tasks file for prometheus_stack role
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+  tags:
+    - always
+
+- name: Validate configuration
+  ansible.builtin.include_tasks: validate.yml
+  tags:
+    - always
+
+- name: Create Prometheus directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+  loop:
+    - "{{ prometheus_config_dir }}"
+    - "{{ prometheus_config_dir }}/rules"
+    - "{{ prometheus_config_dir }}/file_sd"
+    - "{{ prometheus_db_dir }}"
+  when: prometheus_stack_install_prometheus | bool
+  tags:
+    - prometheus
+    - config
+
+- name: Create Alertmanager directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: alertmanager
+    group: alertmanager
+  loop:
+    - "{{ alertmanager_config_dir }}"
+    - "{{ alertmanager_config_dir }}/templates"
+    - "{{ alertmanager_db_dir }}"
+  when: prometheus_stack_install_alertmanager | bool
+  tags:
+    - alertmanager
+    - config
+
+- name: Create Node Exporter directories
+  ansible.builtin.file:
+    path: "{{ node_exporter_textfile_dir }}"
+    state: directory
+    mode: '0755'
+    owner: node_exporter
+    group: node_exporter
+  when: prometheus_stack_install_node_exporter | bool
+  tags:
+    - node_exporter
+
+- name: Create Blackbox Exporter directories
+  ansible.builtin.file:
+    path: "{{ blackbox_exporter_config_dir }}"
+    state: directory
+    mode: '0755'
+    owner: blackbox_exporter
+    group: blackbox_exporter
+  when: prometheus_stack_install_blackbox_exporter | bool
+  tags:
+    - blackbox_exporter
+
+- name: Configure TLS
+  ansible.builtin.include_tasks: tls.yml
+  when: prometheus_stack_enable_tls | bool
+  tags:
+    - tls
+    - security
+
+- name: Deploy Prometheus configuration
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ prometheus_config_dir }}/prometheus.yml"
+    owner: prometheus
+    group: prometheus
+    mode: '0644'
+    validate: promtool check config %s
+  when: prometheus_stack_install_prometheus | bool
+  notify: Reload prometheus
+  tags:
+    - prometheus
+    - config
+
+- name: Deploy Prometheus alert rules
+  ansible.builtin.template:
+    src: alerts.yml.j2
+    dest: "{{ prometheus_config_dir }}/rules/alerts.yml"
+    owner: prometheus
+    group: prometheus
+    mode: '0644'
+    validate: promtool check rules %s
+  when:
+    - prometheus_stack_install_prometheus | bool
+    - prometheus_alert_rules_enabled | bool
+  notify: Reload prometheus
+  tags:
+    - prometheus
+    - config
+    - alerts
+
+- name: Deploy Alertmanager configuration
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ alertmanager_config_dir }}/alertmanager.yml"
+    owner: alertmanager
+    group: alertmanager
+    mode: '0644'
+  when: prometheus_stack_install_alertmanager | bool
+  notify: Reload alertmanager
+  tags:
+    - alertmanager
+    - config
+
+- name: Deploy Alertmanager notification templates
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "{{ alertmanager_config_dir }}/templates/{{ item | basename | regex_replace('\\.j2$', '') }}"
+    owner: alertmanager
+    group: alertmanager
+    mode: '0644'
+  with_fileglob:
+    - "templates/alertmanager/*.j2"
+  when: prometheus_stack_install_alertmanager | bool
+  notify: Reload alertmanager
+  tags:
+    - alertmanager
+    - config
+
+- name: Deploy Blackbox Exporter configuration
+  ansible.builtin.template:
+    src: blackbox.yml.j2
+    dest: "{{ blackbox_exporter_config_dir }}/blackbox.yml"
+    owner: blackbox_exporter
+    group: blackbox_exporter
+    mode: '0644'
+  when: prometheus_stack_install_blackbox_exporter | bool
+  notify: Restart blackbox_exporter
+  tags:
+    - blackbox_exporter
+    - config
+
+- name: Configure firewall
+  ansible.builtin.include_tasks: firewall.yml
+  when: prometheus_stack_configure_firewall | bool
+  tags:
+    - firewall
+    - security
+
+- name: Verify Prometheus stack services
+  ansible.builtin.include_tasks: verify.yml
+  tags:
+    - verify
+    - testing

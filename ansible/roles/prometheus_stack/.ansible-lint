@@ -1,0 +1,9 @@
+---
+# ansible-lint configuration for prometheus_stack role
+# This role wraps prometheus.prometheus community roles and must use their variable names
+
+skip_list:
+  - var-naming[no-role-prefix]  # Community roles require specific variable names without prefix
+
+warn_list:
+  - experimental
