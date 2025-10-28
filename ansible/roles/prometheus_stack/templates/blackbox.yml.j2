@@ -1,0 +1,184 @@
+# {{ ansible_managed }}
+# Blackbox Exporter Configuration File
+
+modules:
+{% for module_name, module_config in blackbox_exporter_modules.items() %}
+  {{ module_name }}:
+    prober: {{ module_config.prober }}
+{% if module_config.timeout is defined %}
+    timeout: {{ module_config.timeout }}
+{% endif %}
+{% if module_config.http is defined %}
+    http:
+{% if module_config.http.valid_http_versions is defined %}
+      valid_http_versions: {{ module_config.http.valid_http_versions | to_json }}
+{% endif %}
+{% if module_config.http.valid_status_codes is defined %}
+      valid_status_codes: {{ module_config.http.valid_status_codes | to_json }}
+{% endif %}
+{% if module_config.http.method is defined %}
+      method: {{ module_config.http.method }}
+{% endif %}
+{% if module_config.http.headers is defined %}
+      headers:
+{% for header, value in module_config.http.headers.items() %}
+        {{ header }}: {{ value }}
+{% endfor %}
+{% endif %}
+{% if module_config.http.no_follow_redirects is defined %}
+      no_follow_redirects: {{ module_config.http.no_follow_redirects | lower }}
+{% endif %}
+{% if module_config.http.fail_if_ssl is defined %}
+      fail_if_ssl: {{ module_config.http.fail_if_ssl | lower }}
+{% endif %}
+{% if module_config.http.fail_if_not_ssl is defined %}
+      fail_if_not_ssl: {{ module_config.http.fail_if_not_ssl | lower }}
+{% endif %}
+{% if module_config.http.fail_if_body_matches_regexp is defined %}
+      fail_if_body_matches_regexp: {{ module_config.http.fail_if_body_matches_regexp | to_json }}
+{% endif %}
+{% if module_config.http.fail_if_body_not_matches_regexp is defined %}
+      fail_if_body_not_matches_regexp: {{ module_config.http.fail_if_body_not_matches_regexp | to_json }}
+{% endif %}
+{% if module_config.http.fail_if_header_matches is defined %}
+      fail_if_header_matches:
+{% for header_match in module_config.http.fail_if_header_matches %}
+        - header: {{ header_match.header }}
+          regexp: {{ header_match.regexp }}
+{% if header_match.allow_missing is defined %}
+          allow_missing: {{ header_match.allow_missing | lower }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if module_config.http.fail_if_header_not_matches is defined %}
+      fail_if_header_not_matches:
+{% for header_match in module_config.http.fail_if_header_not_matches %}
+        - header: {{ header_match.header }}
+          regexp: {{ header_match.regexp }}
+{% if header_match.allow_missing is defined %}
+          allow_missing: {{ header_match.allow_missing | lower }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if module_config.http.tls_config is defined %}
+      tls_config:
+{% if module_config.http.tls_config.insecure_skip_verify is defined %}
+        insecure_skip_verify: {{ module_config.http.tls_config.insecure_skip_verify | lower }}
+{% endif %}
+{% if module_config.http.tls_config.ca_file is defined %}
+        ca_file: {{ module_config.http.tls_config.ca_file }}
+{% endif %}
+{% if module_config.http.tls_config.cert_file is defined %}
+        cert_file: {{ module_config.http.tls_config.cert_file }}
+{% endif %}
+{% if module_config.http.tls_config.key_file is defined %}
+        key_file: {{ module_config.http.tls_config.key_file }}
+{% endif %}
+{% endif %}
+{% if module_config.http.preferred_ip_protocol is defined %}
+      preferred_ip_protocol: {{ module_config.http.preferred_ip_protocol }}
+{% endif %}
+{% if module_config.http.ip_protocol_fallback is defined %}
+      ip_protocol_fallback: {{ module_config.http.ip_protocol_fallback | lower }}
+{% endif %}
+{% if module_config.http.body is defined %}
+      body: {{ module_config.http.body }}
+{% endif %}
+{% if module_config.http.basic_auth is defined %}
+      basic_auth:
+        username: {{ module_config.http.basic_auth.username }}
+        password: {{ module_config.http.basic_auth.password }}
+{% endif %}
+{% if module_config.http.bearer_token is defined %}
+      bearer_token: {{ module_config.http.bearer_token }}
+{% endif %}
+{% if module_config.http.proxy_url is defined %}
+      proxy_url: {{ module_config.http.proxy_url }}
+{% endif %}
+{% endif %}
+{% if module_config.tcp is defined %}
+    tcp:
+{% if module_config.tcp.query_response is defined %}
+      query_response:
+{% for qr in module_config.tcp.query_response %}
+        - expect: {{ qr.expect }}
+{% if qr.send is defined %}
+          send: {{ qr.send }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if module_config.tcp.tls is defined %}
+      tls: {{ module_config.tcp.tls | lower }}
+{% endif %}
+{% if module_config.tcp.tls_config is defined %}
+      tls_config:
+{% if module_config.tcp.tls_config.insecure_skip_verify is defined %}
+        insecure_skip_verify: {{ module_config.tcp.tls_config.insecure_skip_verify | lower }}
+{% endif %}
+{% endif %}
+{% if module_config.tcp.preferred_ip_protocol is defined %}
+      preferred_ip_protocol: {{ module_config.tcp.preferred_ip_protocol }}
+{% endif %}
+{% endif %}
+{% if module_config.icmp is defined %}
+    icmp:
+{% if module_config.icmp.preferred_ip_protocol is defined %}
+      preferred_ip_protocol: {{ module_config.icmp.preferred_ip_protocol }}
+{% endif %}
+{% if module_config.icmp.source_ip_address is defined %}
+      source_ip_address: {{ module_config.icmp.source_ip_address }}
+{% endif %}
+{% if module_config.icmp.payload_size is defined %}
+      payload_size: {{ module_config.icmp.payload_size }}
+{% endif %}
+{% if module_config.icmp.dont_fragment is defined %}
+      dont_fragment: {{ module_config.icmp.dont_fragment | lower }}
+{% endif %}
+{% endif %}
+{% if module_config.dns is defined %}
+    dns:
+{% if module_config.dns.query_name is defined %}
+      query_name: {{ module_config.dns.query_name }}
+{% endif %}
+{% if module_config.dns.query_type is defined %}
+      query_type: {{ module_config.dns.query_type }}
+{% endif %}
+{% if module_config.dns.valid_rcodes is defined %}
+      valid_rcodes: {{ module_config.dns.valid_rcodes | to_json }}
+{% endif %}
+{% if module_config.dns.validate_answer_rrs is defined %}
+      validate_answer_rrs:
+{% if module_config.dns.validate_answer_rrs.fail_if_matches_regexp is defined %}
+        fail_if_matches_regexp: {{ module_config.dns.validate_answer_rrs.fail_if_matches_regexp | to_json }}
+{% endif %}
+{% if module_config.dns.validate_answer_rrs.fail_if_not_matches_regexp is defined %}
+        fail_if_not_matches_regexp: {{ module_config.dns.validate_answer_rrs.fail_if_not_matches_regexp | to_json }}
+{% endif %}
+{% endif %}
+{% if module_config.dns.validate_authority_rrs is defined %}
+      validate_authority_rrs:
+{% if module_config.dns.validate_authority_rrs.fail_if_matches_regexp is defined %}
+        fail_if_matches_regexp: {{ module_config.dns.validate_authority_rrs.fail_if_matches_regexp | to_json }}
+{% endif %}
+{% if module_config.dns.validate_authority_rrs.fail_if_not_matches_regexp is defined %}
+        fail_if_not_matches_regexp: {{ module_config.dns.validate_authority_rrs.fail_if_not_matches_regexp | to_json }}
+{% endif %}
+{% endif %}
+{% if module_config.dns.validate_additional_rrs is defined %}
+      validate_additional_rrs:
+{% if module_config.dns.validate_additional_rrs.fail_if_matches_regexp is defined %}
+        fail_if_matches_regexp: {{ module_config.dns.validate_additional_rrs.fail_if_matches_regexp | to_json }}
+{% endif %}
+{% if module_config.dns.validate_additional_rrs.fail_if_not_matches_regexp is defined %}
+        fail_if_not_matches_regexp: {{ module_config.dns.validate_additional_rrs.fail_if_not_matches_regexp | to_json }}
+{% endif %}
+{% endif %}
+{% if module_config.dns.transport_protocol is defined %}
+      transport_protocol: {{ module_config.dns.transport_protocol }}
+{% endif %}
+{% if module_config.dns.preferred_ip_protocol is defined %}
+      preferred_ip_protocol: {{ module_config.dns.preferred_ip_protocol }}
+{% endif %}
+{% endif %}
+
+{% endfor %}

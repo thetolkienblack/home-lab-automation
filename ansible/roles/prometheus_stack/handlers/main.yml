@@ -1,0 +1,44 @@
+---
+# Handlers for prometheus_stack role
+
+- name: Reload prometheus
+  ansible.builtin.systemd:
+    name: prometheus
+    state: reloaded
+  listen: "Reload prometheus"
+
+- name: Restart prometheus
+  ansible.builtin.systemd:
+    name: prometheus
+    state: restarted
+  listen: "Restart prometheus"
+
+- name: Reload alertmanager
+  ansible.builtin.systemd:
+    name: alertmanager
+    state: reloaded
+  listen: "Reload alertmanager"
+
+- name: Restart alertmanager
+  ansible.builtin.systemd:
+    name: alertmanager
+    state: restarted
+  listen: "Restart alertmanager"
+
+- name: Restart node_exporter
+  ansible.builtin.systemd:
+    name: node_exporter
+    state: restarted
+  listen: "Restart node_exporter"
+
+- name: Restart blackbox_exporter
+  ansible.builtin.systemd:
+    name: blackbox_exporter
+    state: restarted
+  listen: "Restart blackbox_exporter"
+
+- name: Reload firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    state: reloaded
+  listen: "Reload firewalld"

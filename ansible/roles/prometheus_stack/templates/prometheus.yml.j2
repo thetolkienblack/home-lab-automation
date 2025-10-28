@@ -1,0 +1,155 @@
+# {{ ansible_managed }}
+# Prometheus Configuration File
+
+global:
+  scrape_interval: {{ prometheus_global_scrape_interval }}
+  scrape_timeout: {{ prometheus_global_scrape_timeout }}
+  evaluation_interval: {{ prometheus_global_evaluation_interval }}
+
+{% if prometheus_web_external_url %}
+  external_url: {{ prometheus_web_external_url }}
+{% endif %}
+
+{% if prometheus_external_labels %}
+  external_labels:
+{% for label, value in prometheus_external_labels.items() %}
+    {{ label }}: {{ value }}
+{% endfor %}
+{% endif %}
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+{% for am_config in prometheus_alertmanager_config %}
+    - scheme: {{ am_config.scheme | default('http') }}
+{% if am_config.path_prefix is defined %}
+      path_prefix: {{ am_config.path_prefix }}
+{% endif %}
+{% if am_config.timeout is defined %}
+      timeout: {{ am_config.timeout }}
+{% endif %}
+{% if am_config.static_configs is defined %}
+      static_configs:
+{% for static_config in am_config.static_configs %}
+        - targets:
+{% for target in static_config.targets %}
+            - '{{ target }}'
+{% endfor %}
+{% if static_config.labels is defined %}
+          labels:
+{% for label, value in static_config.labels.items() %}
+            {{ label }}: {{ value }}
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endfor %}
+
+# Load rules once and periodically evaluate them
+rule_files:
+{% if prometheus_alert_rules_enabled %}
+  - "{{ prometheus_config_dir }}/rules/*.yml"
+{% endif %}
+
+# Scrape configurations
+scrape_configs:
+{% for scrape_config in prometheus_scrape_configs %}
+  - job_name: '{{ scrape_config.job_name }}'
+{% if scrape_config.scrape_interval is defined %}
+    scrape_interval: {{ scrape_config.scrape_interval }}
+{% endif %}
+{% if scrape_config.scrape_timeout is defined %}
+    scrape_timeout: {{ scrape_config.scrape_timeout }}
+{% endif %}
+{% if scrape_config.metrics_path is defined %}
+    metrics_path: {{ scrape_config.metrics_path }}
+{% endif %}
+{% if scrape_config.params is defined %}
+    params:
+{% for param, values in scrape_config.params.items() %}
+      {{ param }}:
+{% for value in values %}
+        - {{ value }}
+{% endfor %}
+{% endfor %}
+{% endif %}
+{% if scrape_config.scheme is defined %}
+    scheme: {{ scrape_config.scheme }}
+{% endif %}
+{% if scrape_config.honor_labels is defined %}
+    honor_labels: {{ scrape_config.honor_labels | lower }}
+{% endif %}
+{% if scrape_config.honor_timestamps is defined %}
+    honor_timestamps: {{ scrape_config.honor_timestamps | lower }}
+{% endif %}
+{% if scrape_config.static_configs is defined %}
+    static_configs:
+{% for static_config in scrape_config.static_configs %}
+      - targets:
+{% for target in static_config.targets %}
+          - '{{ target }}'
+{% endfor %}
+{% if static_config.labels is defined %}
+        labels:
+{% for label, value in static_config.labels.items() %}
+          {{ label }}: '{{ value }}'
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if scrape_config.file_sd_configs is defined %}
+    file_sd_configs:
+{% for file_sd_config in scrape_config.file_sd_configs %}
+      - files:
+{% for file in file_sd_config.files %}
+          - '{{ file }}'
+{% endfor %}
+{% if file_sd_config.refresh_interval is defined %}
+        refresh_interval: {{ file_sd_config.refresh_interval }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if scrape_config.relabel_configs is defined %}
+    relabel_configs:
+{% for relabel_config in scrape_config.relabel_configs %}
+      - source_labels: {{ relabel_config.source_labels | default([]) }}
+{% if relabel_config.separator is defined %}
+        separator: '{{ relabel_config.separator }}'
+{% endif %}
+{% if relabel_config.target_label is defined %}
+        target_label: {{ relabel_config.target_label }}
+{% endif %}
+{% if relabel_config.regex is defined %}
+        regex: {{ relabel_config.regex }}
+{% endif %}
+{% if relabel_config.modulus is defined %}
+        modulus: {{ relabel_config.modulus }}
+{% endif %}
+{% if relabel_config.replacement is defined %}
+        replacement: {{ relabel_config.replacement }}
+{% endif %}
+{% if relabel_config.action is defined %}
+        action: {{ relabel_config.action }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if scrape_config.metric_relabel_configs is defined %}
+    metric_relabel_configs:
+{% for metric_relabel_config in scrape_config.metric_relabel_configs %}
+      - source_labels: {{ metric_relabel_config.source_labels | default([]) }}
+{% if metric_relabel_config.target_label is defined %}
+        target_label: {{ metric_relabel_config.target_label }}
+{% endif %}
+{% if metric_relabel_config.regex is defined %}
+        regex: {{ metric_relabel_config.regex }}
+{% endif %}
+{% if metric_relabel_config.replacement is defined %}
+        replacement: {{ metric_relabel_config.replacement }}
+{% endif %}
+{% if metric_relabel_config.action is defined %}
+        action: {{ metric_relabel_config.action }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% endfor %}

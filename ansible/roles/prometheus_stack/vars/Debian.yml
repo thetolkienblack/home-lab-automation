@@ -1,0 +1,21 @@
+---
+# Debian family specific variables
+
+# Package names
+prometheus_package: prometheus
+alertmanager_package: prometheus-alertmanager
+node_exporter_package: prometheus-node-exporter
+blackbox_exporter_package: prometheus-blackbox-exporter
+
+# Firewall service
+firewall_service: ufw
+
+# System paths
+prometheus_system_user: prometheus
+prometheus_system_group: prometheus
+alertmanager_system_user: prometheus
+alertmanager_system_group: prometheus
+node_exporter_system_user: prometheus
+node_exporter_system_group: prometheus
+blackbox_exporter_system_user: prometheus
+blackbox_exporter_system_group: prometheus

@@ -1,0 +1,94 @@
+---
+# TLS configuration tasks
+
+- name: Create TLS directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  loop:
+    - "{{ prometheus_stack_tls_cert_path }}"
+    - "{{ alertmanager_config_dir }}/tls"
+    - "{{ blackbox_exporter_config_dir }}/tls"
+
+- name: Generate self-signed certificates
+  when: prometheus_stack_generate_self_signed_cert | bool
+  block:
+    - name: Generate private key for Prometheus
+      community.crypto.openssl_privatekey:
+        path: "{{ prometheus_stack_tls_server_config.key_file }}"
+        size: 4096
+        mode: '0600'
+        owner: prometheus
+        group: prometheus
+
+    - name: Generate CSR for Prometheus
+      community.crypto.openssl_csr:
+        path: "{{ prometheus_stack_tls_cert_path }}/prometheus.csr"
+        privatekey_path: "{{ prometheus_stack_tls_server_config.key_file }}"
+        common_name: "{{ prometheus_stack_tls_cert_common_name }}"
+        country_name: "{{ prometheus_stack_tls_cert_country }}"
+        state_or_province_name: "{{ prometheus_stack_tls_cert_state }}"
+        locality_name: "{{ prometheus_stack_tls_cert_locality }}"
+        organization_name: "{{ prometheus_stack_tls_cert_organization }}"
+        subject_alt_name:
+          - "DNS:{{ prometheus_stack_tls_cert_common_name }}"
+          - "DNS:localhost"
+          - "IP:127.0.0.1"
+
+    - name: Generate self-signed certificate for Prometheus
+      community.crypto.x509_certificate:
+        path: "{{ prometheus_stack_tls_server_config.cert_file }}"
+        privatekey_path: "{{ prometheus_stack_tls_server_config.key_file }}"
+        csr_path: "{{ prometheus_stack_tls_cert_path }}/prometheus.csr"
+        provider: selfsigned
+        selfsigned_not_after: "+{{ prometheus_stack_tls_cert_days }}d"
+        mode: '0644'
+        owner: prometheus
+        group: prometheus
+
+    - name: Generate private key for Alertmanager
+      community.crypto.openssl_privatekey:
+        path: "{{ alertmanager_tls_server_config.key_file }}"
+        size: 4096
+        mode: '0600'
+        owner: alertmanager
+        group: alertmanager
+
+    - name: Generate CSR for Alertmanager
+      community.crypto.openssl_csr:
+        path: "{{ alertmanager_config_dir }}/tls/alertmanager.csr"
+        privatekey_path: "{{ alertmanager_tls_server_config.key_file }}"
+        common_name: "alertmanager.{{ prometheus_stack_tls_cert_common_name }}"
+        country_name: "{{ prometheus_stack_tls_cert_country }}"
+        state_or_province_name: "{{ prometheus_stack_tls_cert_state }}"
+        locality_name: "{{ prometheus_stack_tls_cert_locality }}"
+        organization_name: "{{ prometheus_stack_tls_cert_organization }}"
+        subject_alt_name:
+          - "DNS:alertmanager.{{ prometheus_stack_tls_cert_common_name }}"
+          - "DNS:localhost"
+          - "IP:127.0.0.1"
+
+    - name: Generate self-signed certificate for Alertmanager
+      community.crypto.x509_certificate:
+        path: "{{ alertmanager_tls_server_config.cert_file }}"
+        privatekey_path: "{{ alertmanager_tls_server_config.key_file }}"
+        csr_path: "{{ alertmanager_config_dir }}/tls/alertmanager.csr"
+        provider: selfsigned
+        selfsigned_not_after: "+{{ prometheus_stack_tls_cert_days }}d"
+        mode: '0644'
+        owner: alertmanager
+        group: alertmanager
+
+- name: Verify TLS certificates exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: tls_cert_check
+  failed_when: not tls_cert_check.stat.exists
+  loop:
+    - "{{ prometheus_stack_tls_server_config.cert_file }}"
+    - "{{ prometheus_stack_tls_server_config.key_file }}"
+    - "{{ alertmanager_tls_server_config.cert_file }}"
+    - "{{ alertmanager_tls_server_config.key_file }}"

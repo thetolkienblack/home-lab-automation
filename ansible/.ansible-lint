@@ -11,6 +11,7 @@ exclude_paths:
 skip_list:
   - yaml[line-length]  # Allow longer lines in some cases
   - name[casing]       # Allow flexible task naming
+  - var-naming[no-role-prefix]  # prometheus_stack uses community role variable names
 
 warn_list:
   - command-instead-of-module
@@ -43,3 +44,4 @@ mock_roles:
   - k3s
   - trivy
   - wazuh
+  - prometheus_stack

@@ -1,0 +1,46 @@
+---
+# Firewall configuration tasks
+
+- name: Configure firewalld (RedHat family)
+  when: ansible_os_family == 'RedHat'
+  block:
+    - name: Ensure firewalld is installed
+      ansible.builtin.package:
+        name: firewalld
+        state: present
+
+    - name: Ensure firewalld is running
+      ansible.builtin.service:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Open Prometheus stack ports in firewalld
+      ansible.posix.firewalld:
+        port: "{{ item }}"
+        permanent: true
+        state: enabled
+        zone: "{{ prometheus_stack_firewall_zone }}"
+        immediate: true
+      loop: "{{ prometheus_stack_firewall_ports }}"
+      notify: Reload firewalld
+
+- name: Configure UFW (Debian family)
+  when: ansible_os_family == 'Debian'
+  block:
+    - name: Ensure UFW is installed
+      ansible.builtin.package:
+        name: ufw
+        state: present
+
+    - name: Open Prometheus stack ports in UFW
+      community.general.ufw:
+        rule: allow
+        port: "{{ item.split('/')[0] }}"
+        proto: "{{ item.split('/')[1] }}"
+        comment: "Prometheus Stack - {{ item }}"
+      loop: "{{ prometheus_stack_firewall_ports }}"
+
+    - name: Ensure UFW is enabled
+      community.general.ufw:
+        state: enabled

@@ -1,0 +1,297 @@
+# {{ ansible_managed }}
+# Alertmanager Configuration File
+
+global:
+  resolve_timeout: 5m
+{% if alertmanager_smtp_smarthost is defined %}
+  smtp_smarthost: '{{ alertmanager_smtp_smarthost }}'
+  smtp_from: '{{ alertmanager_smtp_from | default("alertmanager@localhost") }}'
+{% if alertmanager_smtp_auth_username is defined %}
+  smtp_auth_username: '{{ alertmanager_smtp_auth_username }}'
+{% endif %}
+{% if alertmanager_smtp_auth_password is defined %}
+  smtp_auth_password: '{{ alertmanager_smtp_auth_password }}'
+{% endif %}
+{% if alertmanager_smtp_require_tls is defined %}
+  smtp_require_tls: {{ alertmanager_smtp_require_tls | lower }}
+{% endif %}
+{% endif %}
+{% if alertmanager_slack_api_url is defined %}
+  slack_api_url: '{{ alertmanager_slack_api_url }}'
+{% endif %}
+{% if alertmanager_pagerduty_url is defined %}
+  pagerduty_url: '{{ alertmanager_pagerduty_url }}'
+{% endif %}
+{% if alertmanager_opsgenie_api_url is defined %}
+  opsgenie_api_url: '{{ alertmanager_opsgenie_api_url }}'
+{% endif %}
+{% if alertmanager_wechat_api_url is defined %}
+  wechat_api_url: '{{ alertmanager_wechat_api_url }}'
+{% endif %}
+{% if alertmanager_victorops_api_url is defined %}
+  victorops_api_url: '{{ alertmanager_victorops_api_url }}'
+{% endif %}
+
+# Templates for notification formatting
+templates:
+  - '{{ alertmanager_config_dir }}/templates/*.tmpl'
+
+# Route tree for alert notifications
+route:
+{% if alertmanager_route.receiver is defined %}
+  receiver: '{{ alertmanager_route.receiver }}'
+{% endif %}
+{% if alertmanager_route.group_by is defined %}
+  group_by: {{ alertmanager_route.group_by | to_json }}
+{% endif %}
+{% if alertmanager_route.group_wait is defined %}
+  group_wait: {{ alertmanager_route.group_wait }}
+{% endif %}
+{% if alertmanager_route.group_interval is defined %}
+  group_interval: {{ alertmanager_route.group_interval }}
+{% endif %}
+{% if alertmanager_route.repeat_interval is defined %}
+  repeat_interval: {{ alertmanager_route.repeat_interval }}
+{% endif %}
+{% if alertmanager_route.continue is defined %}
+  continue: {{ alertmanager_route.continue | lower }}
+{% endif %}
+{% if alertmanager_route.routes is defined %}
+
+  routes:
+{% for route in alertmanager_route.routes %}
+    - receiver: '{{ route.receiver }}'
+{% if route.match is defined %}
+      match:
+{% for key, value in route.match.items() %}
+        {{ key }}: '{{ value }}'
+{% endfor %}
+{% endif %}
+{% if route.match_re is defined %}
+      match_re:
+{% for key, value in route.match_re.items() %}
+        {{ key }}: '{{ value }}'
+{% endfor %}
+{% endif %}
+{% if route.group_by is defined %}
+      group_by: {{ route.group_by | to_json }}
+{% endif %}
+{% if route.group_wait is defined %}
+      group_wait: {{ route.group_wait }}
+{% endif %}
+{% if route.group_interval is defined %}
+      group_interval: {{ route.group_interval }}
+{% endif %}
+{% if route.repeat_interval is defined %}
+      repeat_interval: {{ route.repeat_interval }}
+{% endif %}
+{% if route.continue is defined %}
+      continue: {{ route.continue | lower }}
+{% endif %}
+
+{% endfor %}
+{% endif %}
+
+# Inhibit rules to mute certain alerts
+{% if alertmanager_inhibit_rules is defined and alertmanager_inhibit_rules | length > 0 %}
+inhibit_rules:
+{% for rule in alertmanager_inhibit_rules %}
+  - source_match:
+{% for key, value in rule.source_match.items() %}
+      {{ key }}: '{{ value }}'
+{% endfor %}
+{% if rule.source_match_re is defined %}
+    source_match_re:
+{% for key, value in rule.source_match_re.items() %}
+      {{ key }}: '{{ value }}'
+{% endfor %}
+{% endif %}
+    target_match:
+{% for key, value in rule.target_match.items() %}
+      {{ key }}: '{{ value }}'
+{% endfor %}
+{% if rule.target_match_re is defined %}
+    target_match_re:
+{% for key, value in rule.target_match_re.items() %}
+      {{ key }}: '{{ value }}'
+{% endfor %}
+{% endif %}
+{% if rule.equal is defined %}
+    equal: {{ rule.equal | to_json }}
+{% endif %}
+
+{% endfor %}
+{% endif %}
+
+# Receivers for alert notifications
+receivers:
+{% for receiver in alertmanager_receivers %}
+  - name: '{{ receiver.name }}'
+{% if receiver.email_configs is defined %}
+    email_configs:
+{% for email_config in receiver.email_configs %}
+      - to: '{{ email_config.to }}'
+{% if email_config.from is defined %}
+        from: '{{ email_config.from }}'
+{% endif %}
+{% if email_config.smarthost is defined %}
+        smarthost: '{{ email_config.smarthost }}'
+{% endif %}
+{% if email_config.auth_username is defined %}
+        auth_username: '{{ email_config.auth_username }}'
+{% endif %}
+{% if email_config.auth_password is defined %}
+        auth_password: '{{ email_config.auth_password }}'
+{% endif %}
+{% if email_config.auth_secret is defined %}
+        auth_secret: '{{ email_config.auth_secret }}'
+{% endif %}
+{% if email_config.auth_identity is defined %}
+        auth_identity: '{{ email_config.auth_identity }}'
+{% endif %}
+{% if email_config.require_tls is defined %}
+        require_tls: {{ email_config.require_tls | lower }}
+{% endif %}
+{% if email_config.tls_config is defined %}
+        tls_config:
+{% if email_config.tls_config.ca_file is defined %}
+          ca_file: '{{ email_config.tls_config.ca_file }}'
+{% endif %}
+{% if email_config.tls_config.cert_file is defined %}
+          cert_file: '{{ email_config.tls_config.cert_file }}'
+{% endif %}
+{% if email_config.tls_config.key_file is defined %}
+          key_file: '{{ email_config.tls_config.key_file }}'
+{% endif %}
+{% if email_config.tls_config.insecure_skip_verify is defined %}
+          insecure_skip_verify: {{ email_config.tls_config.insecure_skip_verify | lower }}
+{% endif %}
+{% endif %}
+{% if email_config.html is defined %}
+        html: '{{ email_config.html }}'
+{% endif %}
+{% if email_config.headers is defined %}
+        headers:
+{% for key, value in email_config.headers.items() %}
+          {{ key }}: '{{ value }}'
+{% endfor %}
+{% endif %}
+{% if email_config.send_resolved is defined %}
+        send_resolved: {{ email_config.send_resolved | lower }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if receiver.slack_configs is defined %}
+    slack_configs:
+{% for slack_config in receiver.slack_configs %}
+      - api_url: '{{ slack_config.api_url }}'
+{% if slack_config.channel is defined %}
+        channel: '{{ slack_config.channel }}'
+{% endif %}
+{% if slack_config.username is defined %}
+        username: '{{ slack_config.username }}'
+{% endif %}
+{% if slack_config.color is defined %}
+        color: '{{ slack_config.color }}'
+{% endif %}
+{% if slack_config.title is defined %}
+        title: '{{ slack_config.title }}'
+{% endif %}
+{% if slack_config.title_link is defined %}
+        title_link: '{{ slack_config.title_link }}'
+{% endif %}
+{% if slack_config.pretext is defined %}
+        pretext: '{{ slack_config.pretext }}'
+{% endif %}
+{% if slack_config.text is defined %}
+        text: '{{ slack_config.text }}'
+{% endif %}
+{% if slack_config.fields is defined %}
+        fields:
+{% for field in slack_config.fields %}
+          - title: '{{ field.title }}'
+            value: '{{ field.value }}'
+{% if field.short is defined %}
+            short: {{ field.short | lower }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if slack_config.short_fields is defined %}
+        short_fields: {{ slack_config.short_fields | lower }}
+{% endif %}
+{% if slack_config.footer is defined %}
+        footer: '{{ slack_config.footer }}'
+{% endif %}
+{% if slack_config.icon_emoji is defined %}
+        icon_emoji: '{{ slack_config.icon_emoji }}'
+{% endif %}
+{% if slack_config.icon_url is defined %}
+        icon_url: '{{ slack_config.icon_url }}'
+{% endif %}
+{% if slack_config.link_names is defined %}
+        link_names: {{ slack_config.link_names | lower }}
+{% endif %}
+{% if slack_config.send_resolved is defined %}
+        send_resolved: {{ slack_config.send_resolved | lower }}
+{% endif %}
+{% if slack_config.http_config is defined %}
+        http_config:
+{% if slack_config.http_config.proxy_url is defined %}
+          proxy_url: '{{ slack_config.http_config.proxy_url }}'
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if receiver.webhook_configs is defined %}
+    webhook_configs:
+{% for webhook_config in receiver.webhook_configs %}
+      - url: '{{ webhook_config.url }}'
+{% if webhook_config.send_resolved is defined %}
+        send_resolved: {{ webhook_config.send_resolved | lower }}
+{% endif %}
+{% if webhook_config.http_config is defined %}
+        http_config:
+{% if webhook_config.http_config.bearer_token is defined %}
+          bearer_token: '{{ webhook_config.http_config.bearer_token }}'
+{% endif %}
+{% if webhook_config.http_config.proxy_url is defined %}
+          proxy_url: '{{ webhook_config.http_config.proxy_url }}'
+{% endif %}
+{% if webhook_config.http_config.tls_config is defined %}
+          tls_config:
+{% if webhook_config.http_config.tls_config.insecure_skip_verify is defined %}
+            insecure_skip_verify: {{ webhook_config.http_config.tls_config.insecure_skip_verify | lower }}
+{% endif %}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if receiver.pagerduty_configs is defined %}
+    pagerduty_configs:
+{% for pagerduty_config in receiver.pagerduty_configs %}
+      - service_key: '{{ pagerduty_config.service_key }}'
+{% if pagerduty_config.routing_key is defined %}
+        routing_key: '{{ pagerduty_config.routing_key }}'
+{% endif %}
+{% if pagerduty_config.url is defined %}
+        url: '{{ pagerduty_config.url }}'
+{% endif %}
+{% if pagerduty_config.client is defined %}
+        client: '{{ pagerduty_config.client }}'
+{% endif %}
+{% if pagerduty_config.client_url is defined %}
+        client_url: '{{ pagerduty_config.client_url }}'
+{% endif %}
+{% if pagerduty_config.description is defined %}
+        description: '{{ pagerduty_config.description }}'
+{% endif %}
+{% if pagerduty_config.severity is defined %}
+        severity: '{{ pagerduty_config.severity }}'
+{% endif %}
+{% if pagerduty_config.send_resolved is defined %}
+        send_resolved: {{ pagerduty_config.send_resolved | lower }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% endfor %}

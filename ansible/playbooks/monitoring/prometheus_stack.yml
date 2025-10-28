@@ -1,0 +1,202 @@
+---
+# Playbook for deploying complete Prometheus monitoring stack
+# This playbook deploys Prometheus, Alertmanager, Node Exporter, and Blackbox Exporter
+#
+# Usage:
+#   ansible-playbook -i inventories/production playbooks/monitoring/prometheus_stack.yml
+#   ansible-playbook -i inventories/production playbooks/monitoring/prometheus_stack.yml --tags monitoring
+#
+# Deploy with TLS enabled:
+#   ansible-playbook ... --extra-vars "prometheus_stack_enable_tls=true prometheus_stack_generate_self_signed_cert=true"
+#
+# Deploy without firewall configuration:
+#   ansible-playbook ... --extra-vars "prometheus_stack_configure_firewall=false"
+
+- name: Deploy Complete Prometheus Monitoring Stack
+  hosts: prometheus_servers
+  become: true
+  gather_facts: true
+
+  vars:
+    # Install all components
+    prometheus_stack_install_prometheus: true
+    prometheus_stack_install_alertmanager: true
+    prometheus_stack_install_node_exporter: true
+    prometheus_stack_install_blackbox_exporter: true
+
+    # Default configuration
+    prometheus_storage_retention: "14d"
+    prometheus_web_listen_address: "0.0.0.0:9090"
+    alertmanager_web_listen_address: "0.0.0.0:9093"
+    node_exporter_web_listen_address: "0.0.0.0:9100"
+    blackbox_exporter_web_listen_address: "0.0.0.0:9115"
+
+    # Enable firewall and configure required ports
+    prometheus_stack_configure_firewall: true
+
+    # Example: Customize alertmanager receivers
+    # Uncomment and modify to use Slack notifications
+    # alertmanager_receivers:
+    #   - name: 'slack-receiver'
+    #     slack_configs:
+    #       - api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
+    #         channel: '#alerts'
+    #         username: 'Alertmanager'
+    #         title: 'Alert: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}'
+    #         text: '{{ "{{" }} range .Alerts {{ "}}" }}{{ "{{" }} .Annotations.description {{ "}}" }}{{ "{{" }} end {{ "}}" }}'
+    #         send_resolved: true
+
+  pre_tasks:
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Deploying Prometheus Monitoring Stack"
+          - "=========================================="
+          - "Target Host: {{ inventory_hostname }}"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "OS Family: {{ ansible_os_family }}"
+          - "Architecture: {{ ansible_architecture }}"
+          - "=========================================="
+          - "Components:"
+          - "  - Prometheus Server"
+          - "  - Alertmanager"
+          - "  - Node Exporter"
+          - "  - Blackbox Exporter"
+          - "=========================================="
+          - "Configuration:"
+          - "  Storage Retention: {{ prometheus_storage_retention }}"
+          - "  Firewall: {{ 'Enabled' if prometheus_stack_configure_firewall else 'Disabled' }}"
+          - "  TLS: {{ 'Enabled' if prometheus_stack_enable_tls | default(false) else 'Disabled' }}"
+          - "=========================================="
+
+    - name: Validate host requirements
+      ansible.builtin.assert:
+        that:
+          - ansible_os_family in ['Debian', 'RedHat']
+          - ansible_service_mgr == 'systemd'
+          - ansible_distribution_major_version | int >= 11 or (ansible_os_family == 'RedHat' and ansible_distribution_major_version | int >= 9)
+        fail_msg: |
+          Host does not meet requirements:
+          - Must be Debian/RedHat family
+          - Must use systemd
+          - Debian: >= 11, Ubuntu: >= 22.04, RHEL/Rocky: >= 9
+
+    - name: Check available disk space
+      ansible.builtin.shell: df -BG {{ prometheus_db_dir | default('/var/lib/prometheus') }} | tail -1 | awk '{print $4}' | sed 's/G//'
+      register: available_space
+      changed_when: false
+
+    - name: Warn if low disk space
+      ansible.builtin.debug:
+        msg: "WARNING: Low disk space detected ({{ available_space.stdout }}GB available). Recommend at least 20GB for Prometheus data."
+      when: available_space.stdout | int < 20
+
+  roles:
+    - role: prometheus_stack
+      tags:
+        - monitoring
+        - prometheus
+        - alertmanager
+        - exporters
+
+  post_tasks:
+    - name: Wait for all services to be ready
+      ansible.builtin.uri:
+        url: "{{ item.url }}"
+        method: GET
+        status_code: 200
+      retries: 10
+      delay: 5
+      register: service_check
+      until: service_check.status == 200
+      loop:
+        - name: Prometheus
+          url: "http://localhost:{{ prometheus_web_listen_address.split(':')[1] | default('9090') }}/-/ready"
+        - name: Alertmanager
+          url: "http://localhost:{{ alertmanager_web_listen_address.split(':')[1] | default('9093') }}/-/ready"
+        - name: Node Exporter
+          url: "http://localhost:{{ node_exporter_web_listen_address.split(':')[1] | default('9100') }}/metrics"
+        - name: Blackbox Exporter
+          url: "http://localhost:{{ blackbox_exporter_web_listen_address.split(':')[1] | default('9115') }}/metrics"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Get Prometheus targets status
+      ansible.builtin.uri:
+        url: "http://localhost:{{ prometheus_web_listen_address.split(':')[1] | default('9090') }}/api/v1/targets"
+        method: GET
+        return_content: true
+      register: prometheus_targets
+
+    - name: Display deployment summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "Prometheus Stack Deployment Complete!"
+          - "=========================================="
+          - "Access Information:"
+          - ""
+          - "Prometheus Web UI:"
+          - "  http://{{ ansible_default_ipv4.address }}:{{ prometheus_web_listen_address.split(':')[1] | default('9090') }}"
+          - ""
+          - "Alertmanager Web UI:"
+          - "  http://{{ ansible_default_ipv4.address }}:{{ alertmanager_web_listen_address.split(':')[1] | default('9093') }}"
+          - ""
+          - "Node Exporter Metrics:"
+          - "  http://{{ ansible_default_ipv4.address }}:{{ node_exporter_web_listen_address.split(':')[1] | default('9100') }}/metrics"
+          - ""
+          - "Blackbox Exporter Metrics:"
+          - "  http://{{ ansible_default_ipv4.address }}:{{ blackbox_exporter_web_listen_address.split(':')[1] | default('9115') }}/metrics"
+          - ""
+          - "=========================================="
+          - "Configuration Files:"
+          - "  Prometheus: {{ prometheus_config_dir }}/prometheus.yml"
+          - "  Alert Rules: {{ prometheus_config_dir }}/rules/alerts.yml"
+          - "  Alertmanager: {{ alertmanager_config_dir }}/alertmanager.yml"
+          - "  Blackbox: {{ blackbox_exporter_config_dir }}/blackbox.yml"
+          - ""
+          - "=========================================="
+          - "Active Targets: {{ prometheus_targets.json.data.activeTargets | length }}"
+          - "=========================================="
+          - ""
+          - "Next Steps:"
+          - "  1. Access Prometheus UI and verify targets are up"
+          - "  2. Configure additional scrape targets in inventory"
+          - "  3. Customize alert rules in {{ prometheus_config_dir }}/rules/"
+          - "  4. Set up notification receivers in Alertmanager config"
+          - "  5. Add more exporters as needed for your services"
+          - ""
+          - "Documentation: See roles/prometheus_stack/README.md"
+          - "=========================================="
+
+    - name: Save access information to file
+      ansible.builtin.copy:
+        content: |
+          Prometheus Monitoring Stack - Deployment Information
+          ====================================================
+          Deployed on: {{ ansible_date_time.iso8601 }}
+          Host: {{ inventory_hostname }} ({{ ansible_default_ipv4.address }})
+
+          Access URLs:
+          ------------
+          Prometheus: http://{{ ansible_default_ipv4.address }}:{{ prometheus_web_listen_address.split(':')[1] | default('9090') }}
+          Alertmanager: http://{{ ansible_default_ipv4.address }}:{{ alertmanager_web_listen_address.split(':')[1] | default('9093') }}
+          Node Exporter: http://{{ ansible_default_ipv4.address }}:{{ node_exporter_web_listen_address.split(':')[1] | default('9100') }}/metrics
+          Blackbox Exporter: http://{{ ansible_default_ipv4.address }}:{{ blackbox_exporter_web_listen_address.split(':')[1] | default('9115') }}/metrics
+
+          Configuration:
+          -------------
+          Storage Retention: {{ prometheus_storage_retention }}
+          Firewall: {{ 'Enabled' if prometheus_stack_configure_firewall else 'Disabled' }}
+          TLS: {{ 'Enabled' if prometheus_stack_enable_tls | default(false) else 'Disabled' }}
+
+          Active Targets: {{ prometheus_targets.json.data.activeTargets | length }}
+        dest: "/tmp/prometheus_stack_deployment_{{ inventory_hostname }}.txt"
+        mode: '0644'
+      delegate_to: localhost
+      become: false
+
+    - name: Display deployment info file location
+      ansible.builtin.debug:
+        msg: "Deployment information saved to: /tmp/prometheus_stack_deployment_{{ inventory_hostname }}.txt"

@@ -1,0 +1,71 @@
+---
+# Playbook for deploying Prometheus only
+# This playbook deploys only the Prometheus server without Alertmanager or exporters
+#
+# Usage:
+#   ansible-playbook -i inventories/production playbooks/monitoring/prometheus.yml
+#   ansible-playbook -i inventories/production playbooks/monitoring/prometheus.yml --tags prometheus
+#
+# Variables can be overridden in inventory or with --extra-vars:
+#   ansible-playbook ... --extra-vars "prometheus_storage_retention=30d"
+
+- name: Deploy Prometheus Server
+  hosts: prometheus_servers
+  become: true
+  gather_facts: true
+
+  vars:
+    # Install only Prometheus
+    prometheus_stack_install_prometheus: true
+    prometheus_stack_install_alertmanager: false
+    prometheus_stack_install_node_exporter: false
+    prometheus_stack_install_blackbox_exporter: false
+
+    # Prometheus-specific configuration
+    prometheus_web_listen_address: "0.0.0.0:9090"
+    prometheus_storage_retention: "14d"
+
+  pre_tasks:
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg:
+          - "Deploying Prometheus to: {{ inventory_hostname }}"
+          - "OS Family: {{ ansible_os_family }}"
+          - "Storage Retention: {{ prometheus_storage_retention }}"
+          - "Listen Address: {{ prometheus_web_listen_address }}"
+
+    - name: Validate host requirements
+      ansible.builtin.assert:
+        that:
+          - ansible_os_family in ['Debian', 'RedHat']
+          - ansible_service_mgr == 'systemd'
+        fail_msg: "Host does not meet requirements (Debian/RedHat with systemd)"
+
+  roles:
+    - role: prometheus_stack
+      tags:
+        - prometheus
+        - monitoring
+
+  post_tasks:
+    - name: Display Prometheus access information
+      ansible.builtin.debug:
+        msg:
+          - "Prometheus has been successfully deployed!"
+          - "Access URL: http://{{ ansible_default_ipv4.address }}:{{ prometheus_web_listen_address.split(':')[1] | default('9090') }}"
+          - "Configuration: {{ prometheus_config_dir }}/prometheus.yml"
+          - "Data Directory: {{ prometheus_db_dir }}"
+
+    - name: Wait for Prometheus to be accessible
+      ansible.builtin.uri:
+        url: "http://localhost:{{ prometheus_web_listen_address.split(':')[1] | default('9090') }}/-/ready"
+        method: GET
+        status_code: 200
+      retries: 10
+      delay: 5
+      register: prometheus_ready
+      until: prometheus_ready.status == 200
+
+    - name: Display success message
+      ansible.builtin.debug:
+        msg: "Prometheus is ready and accepting connections!"

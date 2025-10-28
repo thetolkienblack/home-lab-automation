@@ -1,0 +1,327 @@
+---
+# Prometheus Stack default variables
+
+# =============================================================================
+# General Settings
+# =============================================================================
+prometheus_stack_install_prometheus: true
+prometheus_stack_install_alertmanager: true
+prometheus_stack_install_node_exporter: true
+prometheus_stack_install_blackbox_exporter: true
+
+# Installation method: 'package' (default) or 'binary'
+prometheus_stack_install_method: package
+
+# =============================================================================
+# Prometheus Configuration
+# =============================================================================
+prometheus_version: latest
+prometheus_web_listen_address: "0.0.0.0:9090"
+prometheus_storage_retention: "14d"
+prometheus_storage_retention_size: "0"  # 0 means no limit
+prometheus_config_dir: /etc/prometheus
+prometheus_db_dir: /var/lib/prometheus
+prometheus_web_external_url: ""
+
+# Prometheus scrape interval
+prometheus_global_scrape_interval: 15s
+prometheus_global_scrape_timeout: 10s
+prometheus_global_evaluation_interval: 15s
+
+# Prometheus alerting configuration
+prometheus_alertmanager_config:
+  - scheme: http
+    static_configs:
+      - targets:
+          - "localhost:9093"
+
+# =============================================================================
+# Alertmanager Configuration
+# =============================================================================
+alertmanager_version: latest
+alertmanager_web_listen_address: "0.0.0.0:9093"
+alertmanager_config_dir: /etc/alertmanager
+alertmanager_db_dir: /var/lib/alertmanager
+alertmanager_cluster_listen_address: "0.0.0.0:9094"
+
+# Alertmanager notification receivers
+alertmanager_receivers:
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'admin@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'smtp.example.com:587'
+        auth_username: 'alertmanager@example.com'
+        auth_password: 'changeme'
+        require_tls: true
+
+# Alertmanager route configuration
+alertmanager_route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default-receiver'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'default-receiver'
+      repeat_interval: 5m
+
+# Alertmanager inhibit rules
+alertmanager_inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'cluster', 'service']
+
+# =============================================================================
+# Node Exporter Configuration
+# =============================================================================
+node_exporter_version: latest
+node_exporter_web_listen_address: "0.0.0.0:9100"
+node_exporter_enabled_collectors:
+  - systemd
+  - textfile:
+      directory: "{{ node_exporter_textfile_dir }}"
+node_exporter_disabled_collectors: []
+node_exporter_textfile_dir: /var/lib/node_exporter
+
+# =============================================================================
+# Blackbox Exporter Configuration
+# =============================================================================
+blackbox_exporter_version: latest
+blackbox_exporter_web_listen_address: "0.0.0.0:9115"
+blackbox_exporter_config_dir: /etc/blackbox_exporter
+
+# Blackbox exporter modules
+blackbox_exporter_modules:
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: []
+      method: GET
+      preferred_ip_protocol: "ip4"
+  http_post_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      method: POST
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+  icmp:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: "ip4"
+  dns_query:
+    prober: dns
+    timeout: 5s
+    dns:
+      query_name: "example.com"
+      query_type: "A"
+
+# =============================================================================
+# Scrape Configurations
+# =============================================================================
+prometheus_scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets:
+          - 'localhost:9090'
+        labels:
+          environment: 'production'
+
+  # Alertmanager monitoring
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets:
+          - 'localhost:9093'
+        labels:
+          environment: 'production'
+
+  # Node Exporter monitoring
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets:
+          - 'localhost:9100'
+        labels:
+          environment: 'production'
+
+  # Blackbox Exporter monitoring
+  - job_name: 'blackbox_exporter'
+    static_configs:
+      - targets:
+          - 'localhost:9115'
+        labels:
+          environment: 'production'
+
+  # HTTP endpoints monitoring via blackbox
+  - job_name: 'blackbox_http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://www.google.com
+          - https://prometheus.io
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: localhost:9115
+
+# =============================================================================
+# TLS Configuration
+# =============================================================================
+prometheus_stack_enable_tls: false
+prometheus_stack_tls_server_config:
+  cert_file: /etc/prometheus/tls/cert.pem
+  key_file: /etc/prometheus/tls/key.pem
+
+alertmanager_tls_server_config:
+  cert_file: /etc/alertmanager/tls/cert.pem
+  key_file: /etc/alertmanager/tls/key.pem
+
+# TLS certificate configuration
+prometheus_stack_generate_self_signed_cert: false
+prometheus_stack_tls_cert_path: /etc/prometheus/tls
+prometheus_stack_tls_cert_days: 365
+prometheus_stack_tls_cert_country: US
+prometheus_stack_tls_cert_state: California
+prometheus_stack_tls_cert_locality: San Francisco
+prometheus_stack_tls_cert_organization: Home Lab
+prometheus_stack_tls_cert_common_name: prometheus.local
+
+# =============================================================================
+# Firewall Configuration
+# =============================================================================
+prometheus_stack_configure_firewall: true
+prometheus_stack_firewall_zone: public
+
+# Firewall ports to open
+prometheus_stack_firewall_ports:
+  - 9090/tcp  # Prometheus
+  - 9093/tcp  # Alertmanager
+  - 9094/tcp  # Alertmanager cluster
+  - 9100/tcp  # Node Exporter
+  - 9115/tcp  # Blackbox Exporter
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+prometheus_systemd_enabled: true
+prometheus_systemd_state: started
+alertmanager_systemd_enabled: true
+alertmanager_systemd_state: started
+node_exporter_systemd_enabled: true
+node_exporter_systemd_state: started
+blackbox_exporter_systemd_enabled: true
+blackbox_exporter_systemd_state: started
+
+# =============================================================================
+# Alert Rules Configuration
+# =============================================================================
+prometheus_alert_rules_enabled: true
+prometheus_alert_rules:
+  - alert: InstanceDown
+    expr: up == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Instance instance down"
+      description: "instance of job job has been down for more than 5 minutes."
+
+  - alert: HighCPUUsage
+    expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU usage detected on instance"
+      description: "CPU usage is above 80% (current value: value%)"
+
+  - alert: HighMemoryUsage
+    expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage detected on instance"
+      description: "Memory usage is above 80% (current value: value%)"
+
+  - alert: DiskSpaceLow
+    expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 20
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Low disk space on instance"
+      description: "Disk space is below 20% (current value: value%)"
+
+  - alert: DiskSpaceCritical
+    expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Critical disk space on instance"
+      description: "Disk space is below 10% (current value: value%)"
+
+  - alert: ServiceDown
+    expr: up{job!="prometheus"} == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Service job is down"
+      description: "job on instance has been down for more than 5 minutes."
+
+  - alert: PrometheusConfigReloadFailed
+    expr: prometheus_config_last_reload_successful == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Prometheus configuration reload failed"
+      description: "Prometheus configuration reload has failed on instance"
+
+  - alert: AlertmanagerConfigReloadFailed
+    expr: alertmanager_config_last_reload_successful == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Alertmanager configuration reload failed"
+      description: "Alertmanager configuration reload has failed on instance"
+
+  - alert: HighRequestLatency
+    expr: http_request_duration_seconds{quantile="0.9"} > 1
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High request latency detected"
+      description: "90th percentile request latency is above 1 second (current value: values)"
+
+# =============================================================================
+# Additional Configuration
+# =============================================================================
+# Custom labels to add to all metrics
+prometheus_external_labels: {}
+
+# Enable basic auth
+prometheus_web_basic_auth_enabled: false
+prometheus_web_basic_auth_users: []
+
+# Log level: debug, info, warn, error
+prometheus_log_level: info
+alertmanager_log_level: info
