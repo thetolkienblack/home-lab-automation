@@ -1,0 +1,55 @@
+---
+# Install Grafana via Docker
+
+- name: Ensure Docker is installed
+  ansible.builtin.package:
+    name: docker
+    state: present
+
+- name: Ensure Docker service is running
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Create Grafana directories for Docker volumes
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "472"  # Grafana Docker user
+    group: "472"
+    mode: '0755'
+  loop:
+    - "{{ grafana_config_dir }}"
+    - "{{ grafana_data_dir }}"
+    - "{{ grafana_logs_dir }}"
+    - "{{ grafana_provisioning_dir }}"
+    - "{{ grafana_provisioning_dir }}/datasources"
+    - "{{ grafana_provisioning_dir }}/dashboards"
+    - "{{ grafana_dashboards_dir }}"
+
+- name: Create Docker network for Grafana stack
+  community.docker.docker_network:
+    name: "{{ grafana_docker_network }}"
+    state: present
+
+- name: Deploy Grafana container
+  community.docker.docker_container:
+    name: grafana
+    image: "{{ grafana_docker_image }}:{{ grafana_docker_tag }}"
+    state: started
+    restart_policy: unless-stopped
+    networks:
+      - name: "{{ grafana_docker_network }}"
+    ports:
+      - "{{ grafana_server_http_port }}:3000"
+    volumes:
+      - "{{ grafana_data_dir }}:/var/lib/grafana"
+      - "{{ grafana_config_dir }}/grafana.ini:/etc/grafana/grafana.ini:ro"
+      - "{{ grafana_provisioning_dir }}:/etc/grafana/provisioning:ro"
+      - "{{ grafana_logs_dir }}:/var/log/grafana"
+    env:
+      GF_SERVER_HTTP_PORT: "3000"
+      GF_SECURITY_ADMIN_USER: "{{ grafana_security_admin_user }}"
+      GF_SECURITY_ADMIN_PASSWORD: "{{ grafana_security_admin_password }}"
+      GF_INSTALL_PLUGINS: "{{ grafana_plugins_install | join(',') }}"

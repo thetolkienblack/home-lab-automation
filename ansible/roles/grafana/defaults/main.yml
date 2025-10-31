@@ -1,0 +1,403 @@
+---
+# Grafana Stack default variables
+
+# =============================================================================
+# General Settings - Component Installation Flags
+# =============================================================================
+grafana_install_server: true
+grafana_install_loki: false
+grafana_install_tempo: false
+grafana_install_mimir: false
+grafana_install_alloy: false
+
+# Installation method: 'package', 'binary', or 'docker'
+grafana_install_method: package
+
+# =============================================================================
+# Grafana Server Configuration
+# =============================================================================
+grafana_version: latest
+grafana_package_state: present
+
+# Grafana server settings
+grafana_server_protocol: http
+grafana_server_http_addr: "0.0.0.0"
+grafana_server_http_port: 3000
+grafana_server_domain: localhost
+grafana_server_root_url: "%(protocol)s://%(domain)s:%(http_port)s/"
+grafana_server_serve_from_sub_path: false
+grafana_server_enable_gzip: false
+grafana_server_cert_file: ""
+grafana_server_cert_key: ""
+
+# Grafana paths
+grafana_config_dir: /etc/grafana
+grafana_data_dir: /var/lib/grafana
+grafana_logs_dir: /var/log/grafana
+grafana_plugins_dir: /var/lib/grafana/plugins
+grafana_provisioning_dir: /etc/grafana/provisioning
+
+# =============================================================================
+# Database Backend Configuration
+# =============================================================================
+grafana_database_type: postgres  # sqlite3, mysql, postgres
+grafana_database_host: "127.0.0.1:5432"
+grafana_database_name: grafana
+grafana_database_user: grafana
+# STORE IN VAULT: grafana_database_password
+grafana_database_ssl_mode: disable  # disable, require, verify-ca, verify-full
+grafana_database_ca_cert_path: ""
+grafana_database_client_key_path: ""
+grafana_database_client_cert_path: ""
+grafana_database_server_cert_name: ""
+grafana_database_path: grafana.db  # For SQLite
+grafana_database_max_idle_conn: 2
+grafana_database_max_open_conn: 0
+grafana_database_conn_max_lifetime: 14400
+
+# Database setup (create database/user)
+grafana_database_setup: false
+grafana_database_root_user: postgres
+# STORE IN VAULT: grafana_database_root_password
+
+# =============================================================================
+# Authentication Configuration
+# =============================================================================
+grafana_auth_anonymous_enabled: false
+grafana_auth_anonymous_org_name: Main Org.
+grafana_auth_anonymous_org_role: Viewer
+
+# Basic authentication
+grafana_auth_basic_enabled: true
+grafana_auth_disable_login_form: false
+grafana_auth_disable_signout_menu: false
+
+# Admin user configuration
+grafana_security_admin_user: admin
+# STORE IN VAULT: grafana_security_admin_password
+grafana_security_admin_email: admin@localhost
+
+# Session settings
+grafana_session_provider: file
+grafana_session_provider_config: sessions
+grafana_session_cookie_name: grafana_sess
+grafana_session_cookie_secure: false
+grafana_session_session_life_time: 86400
+
+# OAuth/LDAP (examples - customize as needed)
+grafana_auth_oauth_enabled: false
+grafana_auth_ldap_enabled: false
+grafana_auth_ldap_config_file: /etc/grafana/ldap.toml
+
+# =============================================================================
+# Security Settings
+# =============================================================================
+# STORE IN VAULT: grafana_security_secret_key
+grafana_security_login_remember_days: 7
+grafana_security_cookie_samesite: lax
+grafana_security_allow_embedding: false
+grafana_security_cookie_secure: false
+grafana_security_strict_transport_security: false
+grafana_security_x_content_type_options: true
+grafana_security_x_xss_protection: true
+
+# =============================================================================
+# Users and Organizations
+# =============================================================================
+grafana_users_allow_sign_up: false
+grafana_users_allow_org_create: false
+grafana_users_auto_assign_org: true
+grafana_users_auto_assign_org_id: 1
+grafana_users_auto_assign_org_role: Viewer
+grafana_users_default_theme: dark
+
+# =============================================================================
+# Data Sources Provisioning
+# =============================================================================
+grafana_datasources_enabled: true
+grafana_datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://localhost:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: 15s
+      queryTimeout: 60s
+      httpMethod: POST
+    enabled: "{{ lookup('vars', 'grafana_datasource_prometheus_enabled', default=true) }}"
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://localhost:3100
+    isDefault: false
+    editable: true
+    jsonData:
+      maxLines: 1000
+      timeout: 60
+    enabled: "{{ grafana_install_loki | bool }}"
+
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://localhost:3200
+    isDefault: false
+    editable: true
+    jsonData:
+      nodeGraph:
+        enabled: true
+      serviceMap:
+        enabled: true
+    enabled: "{{ grafana_install_tempo | bool }}"
+
+  - name: Elasticsearch
+    type: elasticsearch
+    access: proxy
+    url: http://localhost:9200
+    database: "[logs-]YYYY.MM.DD"
+    isDefault: false
+    editable: true
+    jsonData:
+      timeField: "@timestamp"
+      esVersion: "8.0.0"
+      logMessageField: message
+      logLevelField: level
+    enabled: "{{ lookup('vars', 'grafana_datasource_elasticsearch_enabled', default=false) }}"
+
+# Additional data sources
+grafana_additional_datasources: []
+
+# =============================================================================
+# Dashboards Provisioning
+# =============================================================================
+grafana_dashboards_enabled: true
+grafana_dashboards_dir: /var/lib/grafana/dashboards
+
+# Pre-configured dashboards to import (by ID from grafana.com)
+grafana_dashboards_import:
+  - dashboard_id: 1860  # Node Exporter Full
+    revision: 31
+    datasource: Prometheus
+    enabled: true
+  - dashboard_id: 13639  # Loki Dashboard
+    revision: 2
+    datasource: Loki
+    enabled: "{{ grafana_install_loki | bool }}"
+  - dashboard_id: 15983  # Tempo Dashboard
+    revision: 2
+    datasource: Tempo
+    enabled: "{{ grafana_install_tempo | bool }}"
+
+# Custom dashboards (JSON files to copy)
+grafana_dashboards_custom: []
+# Example:
+# - name: "My Custom Dashboard"
+#   file: path/to/dashboard.json
+#   folder: "Custom"
+
+# =============================================================================
+# Plugins Configuration
+# =============================================================================
+grafana_plugins_enabled: true
+grafana_plugins_install: []
+# Example:
+# - grafana-clock-panel
+# - grafana-simple-json-datasource
+# - grafana-piechart-panel
+
+# =============================================================================
+# Alerting Configuration
+# =============================================================================
+grafana_alerting_enabled: true
+grafana_alerting_execute_alerts: true
+grafana_unified_alerting_enabled: true
+
+# =============================================================================
+# SMTP Configuration
+# =============================================================================
+grafana_smtp_enabled: false
+grafana_smtp_host: localhost:25
+grafana_smtp_user: ""
+# STORE IN VAULT: grafana_smtp_password
+grafana_smtp_cert_file: ""
+grafana_smtp_key_file: ""
+grafana_smtp_skip_verify: false
+grafana_smtp_from_address: admin@grafana.localhost
+grafana_smtp_from_name: Grafana
+grafana_smtp_ehlo_identity: ""
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+grafana_log_mode: console file
+grafana_log_level: info
+grafana_log_filters: ""
+
+# =============================================================================
+# Loki Configuration
+# =============================================================================
+loki_version: latest
+loki_http_listen_port: 3100
+loki_grpc_listen_port: 9096
+loki_http_listen_address: "0.0.0.0"
+loki_config_dir: /etc/loki
+loki_data_dir: /var/lib/loki
+loki_wal_dir: /var/lib/loki/wal
+loki_rules_dir: /etc/loki/rules
+
+# Loki retention
+loki_retention_enabled: true
+loki_retention_period: 168h  # 7 days
+
+# Loki storage
+loki_storage_type: filesystem  # filesystem, s3, gcs, azure
+loki_storage_filesystem_directory: /var/lib/loki/chunks
+
+# Loki limits
+loki_limits_reject_old_samples: true
+loki_limits_reject_old_samples_max_age: 168h
+loki_limits_ingestion_rate_mb: 4
+loki_limits_ingestion_burst_size_mb: 6
+loki_limits_max_streams_per_user: 10000
+loki_limits_max_global_streams_per_user: 0
+
+# =============================================================================
+# Tempo Configuration
+# =============================================================================
+tempo_version: latest
+tempo_http_listen_port: 3200
+tempo_grpc_listen_port: 9095
+tempo_http_listen_address: "0.0.0.0"
+tempo_config_dir: /etc/tempo
+tempo_data_dir: /var/lib/tempo
+
+# Tempo storage
+tempo_storage_path: /var/lib/tempo/traces
+tempo_storage_wal_path: /var/lib/tempo/wal
+
+# Tempo receivers (OTLP, Jaeger, Zipkin)
+tempo_receivers_otlp_grpc_enabled: true
+tempo_receivers_otlp_grpc_endpoint: "0.0.0.0:4317"
+tempo_receivers_otlp_http_enabled: true
+tempo_receivers_otlp_http_endpoint: "0.0.0.0:4318"
+tempo_receivers_jaeger_grpc_enabled: true
+tempo_receivers_jaeger_grpc_endpoint: "0.0.0.0:14250"
+tempo_receivers_jaeger_thrift_http_enabled: true
+tempo_receivers_jaeger_thrift_http_endpoint: "0.0.0.0:14268"
+tempo_receivers_zipkin_enabled: true
+tempo_receivers_zipkin_endpoint: "0.0.0.0:9411"
+
+# =============================================================================
+# Mimir Configuration
+# =============================================================================
+mimir_version: latest
+mimir_http_listen_port: 9009
+mimir_grpc_listen_port: 9095
+mimir_http_listen_address: "0.0.0.0"
+mimir_config_dir: /etc/mimir
+mimir_data_dir: /var/lib/mimir
+
+# Mimir target (deployment mode)
+mimir_target: all  # all, read, write, backend, read-write
+
+# Mimir storage
+mimir_storage_backend: filesystem  # filesystem, s3, gcs, azure
+mimir_storage_filesystem_dir: /var/lib/mimir/data
+
+# Mimir blocks storage
+mimir_blocks_storage_bucket_store_sync_interval: 15m
+mimir_blocks_storage_tsdb_dir: /var/lib/mimir/tsdb
+
+# =============================================================================
+# Grafana Alloy Configuration
+# =============================================================================
+alloy_version: latest
+alloy_http_listen_port: 12345
+alloy_http_listen_address: "0.0.0.0"
+alloy_config_dir: /etc/alloy
+alloy_data_dir: /var/lib/alloy
+
+# Alloy configuration file
+alloy_config_file: /etc/alloy/config.alloy
+
+# Alloy integrations
+alloy_prometheus_remote_write_enabled: true
+alloy_prometheus_remote_write_url: http://localhost:9009/api/v1/push
+alloy_loki_write_enabled: true
+alloy_loki_write_url: http://localhost:3100/loki/api/v1/push
+alloy_tempo_write_enabled: true
+alloy_tempo_write_url: http://localhost:4317
+
+# Alloy discovery
+alloy_discovery_kubernetes_enabled: false
+alloy_discovery_docker_enabled: false
+alloy_discovery_file_enabled: true
+
+# =============================================================================
+# Firewall Configuration
+# =============================================================================
+grafana_configure_firewall: true
+grafana_firewall_zone: public
+
+# Firewall ports
+grafana_firewall_ports:
+  - 3000/tcp   # Grafana
+  - 3100/tcp   # Loki
+  - 3200/tcp   # Tempo
+  - 9009/tcp   # Mimir
+  - 9095/tcp   # Tempo/Mimir gRPC
+  - 9096/tcp   # Loki gRPC
+  - 12345/tcp  # Alloy
+  - 4317/tcp   # OTLP gRPC
+  - 4318/tcp   # OTLP HTTP
+  - 14250/tcp  # Jaeger gRPC
+  - 14268/tcp  # Jaeger HTTP
+  - 9411/tcp   # Zipkin
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+grafana_service_enabled: true
+grafana_service_state: started
+loki_service_enabled: true
+loki_service_state: started
+tempo_service_enabled: true
+tempo_service_state: started
+mimir_service_enabled: true
+mimir_service_state: started
+alloy_service_enabled: true
+alloy_service_state: started
+
+# =============================================================================
+# Docker Configuration (when install_method is 'docker')
+# =============================================================================
+grafana_docker_image: grafana/grafana
+grafana_docker_tag: latest
+grafana_docker_network: grafana_network
+grafana_docker_volumes:
+  - grafana-data:/var/lib/grafana
+  - grafana-config:/etc/grafana
+
+loki_docker_image: grafana/loki
+loki_docker_tag: latest
+tempo_docker_image: grafana/tempo
+tempo_docker_tag: latest
+mimir_docker_image: grafana/mimir
+mimir_docker_tag: latest
+alloy_docker_image: grafana/alloy
+alloy_docker_tag: latest
+
+# =============================================================================
+# Binary Installation Configuration
+# =============================================================================
+grafana_binary_url: "https://dl.grafana.com/oss/release/grafana-{{ grafana_version }}.linux-amd64.tar.gz"
+loki_binary_url: "https://github.com/grafana/loki/releases/download/v{{ loki_version }}/loki-linux-amd64.zip"
+tempo_binary_url: "https://github.com/grafana/tempo/releases/download/v{{ tempo_version }}/tempo_{{ tempo_version }}_linux_amd64.tar.gz"
+mimir_binary_url: "https://github.com/grafana/mimir/releases/download/mimir-{{ mimir_version }}/mimir-linux-amd64"
+alloy_binary_url: "https://github.com/grafana/alloy/releases/download/v{{ alloy_version }}/alloy-linux-amd64.zip"
+
+grafana_binary_install_dir: /usr/local/bin
+grafana_user: grafana
+grafana_group: grafana

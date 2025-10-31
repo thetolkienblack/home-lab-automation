@@ -1,0 +1,25 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Update apt cache (Debian)
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Update yum cache (RedHat)
+      ansible.builtin.yum:
+        update_cache: true
+      when: ansible_os_family == "RedHat"
+
+  roles:
+    - role: elk_stack
+
+  post_tasks:
+    - name: Wait for services to stabilize
+      ansible.builtin.pause:
+        seconds: 30

@@ -1,0 +1,24 @@
+---
+# Configure firewall rules
+
+- name: Configure UFW firewall rules (Debian)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.split('/')[0] }}"
+    proto: "{{ item.split('/')[1] }}"
+  loop: "{{ grafana_firewall_ports }}"
+  when:
+    - ansible_os_family == "Debian"
+    - grafana_firewall_tool == "ufw"
+
+- name: Configure firewalld rules (RedHat)
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    permanent: true
+    state: enabled
+    zone: "{{ grafana_firewall_zone }}"
+    immediate: true
+  loop: "{{ grafana_firewall_ports }}"
+  when:
+    - ansible_os_family == "RedHat"
+    - grafana_firewall_tool == "firewalld"

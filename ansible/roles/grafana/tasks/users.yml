@@ -1,0 +1,92 @@
+---
+# Create system users and groups
+
+- name: Create Grafana system group
+  ansible.builtin.group:
+    name: "{{ grafana_group }}"
+    state: present
+    system: true
+  when: grafana_install_server | bool
+
+- name: Create Grafana system user
+  ansible.builtin.user:
+    name: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    shell: /usr/sbin/nologin
+    home: "{{ grafana_data_dir }}"
+    create_home: false
+    system: true
+    state: present
+  when: grafana_install_server | bool
+
+- name: Create Loki system group
+  ansible.builtin.group:
+    name: loki
+    state: present
+    system: true
+  when: grafana_install_loki | bool
+
+- name: Create Loki system user
+  ansible.builtin.user:
+    name: loki
+    group: loki
+    shell: /usr/sbin/nologin
+    home: "{{ loki_data_dir }}"
+    create_home: false
+    system: true
+    state: present
+  when: grafana_install_loki | bool
+
+- name: Create Tempo system group
+  ansible.builtin.group:
+    name: tempo
+    state: present
+    system: true
+  when: grafana_install_tempo | bool
+
+- name: Create Tempo system user
+  ansible.builtin.user:
+    name: tempo
+    group: tempo
+    shell: /usr/sbin/nologin
+    home: "{{ tempo_data_dir }}"
+    create_home: false
+    system: true
+    state: present
+  when: grafana_install_tempo | bool
+
+- name: Create Mimir system group
+  ansible.builtin.group:
+    name: mimir
+    state: present
+    system: true
+  when: grafana_install_mimir | bool
+
+- name: Create Mimir system user
+  ansible.builtin.user:
+    name: mimir
+    group: mimir
+    shell: /usr/sbin/nologin
+    home: "{{ mimir_data_dir }}"
+    create_home: false
+    system: true
+    state: present
+  when: grafana_install_mimir | bool
+
+- name: Create Alloy system group
+  ansible.builtin.group:
+    name: alloy
+    state: present
+    system: true
+  when: grafana_install_alloy | bool
+
+- name: Create Alloy system user
+  ansible.builtin.user:
+    name: alloy
+    group: alloy
+    shell: /usr/sbin/nologin
+    home: "{{ alloy_data_dir }}"
+    create_home: false
+    system: true
+    state: present
+  when: grafana_install_alloy | bool

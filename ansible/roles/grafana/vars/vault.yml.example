@@ -1,0 +1,29 @@
+---
+# Example Ansible Vault file for sensitive Grafana variables
+# To create an encrypted vault file:
+# ansible-vault create vars/vault.yml
+#
+# To edit an encrypted vault file:
+# ansible-vault edit vars/vault.yml
+#
+# Copy this file and encrypt it with your sensitive values
+
+# Grafana Admin Credentials
+grafana_security_admin_password: "ChangeMe123!"
+grafana_security_secret_key: "GenerateARandomSecretKeyHere"
+
+# Database Credentials
+grafana_database_password: "SecureDbPassword123"
+grafana_database_root_password: "SecureRootPassword123"
+
+# SMTP Credentials
+grafana_smtp_password: "EmailPasswordHere"
+
+# OAuth Secrets (if using OAuth)
+# grafana_oauth_client_secret: "YourOAuthClientSecret"
+
+# LDAP Bind Password (if using LDAP)
+# grafana_ldap_bind_password: "LdapBindPassword"
+
+# API Keys (if needed for provisioning)
+# grafana_api_key: "YourApiKeyHere"

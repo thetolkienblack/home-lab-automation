@@ -1,0 +1,104 @@
+---
+- name: Install Elasticsearch (Debian)
+  ansible.builtin.apt:
+    name: "elasticsearch={{ elk_version }}"
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+  notify: Restart Elasticsearch
+
+- name: Install Elasticsearch (RedHat)
+  ansible.builtin.yum:
+    name: "elasticsearch-{{ elk_version }}"
+    state: present
+  when: ansible_os_family == "RedHat"
+  notify: Restart Elasticsearch
+
+- name: Create Elasticsearch data directory
+  ansible.builtin.file:
+    path: "{{ elasticsearch_data_dir }}"
+    state: directory
+    owner: elasticsearch
+    group: elasticsearch
+    mode: '0750'
+
+- name: Create Elasticsearch log directory
+  ansible.builtin.file:
+    path: "{{ elasticsearch_log_dir }}"
+    state: directory
+    owner: elasticsearch
+    group: elasticsearch
+    mode: '0750'
+
+- name: Create SSL certificate directory
+  ansible.builtin.file:
+    path: "{{ elk_ssl_certificate_path }}"
+    state: directory
+    owner: elasticsearch
+    group: elasticsearch
+    mode: '0750'
+  when: elk_ssl_enabled | bool
+
+- name: Configure Elasticsearch
+  ansible.builtin.template:
+    src: elasticsearch.yml.j2
+    dest: "{{ elasticsearch_config_dir }}/elasticsearch.yml"
+    owner: root
+    group: elasticsearch
+    mode: '0660'
+  notify: Restart Elasticsearch
+
+- name: Configure Elasticsearch JVM options
+  ansible.builtin.template:
+    src: elasticsearch-jvm.options.j2
+    dest: "{{ elasticsearch_config_dir }}/jvm.options.d/heap.options"
+    owner: root
+    group: elasticsearch
+    mode: '0660'
+  notify: Restart Elasticsearch
+
+- name: Enable and start Elasticsearch service
+  ansible.builtin.systemd:
+    name: elasticsearch
+    enabled: "{{ elk_service_enabled }}"
+    state: "{{ elk_service_state }}"
+    daemon_reload: true
+
+- name: Wait for Elasticsearch to start
+  ansible.builtin.wait_for:
+    port: "{{ elasticsearch_http_port }}"
+    delay: 10
+    timeout: 300
+  when: elk_service_state == "started"
+
+- name: Check Elasticsearch health
+  ansible.builtin.uri:
+    url: "http://localhost:{{ elasticsearch_http_port }}/_cluster/health"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: es_health
+  until: es_health.status == 200
+  retries: 10
+  delay: 5
+  when:
+    - elk_service_state == "started"
+    - not elk_security_enabled | bool
+
+- name: Get Elasticsearch version info
+  ansible.builtin.uri:
+    url: "http://localhost:{{ elasticsearch_http_port }}"
+    method: GET
+    return_content: true
+  register: es_version
+  when:
+    - elk_service_state == "started"
+    - not elk_security_enabled | bool
+
+- name: Display Elasticsearch version
+  ansible.builtin.debug:
+    msg: "Elasticsearch {{ es_version.json.version.number }} is running"
+  when:
+    - elk_service_state == "started"
+    - not elk_security_enabled | bool
+    - es_version.json is defined

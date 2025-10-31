@@ -1,0 +1,49 @@
+---
+# Handlers for Grafana stack
+
+- name: Restart grafana
+  ansible.builtin.systemd:
+    name: "{{ grafana_service_name }}"
+    state: restarted
+    daemon_reload: true
+  when: grafana_install_server | bool
+
+- name: Reload grafana
+  ansible.builtin.systemd:
+    name: "{{ grafana_service_name }}"
+    state: reloaded
+  when: grafana_install_server | bool
+
+- name: Restart loki
+  ansible.builtin.systemd:
+    name: "{{ loki_service_name }}"
+    state: restarted
+    daemon_reload: true
+  when: grafana_install_loki | bool
+
+- name: Reload loki
+  ansible.builtin.systemd:
+    name: "{{ loki_service_name }}"
+    state: reloaded
+  when: grafana_install_loki | bool
+
+- name: Restart tempo
+  ansible.builtin.systemd:
+    name: "{{ tempo_service_name }}"
+    state: restarted
+    daemon_reload: true
+  when: grafana_install_tempo | bool
+
+- name: Restart mimir
+  ansible.builtin.systemd:
+    name: "{{ mimir_service_name }}"
+    state: restarted
+    daemon_reload: true
+  when: grafana_install_mimir | bool
+
+- name: Restart alloy
+  ansible.builtin.systemd:
+    name: "{{ alloy_service_name }}"
+    state: restarted
+    daemon_reload: true
+  when: grafana_install_alloy | bool

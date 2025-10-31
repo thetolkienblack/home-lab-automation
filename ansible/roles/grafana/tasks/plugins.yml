@@ -1,0 +1,23 @@
+---
+# Install Grafana plugins
+
+- name: Install Grafana plugins
+  ansible.builtin.command:
+    cmd: "grafana-cli plugins install {{ item }}"
+  loop: "{{ grafana_plugins_install }}"
+  register: plugin_install
+  changed_when: "'Installed' in plugin_install.stdout"
+  failed_when:
+    - plugin_install.rc != 0
+    - "'already installed' not in plugin_install.stderr"
+  notify: Restart grafana
+
+- name: Update Grafana plugins
+  ansible.builtin.command:
+    cmd: "grafana-cli plugins update {{ item }}"
+  loop: "{{ grafana_plugins_install }}"
+  register: plugin_update
+  changed_when: "'Updated' in plugin_update.stdout"
+  failed_when: false
+  when: grafana_package_state == 'latest'
+  notify: Restart grafana

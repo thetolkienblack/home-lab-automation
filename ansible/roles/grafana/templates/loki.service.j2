@@ -1,0 +1,19 @@
+[Unit]
+Description=Loki log aggregation system
+Documentation=https://grafana.com/docs/loki/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=loki
+Group=loki
+ExecStart={{ grafana_binary_install_dir }}/loki \
+  -config.file={{ loki_config_dir }}/loki.yml
+
+WorkingDirectory={{ loki_data_dir }}
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

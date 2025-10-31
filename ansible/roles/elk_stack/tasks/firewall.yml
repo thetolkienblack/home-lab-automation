@@ -1,0 +1,122 @@
+---
+- name: Configure firewall for ELK Stack (firewalld - RedHat)
+  when:
+    - ansible_os_family == "RedHat"
+  block:
+    - name: Allow Elasticsearch HTTP port
+      ansible.posix.firewalld:
+        port: "{{ elasticsearch_http_port }}/tcp"
+        permanent: true
+        state: enabled
+        zone: "{{ item }}"
+      loop: "{{ elk_firewall_zones }}"
+      when: elk_install_elasticsearch | bool
+
+    - name: Allow Elasticsearch transport port
+      ansible.posix.firewalld:
+        port: "{{ elasticsearch_transport_port }}/tcp"
+        permanent: true
+        state: enabled
+        zone: "{{ item }}"
+      loop: "{{ elk_firewall_zones }}"
+      when:
+        - elk_install_elasticsearch | bool
+        - elk_deployment_mode == "cluster"
+
+    - name: Allow Logstash Beats input port
+      ansible.posix.firewalld:
+        port: "{{ logstash_beats_port }}/tcp"
+        permanent: true
+        state: enabled
+        zone: "{{ item }}"
+      loop: "{{ elk_firewall_zones }}"
+      when: elk_install_logstash | bool
+
+    - name: Allow Logstash HTTP API port
+      ansible.posix.firewalld:
+        port: "{{ logstash_http_port }}/tcp"
+        permanent: true
+        state: enabled
+        zone: "{{ item }}"
+      loop: "{{ elk_firewall_zones }}"
+      when: elk_install_logstash | bool
+
+    - name: Allow Kibana port
+      ansible.posix.firewalld:
+        port: "{{ kibana_server_port }}/tcp"
+        permanent: true
+        state: enabled
+        zone: "{{ item }}"
+      loop: "{{ elk_firewall_zones }}"
+      when: elk_install_kibana | bool
+
+    - name: Allow Prometheus Exporter port
+      ansible.posix.firewalld:
+        port: "{{ elk_prometheus_exporter_port }}/tcp"
+        permanent: true
+        state: enabled
+        zone: "{{ item }}"
+      loop: "{{ elk_firewall_zones }}"
+      when: elk_install_prometheus_exporter | bool
+
+    - name: Reload firewalld
+      ansible.builtin.systemd:
+        name: firewalld
+        state: reloaded
+
+- name: Configure firewall for ELK Stack (ufw - Debian)
+  when:
+    - ansible_os_family == "Debian"
+  block:
+    - name: Install ufw
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+
+    - name: Allow Elasticsearch HTTP port
+      community.general.ufw:
+        rule: allow
+        port: "{{ elasticsearch_http_port }}"
+        proto: tcp
+      when: elk_install_elasticsearch | bool
+
+    - name: Allow Elasticsearch transport port
+      community.general.ufw:
+        rule: allow
+        port: "{{ elasticsearch_transport_port }}"
+        proto: tcp
+      when:
+        - elk_install_elasticsearch | bool
+        - elk_deployment_mode == "cluster"
+
+    - name: Allow Logstash Beats input port
+      community.general.ufw:
+        rule: allow
+        port: "{{ logstash_beats_port }}"
+        proto: tcp
+      when: elk_install_logstash | bool
+
+    - name: Allow Logstash HTTP API port
+      community.general.ufw:
+        rule: allow
+        port: "{{ logstash_http_port }}"
+        proto: tcp
+      when: elk_install_logstash | bool
+
+    - name: Allow Kibana port
+      community.general.ufw:
+        rule: allow
+        port: "{{ kibana_server_port }}"
+        proto: tcp
+      when: elk_install_kibana | bool
+
+    - name: Allow Prometheus Exporter port
+      community.general.ufw:
+        rule: allow
+        port: "{{ elk_prometheus_exporter_port }}"
+        proto: tcp
+      when: elk_install_prometheus_exporter | bool
+
+    - name: Enable ufw
+      community.general.ufw:
+        state: enabled

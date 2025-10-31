@@ -1,0 +1,33 @@
+---
+galaxy_info:
+  role_name: elk_stack
+  author: Sidney
+  description: Install and configure ELK Stack (Elasticsearch, Logstash, Kibana) with monitoring exporters
+  company: Home Lab
+  license: MIT
+  min_ansible_version: "2.12"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - focal
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+
+  galaxy_tags:
+    - elasticsearch
+    - logstash
+    - kibana
+    - elk
+    - logging
+    - monitoring
+    - observability
+
+dependencies: []

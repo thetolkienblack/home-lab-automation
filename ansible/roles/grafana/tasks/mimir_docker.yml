@@ -1,0 +1,39 @@
+---
+# Install Mimir via Docker
+
+- name: Create Mimir directories for Docker volumes
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "10001"  # Mimir Docker user
+    group: "10001"
+    mode: '0755'
+  loop:
+    - "{{ mimir_config_dir }}"
+    - "{{ mimir_data_dir }}"
+    - "{{ mimir_storage_filesystem_dir }}"
+    - "{{ mimir_blocks_storage_tsdb_dir }}"
+
+- name: Deploy Mimir configuration
+  ansible.builtin.template:
+    src: mimir.yml.j2
+    dest: "{{ mimir_config_dir }}/mimir.yml"
+    owner: "10001"
+    group: "10001"
+    mode: '0644'
+
+- name: Deploy Mimir container
+  community.docker.docker_container:
+    name: mimir
+    image: "{{ mimir_docker_image }}:{{ mimir_docker_tag }}"
+    state: started
+    restart_policy: unless-stopped
+    networks:
+      - name: "{{ grafana_docker_network }}"
+    ports:
+      - "{{ mimir_http_listen_port }}:9009"
+      - "{{ mimir_grpc_listen_port }}:9095"
+    volumes:
+      - "{{ mimir_data_dir }}:/data"
+      - "{{ mimir_config_dir }}/mimir.yml:/etc/mimir/mimir.yaml:ro"
+    command: "-config.file=/etc/mimir/mimir.yaml -target={{ mimir_target }}"

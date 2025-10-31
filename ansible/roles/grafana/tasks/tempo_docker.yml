@@ -1,0 +1,39 @@
+---
+# Install Tempo via Docker
+
+- name: Create Tempo directories for Docker volumes
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "10001"  # Tempo Docker user
+    group: "10001"
+    mode: '0755'
+  loop:
+    - "{{ tempo_config_dir }}"
+    - "{{ tempo_data_dir }}"
+    - "{{ tempo_storage_path }}"
+    - "{{ tempo_storage_wal_path }}"
+
+- name: Deploy Tempo configuration
+  ansible.builtin.template:
+    src: tempo.yml.j2
+    dest: "{{ tempo_config_dir }}/tempo.yml"
+    owner: "10001"
+    group: "10001"
+    mode: '0644'
+
+- name: Deploy Tempo container
+  community.docker.docker_container:
+    name: tempo
+    image: "{{ tempo_docker_image }}:{{ tempo_docker_tag }}"
+    state: started
+    restart_policy: unless-stopped
+    networks:
+      - name: "{{ grafana_docker_network }}"
+    ports:
+      - "{{ tempo_http_listen_port }}:3200"
+      - "{{ tempo_grpc_listen_port }}:9095"
+    volumes:
+      - "{{ tempo_data_dir }}:/var/tempo"
+      - "{{ tempo_config_dir }}/tempo.yml:/etc/tempo/tempo.yml:ro"
+    command: "-config.file=/etc/tempo/tempo.yml"

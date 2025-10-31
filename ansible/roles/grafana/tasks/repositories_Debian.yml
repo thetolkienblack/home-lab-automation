@@ -1,0 +1,21 @@
+---
+# Debian repository setup
+
+- name: Install system packages (Debian)
+  ansible.builtin.apt:
+    name: "{{ grafana_system_packages }}"
+    state: present
+    update_cache: true
+
+- name: Add Grafana GPG key (Debian)
+  ansible.builtin.get_url:
+    url: "{{ grafana_repo_key_url }}"
+    dest: "{{ grafana_repo_key_dest }}"
+    mode: '0644'
+
+- name: Add Grafana APT repository (Debian)
+  ansible.builtin.apt_repository:
+    repo: "{{ grafana_repo_url }}"
+    state: present
+    filename: grafana
+    update_cache: true

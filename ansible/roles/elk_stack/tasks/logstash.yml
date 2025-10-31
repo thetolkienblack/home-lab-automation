@@ -1,0 +1,117 @@
+---
+- name: Install Logstash (Debian)
+  ansible.builtin.apt:
+    name: "logstash=1:{{ elk_version }}-1"
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+  notify: Restart Logstash
+
+- name: Install Logstash (RedHat)
+  ansible.builtin.yum:
+    name: "logstash-{{ elk_version }}"
+    state: present
+  when: ansible_os_family == "RedHat"
+  notify: Restart Logstash
+
+- name: Create Logstash data directory
+  ansible.builtin.file:
+    path: "{{ logstash_data_dir }}"
+    state: directory
+    owner: logstash
+    group: logstash
+    mode: '0750'
+
+- name: Create Logstash log directory
+  ansible.builtin.file:
+    path: "{{ logstash_log_dir }}"
+    state: directory
+    owner: logstash
+    group: logstash
+    mode: '0750'
+
+- name: Create Logstash pipeline directory
+  ansible.builtin.file:
+    path: "{{ logstash_config_dir }}/conf.d"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Configure Logstash main settings
+  ansible.builtin.template:
+    src: logstash.yml.j2
+    dest: "{{ logstash_config_dir }}/logstash.yml"
+    owner: root
+    group: logstash
+    mode: '0660'
+  notify: Restart Logstash
+
+- name: Configure Logstash JVM options
+  ansible.builtin.template:
+    src: logstash-jvm.options.j2
+    dest: "{{ logstash_config_dir }}/jvm.options"
+    owner: root
+    group: logstash
+    mode: '0660'
+  notify: Restart Logstash
+
+- name: Configure Logstash pipelines
+  ansible.builtin.template:
+    src: pipelines.yml.j2
+    dest: "{{ logstash_config_dir }}/pipelines.yml"
+    owner: root
+    group: logstash
+    mode: '0660'
+  notify: Restart Logstash
+
+- name: Configure Logstash Beats input pipeline
+  ansible.builtin.template:
+    src: logstash-beats.conf.j2
+    dest: "{{ logstash_config_dir }}/conf.d/beats.conf"
+    owner: root
+    group: logstash
+    mode: '0660'
+  notify: Restart Logstash
+
+- name: Configure Logstash Syslog input pipeline
+  ansible.builtin.template:
+    src: logstash-syslog.conf.j2
+    dest: "{{ logstash_config_dir }}/conf.d/syslog.conf"
+    owner: root
+    group: logstash
+    mode: '0660'
+  notify: Restart Logstash
+
+- name: Enable and start Logstash service
+  ansible.builtin.systemd:
+    name: logstash
+    enabled: "{{ elk_service_enabled }}"
+    state: "{{ elk_service_state }}"
+    daemon_reload: true
+
+- name: Wait for Logstash to start
+  ansible.builtin.wait_for:
+    port: "{{ logstash_http_port }}"
+    delay: 15
+    timeout: 300
+  when: elk_service_state == "started"
+
+- name: Check Logstash API health
+  ansible.builtin.uri:
+    url: "http://localhost:{{ logstash_http_port }}/"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: logstash_health
+  until: logstash_health.status == 200
+  retries: 10
+  delay: 5
+  when: elk_service_state == "started"
+
+- name: Display Logstash info
+  ansible.builtin.debug:
+    msg: "Logstash is running and accepting connections"
+  when:
+    - elk_service_state == "started"
+    - logstash_health.status == 200

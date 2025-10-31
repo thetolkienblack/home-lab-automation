@@ -1,0 +1,100 @@
+---
+- name: Deploy ELK Stack
+  hosts: elk_servers
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Validate ELK deployment requirements
+      ansible.builtin.assert:
+        that:
+          - ansible_memtotal_mb >= 4096
+          - ansible_processor_vcpus >= 2
+        fail_msg: |
+          ELK Stack requires minimum:
+          - 4GB RAM (found: {{ ansible_memtotal_mb }}MB)
+          - 2 CPU cores (found: {{ ansible_processor_vcpus }})
+        success_msg: "System meets ELK Stack requirements"
+
+    - name: Set vm.max_map_count for Elasticsearch
+      ansible.posix.sysctl:
+        name: vm.max_map_count
+        value: "262144"
+        state: present
+        reload: true
+
+    - name: Check disk space
+      ansible.builtin.shell: df -h / | tail -1 | awk '{print $5}' | sed 's/%//'
+      register: disk_usage
+      changed_when: false
+
+    - name: Warn if disk space is low
+      ansible.builtin.debug:
+        msg: "WARNING: Disk usage is {{ disk_usage.stdout }}%. ELK Stack requires significant disk space."
+      when: disk_usage.stdout | int > 80
+
+  roles:
+    - role: elk_stack
+
+  post_tasks:
+    - name: Wait for all services to stabilize
+      ansible.builtin.pause:
+        seconds: 30
+        prompt: "Waiting for ELK Stack services to stabilize..."
+
+    - name: Verify Elasticsearch cluster health
+      ansible.builtin.uri:
+        url: "http://localhost:9200/_cluster/health"
+        method: GET
+        return_content: true
+      register: cluster_health
+      until: cluster_health.json.status in ['green', 'yellow']
+      retries: 10
+      delay: 10
+      when: elk_install_elasticsearch | default(true) | bool
+
+    - name: Display Elasticsearch cluster info
+      ansible.builtin.debug:
+        msg:
+          - "Cluster Name: {{ cluster_health.json.cluster_name }}"
+          - "Status: {{ cluster_health.json.status }}"
+          - "Nodes: {{ cluster_health.json.number_of_nodes }}"
+          - "Active Shards: {{ cluster_health.json.active_shards }}"
+      when:
+        - elk_install_elasticsearch | default(true) | bool
+        - cluster_health.json is defined
+
+    - name: Get Logstash node info
+      ansible.builtin.uri:
+        url: "http://localhost:9600/?pretty"
+        method: GET
+        return_content: true
+      register: logstash_info
+      when: elk_install_logstash | default(true) | bool
+
+    - name: Display Logstash info
+      ansible.builtin.debug:
+        msg:
+          - "Logstash Version: {{ logstash_info.json.version }}"
+          - "Logstash Status: {{ logstash_info.json.status }}"
+      when:
+        - elk_install_logstash | default(true) | bool
+        - logstash_info.json is defined
+
+    - name: Display access URLs
+      ansible.builtin.debug:
+        msg:
+          - "========================================="
+          - "ELK Stack Deployment Summary"
+          - "========================================="
+          - "Elasticsearch: http://{{ ansible_default_ipv4.address }}:9200"
+          - "Kibana: http://{{ ansible_default_ipv4.address }}:5601"
+          - "Logstash API: http://{{ ansible_default_ipv4.address }}:9600"
+          - "Logstash Beats Input: {{ ansible_default_ipv4.address }}:5044"
+          - "Prometheus Metrics: http://{{ ansible_default_ipv4.address }}:9114/metrics"
+          - "========================================="
+          - "Next Steps:"
+          - "1. Access Kibana at http://{{ ansible_default_ipv4.address }}:5601"
+          - "2. Configure your log shippers to send to {{ ansible_default_ipv4.address }}:5044"
+          - "3. Add Prometheus scrape config for {{ ansible_default_ipv4.address }}:9114"
+          - "========================================="

@@ -1,0 +1,4 @@
+---
+# Debian-specific variables
+elk_package_state: present
+elk_apt_cache_valid_time: 3600

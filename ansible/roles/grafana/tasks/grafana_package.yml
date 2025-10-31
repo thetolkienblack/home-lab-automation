@@ -1,0 +1,40 @@
+---
+# Install Grafana via package manager
+
+- name: Create Grafana directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0755'
+  loop:
+    - "{{ grafana_config_dir }}"
+    - "{{ grafana_data_dir }}"
+    - "{{ grafana_logs_dir }}"
+    - "{{ grafana_plugins_dir }}"
+    - "{{ grafana_provisioning_dir }}"
+    - "{{ grafana_provisioning_dir }}/datasources"
+    - "{{ grafana_provisioning_dir }}/dashboards"
+    - "{{ grafana_provisioning_dir }}/notifiers"
+    - "{{ grafana_provisioning_dir }}/plugins"
+    - "{{ grafana_dashboards_dir }}"
+
+- name: Install Grafana package (Debian)
+  ansible.builtin.apt:
+    name: "{{ grafana_package_name }}{% if grafana_version != 'latest' %}={{ grafana_version }}{% endif %}"
+    state: "{{ grafana_package_state }}"
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Install Grafana package (RedHat)
+  ansible.builtin.yum:
+    name: "{{ grafana_package_name }}{% if grafana_version != 'latest' %}-{{ grafana_version }}{% endif %}"
+    state: "{{ grafana_package_state }}"
+  when: ansible_os_family == "RedHat"
+
+- name: Ensure Grafana service is configured
+  ansible.builtin.systemd:
+    name: "{{ grafana_service_name }}"
+    enabled: "{{ grafana_service_enabled }}"
+    daemon_reload: true

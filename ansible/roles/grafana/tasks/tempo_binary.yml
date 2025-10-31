@@ -1,0 +1,61 @@
+---
+# Install Tempo from binary
+
+- name: Create Tempo directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: tempo
+    group: tempo
+    mode: '0755'
+  loop:
+    - "{{ tempo_config_dir }}"
+    - "{{ tempo_data_dir }}"
+    - "{{ tempo_storage_path }}"
+    - "{{ tempo_storage_wal_path }}"
+
+- name: Download Tempo binary
+  ansible.builtin.get_url:
+    url: "{{ tempo_binary_url }}"
+    dest: /tmp/tempo.tar.gz
+    mode: '0644'
+
+- name: Unzip Tempo binary
+  ansible.builtin.unarchive:
+    src: /tmp/tempo.tar.gz
+    dest: "{{ grafana_binary_install_dir }}"
+    remote_src: true
+    mode: '0755'
+
+- name: Rename Tempo binary
+  ansible.builtin.copy:
+    src: "{{ grafana_binary_install_dir }}/tempo-linux-amd64"
+    dest: "{{ grafana_binary_install_dir }}/tempo"
+    mode: '0755'
+    remote_src: true
+
+- name: Deploy Tempo configuration
+  ansible.builtin.template:
+    src: tempo.yml.j2
+    dest: "{{ tempo_config_dir }}/tempo.yml"
+    owner: tempo
+    group: tempo
+    mode: '0644'
+  notify: Restart tempo
+
+- name: Deploy Tempo systemd service file
+  ansible.builtin.template:
+    src: tempo.service.j2
+    dest: /etc/systemd/system/tempo.service
+    mode: '0644'
+  notify: Restart tempo
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Enable and start Tempo service
+  ansible.builtin.systemd:
+    name: tempo
+    enabled: "{{ tempo_service_enabled }}"
+    state: "{{ tempo_service_state }}"

@@ -1,0 +1,71 @@
+---
+# Install Grafana from binary
+
+- name: Create Grafana directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0755'
+  loop:
+    - "{{ grafana_config_dir }}"
+    - "{{ grafana_data_dir }}"
+    - "{{ grafana_logs_dir }}"
+    - "{{ grafana_plugins_dir }}"
+    - "{{ grafana_provisioning_dir }}"
+    - "{{ grafana_provisioning_dir }}/datasources"
+    - "{{ grafana_provisioning_dir }}/dashboards"
+    - "{{ grafana_provisioning_dir }}/notifiers"
+    - "{{ grafana_provisioning_dir }}/plugins"
+    - "{{ grafana_dashboards_dir }}"
+    - /opt/grafana
+
+- name: Download Grafana binary
+  ansible.builtin.get_url:
+    url: "{{ grafana_binary_url }}"
+    dest: /tmp/grafana.tar.gz
+    mode: '0644'
+  when: grafana_version != 'latest'
+
+- name: Download Grafana latest binary
+  ansible.builtin.get_url:
+    url: "https://dl.grafana.com/oss/release/grafana-latest.linux-amd64.tar.gz"
+    dest: /tmp/grafana.tar.gz
+    mode: '0644'
+  when: grafana_version == 'latest'
+
+- name: Extract Grafana binary
+  ansible.builtin.unarchive:
+    src: /tmp/grafana.tar.gz
+    dest: /opt/grafana
+    remote_src: true
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    extra_opts:
+      - --strip-components=1
+
+- name: Create Grafana binary symlink
+  ansible.builtin.file:
+    src: /opt/grafana/bin/grafana-server
+    dest: "{{ grafana_binary_install_dir }}/grafana-server"
+    state: link
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+
+- name: Deploy Grafana systemd service file
+  ansible.builtin.template:
+    src: grafana-server.service.j2
+    dest: /etc/systemd/system/grafana-server.service
+    mode: '0644'
+  notify: Restart grafana
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Enable and start Grafana service
+  ansible.builtin.systemd:
+    name: grafana-server
+    enabled: "{{ grafana_service_enabled }}"
+    state: "{{ grafana_service_state }}"

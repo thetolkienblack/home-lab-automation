@@ -1,0 +1,19 @@
+---
+- name: Install Java (Debian)
+  ansible.builtin.apt:
+    name: "{{ elk_java_package.Debian }}"
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Install Java (RedHat)
+  ansible.builtin.yum:
+    name: "{{ elk_java_package.RedHat }}"
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Verify Java installation
+  ansible.builtin.command: java -version
+  register: java_version
+  changed_when: false
+  failed_when: java_version.rc != 0

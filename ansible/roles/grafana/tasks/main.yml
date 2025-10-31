@@ -1,0 +1,114 @@
+---
+# Main tasks file for Grafana stack role
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+  tags:
+    - always
+
+- name: Validate configuration
+  ansible.builtin.include_tasks: validate.yml
+  tags:
+    - always
+
+- name: Create system users and groups
+  ansible.builtin.include_tasks: users.yml
+  tags:
+    - users
+    - setup
+
+- name: Setup package repositories
+  ansible.builtin.include_tasks: "repositories_{{ ansible_os_family }}.yml"
+  when: grafana_install_method == 'package'
+  tags:
+    - repositories
+    - setup
+
+- name: Install and configure Grafana server
+  ansible.builtin.include_tasks: "grafana_{{ grafana_install_method }}.yml"
+  when: grafana_install_server | bool
+  tags:
+    - grafana
+    - install
+
+- name: Configure Grafana database backend
+  ansible.builtin.include_tasks: database.yml
+  when:
+    - grafana_install_server | bool
+    - grafana_database_setup | bool
+  tags:
+    - grafana
+    - database
+
+- name: Deploy Grafana configuration
+  ansible.builtin.template:
+    src: grafana.ini.j2
+    dest: "{{ grafana_config_dir }}/grafana.ini"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0640'
+  when: grafana_install_server | bool
+  notify: Restart grafana
+  tags:
+    - grafana
+    - config
+
+- name: Configure Grafana provisioning
+  ansible.builtin.include_tasks: provisioning.yml
+  when:
+    - grafana_install_server | bool
+    - grafana_datasources_enabled | bool or grafana_dashboards_enabled | bool
+  tags:
+    - grafana
+    - provisioning
+
+- name: Install and configure Grafana plugins
+  ansible.builtin.include_tasks: plugins.yml
+  when:
+    - grafana_install_server | bool
+    - grafana_plugins_enabled | bool
+    - grafana_plugins_install | length > 0
+  tags:
+    - grafana
+    - plugins
+
+- name: Install and configure Loki
+  ansible.builtin.include_tasks: "loki_{{ grafana_install_method }}.yml"
+  when: grafana_install_loki | bool
+  tags:
+    - loki
+    - install
+
+- name: Install and configure Tempo
+  ansible.builtin.include_tasks: "tempo_{{ grafana_install_method }}.yml"
+  when: grafana_install_tempo | bool
+  tags:
+    - tempo
+    - install
+
+- name: Install and configure Mimir
+  ansible.builtin.include_tasks: "mimir_{{ grafana_install_method }}.yml"
+  when: grafana_install_mimir | bool
+  tags:
+    - mimir
+    - install
+
+- name: Install and configure Grafana Alloy
+  ansible.builtin.include_tasks: "alloy_{{ grafana_install_method }}.yml"
+  when: grafana_install_alloy | bool
+  tags:
+    - alloy
+    - install
+
+- name: Configure firewall rules
+  ansible.builtin.include_tasks: firewall.yml
+  when: grafana_configure_firewall | bool
+  tags:
+    - firewall
+    - security
+
+- name: Verify Grafana stack services
+  ansible.builtin.include_tasks: verify.yml
+  tags:
+    - verify
+    - testing

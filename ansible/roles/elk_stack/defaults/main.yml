@@ -1,0 +1,142 @@
+---
+# ELK Stack Version
+elk_version: "8.11.3"
+
+# Component Installation Flags
+elk_install_elasticsearch: true
+elk_install_logstash: true
+elk_install_kibana: true
+
+# Deployment Mode: single (all on one node) or cluster (distributed)
+elk_deployment_mode: single
+
+# Security Configuration
+elk_security_enabled: true
+elk_security_auto_generate_passwords: true
+elk_security_enrollment_token: ""
+
+# Custom passwords (if not auto-generated)
+elk_elasticsearch_password: ""
+elk_kibana_password: ""
+elk_logstash_password: ""
+
+# SSL/TLS Configuration
+elk_ssl_enabled: true
+elk_ssl_certificate_path: "/etc/elasticsearch/certs"
+elk_ssl_verification_mode: "certificate"  # full, certificate, none
+
+# ==================== ELASTICSEARCH ====================
+elasticsearch_config_dir: "/etc/elasticsearch"
+elasticsearch_data_dir: "/var/lib/elasticsearch"
+elasticsearch_log_dir: "/var/log/elasticsearch"
+elasticsearch_heap_size: "1g"
+
+# Network settings
+elasticsearch_network_host: "0.0.0.0"
+elasticsearch_http_port: 9200
+elasticsearch_transport_port: 9300
+
+# Cluster settings
+elasticsearch_cluster_name: "elk-cluster"
+elasticsearch_node_name: "{{ ansible_hostname }}"
+elasticsearch_node_master: true
+elasticsearch_node_data: true
+elasticsearch_node_ingest: true
+
+# Cluster nodes (for multi-node deployment)
+elasticsearch_cluster_nodes: []
+# Example:
+# elasticsearch_cluster_nodes:
+#   - "node1.example.com:9300"
+#   - "node2.example.com:9300"
+
+# Initial master nodes (required for cluster bootstrap)
+elasticsearch_initial_master_nodes:
+  - "{{ ansible_hostname }}"
+
+# Index settings
+elasticsearch_number_of_shards: 1
+elasticsearch_number_of_replicas: 0
+
+# ==================== LOGSTASH ====================
+logstash_config_dir: "/etc/logstash"
+logstash_data_dir: "/var/lib/logstash"
+logstash_log_dir: "/var/log/logstash"
+logstash_heap_size: "512m"
+
+# Network settings
+logstash_http_host: "0.0.0.0"
+logstash_http_port: 9600
+logstash_beats_port: 5044
+logstash_syslog_port: 5140
+
+# Pipeline settings
+logstash_pipeline_workers: "{{ ansible_processor_vcpus }}"
+logstash_pipeline_batch_size: 125
+logstash_pipeline_batch_delay: 50
+
+# Elasticsearch output settings
+logstash_elasticsearch_hosts:
+  - "http://localhost:9200"
+logstash_elasticsearch_user: "elastic"
+logstash_elasticsearch_password: "{{ elk_elasticsearch_password }}"
+
+# Input pipelines (can be customized)
+logstash_pipelines:
+  - pipeline.id: "beats"
+    path.config: "/etc/logstash/conf.d/beats.conf"
+  - pipeline.id: "syslog"
+    path.config: "/etc/logstash/conf.d/syslog.conf"
+
+# ==================== KIBANA ====================
+kibana_config_dir: "/etc/kibana"
+kibana_data_dir: "/var/lib/kibana"
+kibana_log_dir: "/var/log/kibana"
+
+# Network settings
+kibana_server_host: "0.0.0.0"
+kibana_server_port: 5601
+kibana_server_name: "{{ ansible_hostname }}"
+
+# Elasticsearch connection
+kibana_elasticsearch_hosts:
+  - "http://localhost:9200"
+kibana_elasticsearch_username: "kibana_system"
+kibana_elasticsearch_password: "{{ elk_kibana_password }}"
+
+# ==================== MONITORING & EXPORTERS ====================
+# Prometheus Exporter
+elk_install_prometheus_exporter: true
+elk_prometheus_exporter_version: "1.7.0"
+elk_prometheus_exporter_port: 9114
+
+# Elasticsearch Prometheus Exporter settings
+elasticsearch_exporter_uri: "http://localhost:9200"
+elasticsearch_exporter_all: true
+elasticsearch_exporter_indices: true
+elasticsearch_exporter_shards: true
+elasticsearch_exporter_cluster_settings: true
+
+# CheckMK Integration
+elk_install_checkmk_agent: false
+checkmk_agent_plugin_dir: "/usr/lib/check_mk_agent/plugins"
+
+# Grafana Dashboards
+elk_install_grafana_dashboards: false
+grafana_dashboard_dir: "/var/lib/grafana/dashboards"
+
+# ==================== SYSTEM SETTINGS ====================
+# Java settings (ELK requires Java)
+elk_install_java: true
+elk_java_package:
+  Debian: "openjdk-11-jdk"
+  RedHat: "java-11-openjdk"
+
+# Service settings
+elk_service_enabled: true
+elk_service_state: started
+
+# Firewall settings
+elk_configure_firewall: false
+elk_firewall_zones:
+  - public

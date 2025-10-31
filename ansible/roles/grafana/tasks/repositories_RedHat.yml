@@ -1,0 +1,21 @@
+---
+# RedHat repository setup
+
+- name: Install system packages (RedHat)
+  ansible.builtin.yum:
+    name: "{{ grafana_system_packages }}"
+    state: present
+
+- name: Import Grafana GPG key (RedHat)
+  ansible.builtin.rpm_key:
+    key: "{{ grafana_repo_gpgkey }}"
+    state: present
+
+- name: Add Grafana YUM repository (RedHat)
+  ansible.builtin.yum_repository:
+    name: "{{ grafana_repo_name }}"
+    description: "{{ grafana_repo_description }}"
+    baseurl: "{{ grafana_repo_baseurl }}"
+    gpgcheck: "{{ grafana_repo_gpgcheck }}"
+    gpgkey: "{{ grafana_repo_gpgkey }}"
+    enabled: "{{ grafana_repo_enabled }}"

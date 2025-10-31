@@ -1,0 +1,33 @@
+[Unit]
+Description=Grafana instance
+Documentation=https://grafana.com/docs/
+Wants=network-online.target
+After=network-online.target
+{% if grafana_database_type == 'postgres' %}
+After=postgresql.service
+{% elif grafana_database_type == 'mysql' %}
+After=mariadb.service
+{% endif %}
+
+[Service]
+Type=simple
+User={{ grafana_user }}
+Group={{ grafana_group }}
+ExecStart={{ grafana_binary_install_dir }}/grafana-server \
+  --config={{ grafana_config_dir }}/grafana.ini \
+  --pidfile=/run/grafana/grafana-server.pid \
+  --packaging=rpm \
+  cfg:default.paths.logs={{ grafana_logs_dir }} \
+  cfg:default.paths.data={{ grafana_data_dir }} \
+  cfg:default.paths.plugins={{ grafana_plugins_dir }} \
+  cfg:default.paths.provisioning={{ grafana_provisioning_dir }}
+
+WorkingDirectory={{ grafana_data_dir }}
+RuntimeDirectory=grafana
+RuntimeDirectoryMode=0750
+Restart=on-failure
+LimitNOFILE=10000
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

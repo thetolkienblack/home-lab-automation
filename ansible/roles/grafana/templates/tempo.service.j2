@@ -1,0 +1,19 @@
+[Unit]
+Description=Grafana Tempo distributed tracing backend
+Documentation=https://grafana.com/docs/tempo/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=tempo
+Group=tempo
+ExecStart={{ grafana_binary_install_dir }}/tempo \
+  -config.file={{ tempo_config_dir }}/tempo.yml
+
+WorkingDirectory={{ tempo_data_dir }}
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

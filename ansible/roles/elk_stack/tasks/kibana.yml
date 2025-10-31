@@ -1,0 +1,75 @@
+---
+- name: Install Kibana (Debian)
+  ansible.builtin.apt:
+    name: "kibana={{ elk_version }}"
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+  notify: Restart Kibana
+
+- name: Install Kibana (RedHat)
+  ansible.builtin.yum:
+    name: "kibana-{{ elk_version }}"
+    state: present
+  when: ansible_os_family == "RedHat"
+  notify: Restart Kibana
+
+- name: Create Kibana data directory
+  ansible.builtin.file:
+    path: "{{ kibana_data_dir }}"
+    state: directory
+    owner: kibana
+    group: kibana
+    mode: '0750'
+
+- name: Create Kibana log directory
+  ansible.builtin.file:
+    path: "{{ kibana_log_dir }}"
+    state: directory
+    owner: kibana
+    group: kibana
+    mode: '0750'
+
+- name: Configure Kibana
+  ansible.builtin.template:
+    src: kibana.yml.j2
+    dest: "{{ kibana_config_dir }}/kibana.yml"
+    owner: root
+    group: kibana
+    mode: '0660'
+  notify: Restart Kibana
+
+- name: Enable and start Kibana service
+  ansible.builtin.systemd:
+    name: kibana
+    enabled: "{{ elk_service_enabled }}"
+    state: "{{ elk_service_state }}"
+    daemon_reload: true
+
+- name: Wait for Kibana to start
+  ansible.builtin.wait_for:
+    port: "{{ kibana_server_port }}"
+    delay: 20
+    timeout: 300
+  when: elk_service_state == "started"
+
+- name: Check Kibana API health
+  ansible.builtin.uri:
+    url: "http://localhost:{{ kibana_server_port }}/api/status"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: kibana_health
+  until: kibana_health.status == 200
+  retries: 15
+  delay: 10
+  when:
+    - elk_service_state == "started"
+    - not elk_security_enabled | bool
+
+- name: Display Kibana status
+  ansible.builtin.debug:
+    msg: "Kibana is running and accessible at http://{{ kibana_server_host }}:{{ kibana_server_port }}"
+  when:
+    - elk_service_state == "started"
+    - not elk_security_enabled | bool

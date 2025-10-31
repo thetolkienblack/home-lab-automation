@@ -1,0 +1,108 @@
+---
+- name: Install Prometheus Elasticsearch Exporter
+  when: elk_install_prometheus_exporter | bool
+  block:
+    - name: Create prometheus exporter user
+      ansible.builtin.user:
+        name: elasticsearch_exporter
+        system: true
+        shell: /usr/sbin/nologin
+        create_home: false
+
+    - name: Download Elasticsearch Exporter
+      ansible.builtin.get_url:
+        url: >-
+          https://github.com/prometheus-community/elasticsearch_exporter/releases/download/v{{
+          elk_prometheus_exporter_version }}/elasticsearch_exporter-{{ elk_prometheus_exporter_version }}.linux-amd64.tar.gz
+        dest: "/tmp/elasticsearch_exporter.tar.gz"
+        mode: '0644'
+
+    - name: Extract Elasticsearch Exporter
+      ansible.builtin.unarchive:
+        src: "/tmp/elasticsearch_exporter.tar.gz"
+        dest: /tmp/
+        remote_src: true
+        creates: "/tmp/elasticsearch_exporter-{{ elk_prometheus_exporter_version }}.linux-amd64"
+
+    - name: Install Elasticsearch Exporter binary
+      ansible.builtin.copy:
+        src: "/tmp/elasticsearch_exporter-{{ elk_prometheus_exporter_version }}.linux-amd64/elasticsearch_exporter"
+        dest: /usr/local/bin/elasticsearch_exporter
+        mode: '0755'
+        owner: root
+        group: root
+        remote_src: true
+
+    - name: Create Elasticsearch Exporter systemd service
+      ansible.builtin.template:
+        src: elasticsearch_exporter.service.j2
+        dest: /etc/systemd/system/elasticsearch_exporter.service
+        mode: '0644'
+      notify: Restart Elasticsearch Exporter
+
+    - name: Enable and start Elasticsearch Exporter
+      ansible.builtin.systemd:
+        name: elasticsearch_exporter
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Wait for Elasticsearch Exporter to start
+      ansible.builtin.wait_for:
+        port: "{{ elk_prometheus_exporter_port }}"
+        delay: 5
+        timeout: 60
+
+    - name: Verify Elasticsearch Exporter metrics
+      ansible.builtin.uri:
+        url: "http://localhost:{{ elk_prometheus_exporter_port }}/metrics"
+        method: GET
+        status_code: 200
+      register: exporter_metrics
+      until: exporter_metrics.status == 200
+      retries: 5
+      delay: 3
+
+- name: Install CheckMK agent plugin
+  when: elk_install_checkmk_agent | bool
+  block:
+    - name: Create CheckMK plugin directory
+      ansible.builtin.file:
+        path: "{{ checkmk_agent_plugin_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Deploy CheckMK Elasticsearch plugin
+      ansible.builtin.template:
+        src: checkmk_elasticsearch.j2
+        dest: "{{ checkmk_agent_plugin_dir }}/elasticsearch"
+        mode: '0755'
+
+    - name: Deploy CheckMK Logstash plugin
+      ansible.builtin.template:
+        src: checkmk_logstash.j2
+        dest: "{{ checkmk_agent_plugin_dir }}/logstash"
+        mode: '0755'
+      when: elk_install_logstash | bool
+
+- name: Install Grafana dashboards
+  when: elk_install_grafana_dashboards | bool
+  block:
+    - name: Create Grafana dashboard directory
+      ansible.builtin.file:
+        path: "{{ grafana_dashboard_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Deploy Elasticsearch Grafana dashboard
+      ansible.builtin.copy:
+        src: grafana-elasticsearch-dashboard.json
+        dest: "{{ grafana_dashboard_dir }}/elasticsearch-dashboard.json"
+        mode: '0644'
+
+    - name: Deploy Logstash Grafana dashboard
+      ansible.builtin.copy:
+        src: grafana-logstash-dashboard.json
+        dest: "{{ grafana_dashboard_dir }}/logstash-dashboard.json"
+        mode: '0644'
+      when: elk_install_logstash | bool

@@ -1,0 +1,38 @@
+---
+galaxy_info:
+  author: Sidney
+  description: Install and configure Grafana stack with Loki, Tempo, Mimir, and Alloy
+  company: Home Lab
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+        - trixie
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+    - name: Fedora
+      versions:
+        - "38"
+        - "39"
+  galaxy_tags:
+    - monitoring
+    - grafana
+    - loki
+    - tempo
+    - mimir
+    - alloy
+    - observability
+    - metrics
+    - logging
+    - tracing
+
+dependencies: []

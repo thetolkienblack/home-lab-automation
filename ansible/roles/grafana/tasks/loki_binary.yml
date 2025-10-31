@@ -1,0 +1,62 @@
+---
+# Install Loki from binary
+
+- name: Create Loki directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: loki
+    group: loki
+    mode: '0755'
+  loop:
+    - "{{ loki_config_dir }}"
+    - "{{ loki_data_dir }}"
+    - "{{ loki_wal_dir }}"
+    - "{{ loki_rules_dir }}"
+    - "{{ loki_storage_filesystem_directory }}"
+
+- name: Download Loki binary
+  ansible.builtin.get_url:
+    url: "{{ loki_binary_url }}"
+    dest: /tmp/loki.zip
+    mode: '0644'
+
+- name: Unzip Loki binary
+  ansible.builtin.unarchive:
+    src: /tmp/loki.zip
+    dest: "{{ grafana_binary_install_dir }}"
+    remote_src: true
+    mode: '0755'
+
+- name: Rename Loki binary
+  ansible.builtin.copy:
+    src: "{{ grafana_binary_install_dir }}/loki-linux-amd64"
+    dest: "{{ grafana_binary_install_dir }}/loki"
+    mode: '0755'
+    remote_src: true
+
+- name: Deploy Loki configuration
+  ansible.builtin.template:
+    src: loki.yml.j2
+    dest: "{{ loki_config_dir }}/loki.yml"
+    owner: loki
+    group: loki
+    mode: '0644'
+  notify: Restart loki
+
+- name: Deploy Loki systemd service file
+  ansible.builtin.template:
+    src: loki.service.j2
+    dest: /etc/systemd/system/loki.service
+    mode: '0644'
+  notify: Restart loki
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Enable and start Loki service
+  ansible.builtin.systemd:
+    name: loki
+    enabled: "{{ loki_service_enabled }}"
+    state: "{{ loki_service_state }}"

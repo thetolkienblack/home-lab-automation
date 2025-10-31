@@ -1,0 +1,36 @@
+---
+# Install Grafana Alloy via Docker
+
+- name: Create Alloy directories for Docker volumes
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "10001"  # Alloy Docker user
+    group: "10001"
+    mode: '0755'
+  loop:
+    - "{{ alloy_config_dir }}"
+    - "{{ alloy_data_dir }}"
+
+- name: Deploy Alloy configuration
+  ansible.builtin.template:
+    src: config.alloy.j2
+    dest: "{{ alloy_config_file }}"
+    owner: "10001"
+    group: "10001"
+    mode: '0644'
+
+- name: Deploy Alloy container
+  community.docker.docker_container:
+    name: alloy
+    image: "{{ alloy_docker_image }}:{{ alloy_docker_tag }}"
+    state: started
+    restart_policy: unless-stopped
+    networks:
+      - name: "{{ grafana_docker_network }}"
+    ports:
+      - "{{ alloy_http_listen_port }}:12345"
+    volumes:
+      - "{{ alloy_data_dir }}:/var/lib/alloy"
+      - "{{ alloy_config_file }}:/etc/alloy/config.alloy:ro"
+    command: "run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy /etc/alloy/config.alloy"

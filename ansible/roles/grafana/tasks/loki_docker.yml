@@ -1,0 +1,39 @@
+---
+# Install Loki via Docker
+
+- name: Create Loki directories for Docker volumes
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "10001"  # Loki Docker user
+    group: "10001"
+    mode: '0755'
+  loop:
+    - "{{ loki_config_dir }}"
+    - "{{ loki_data_dir }}"
+    - "{{ loki_wal_dir }}"
+    - "{{ loki_rules_dir }}"
+
+- name: Deploy Loki configuration
+  ansible.builtin.template:
+    src: loki.yml.j2
+    dest: "{{ loki_config_dir }}/loki.yml"
+    owner: "10001"
+    group: "10001"
+    mode: '0644'
+
+- name: Deploy Loki container
+  community.docker.docker_container:
+    name: loki
+    image: "{{ loki_docker_image }}:{{ loki_docker_tag }}"
+    state: started
+    restart_policy: unless-stopped
+    networks:
+      - name: "{{ grafana_docker_network }}"
+    ports:
+      - "{{ loki_http_listen_port }}:3100"
+      - "{{ loki_grpc_listen_port }}:9096"
+    volumes:
+      - "{{ loki_data_dir }}:/loki"
+      - "{{ loki_config_dir }}/loki.yml:/etc/loki/local-config.yaml:ro"
+    command: "-config.file=/etc/loki/local-config.yaml"

@@ -1,0 +1,80 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../../../requirements.yml
+driver:
+  name: docker
+platforms:
+  - name: ubuntu22-grafana
+    image: geerlingguy/docker-ubuntu2204-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - grafana_servers
+
+  - name: debian12-grafana
+    image: geerlingguy/docker-debian12-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - grafana_servers
+
+  - name: rockylinux9-grafana
+    image: geerlingguy/docker-rockylinux9-ansible:latest
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - grafana_servers
+
+provisioner:
+  name: ansible
+  playbooks:
+    converge: converge.yml
+    verify: verify.yml
+  inventory:
+    group_vars:
+      grafana_servers:
+        grafana_configure_firewall: false
+        grafana_database_setup: false
+        grafana_database_type: sqlite3
+        grafana_security_admin_password: "TestPassword123!"
+        grafana_security_secret_key: "TestSecretKey12345678"
+        grafana_dashboards_import: []
+    host_vars:
+      ubuntu22-grafana:
+        ansible_python_interpreter: /usr/bin/python3
+      debian12-grafana:
+        ansible_python_interpreter: /usr/bin/python3
+      rockylinux9-grafana:
+        ansible_python_interpreter: /usr/bin/python3
+
+verifier:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - side_effect
+    - verify
+    - cleanup
+    - destroy

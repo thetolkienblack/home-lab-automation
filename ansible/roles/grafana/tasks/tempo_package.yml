@@ -1,0 +1,44 @@
+---
+# Install Tempo via package manager
+
+- name: Create Tempo directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: tempo
+    group: tempo
+    mode: '0755'
+  loop:
+    - "{{ tempo_config_dir }}"
+    - "{{ tempo_data_dir }}"
+    - "{{ tempo_storage_path }}"
+    - "{{ tempo_storage_wal_path }}"
+
+- name: Install Tempo package (Debian)
+  ansible.builtin.apt:
+    name: "{{ tempo_package_name }}{% if tempo_version != 'latest' %}={{ tempo_version }}{% endif %}"
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Install Tempo package (RedHat)
+  ansible.builtin.yum:
+    name: "{{ tempo_package_name }}{% if tempo_version != 'latest' %}-{{ tempo_version }}{% endif %}"
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Deploy Tempo configuration
+  ansible.builtin.template:
+    src: tempo.yml.j2
+    dest: "{{ tempo_config_dir }}/tempo.yml"
+    owner: tempo
+    group: tempo
+    mode: '0644'
+  notify: Restart tempo
+
+- name: Ensure Tempo service is configured
+  ansible.builtin.systemd:
+    name: "{{ tempo_service_name }}"
+    enabled: "{{ tempo_service_enabled }}"
+    state: "{{ tempo_service_state }}"
+    daemon_reload: true

@@ -1,0 +1,20 @@
+[Unit]
+Description=Grafana Mimir metrics storage
+Documentation=https://grafana.com/docs/mimir/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=mimir
+Group=mimir
+ExecStart={{ grafana_binary_install_dir }}/mimir \
+  -config.file={{ mimir_config_dir }}/mimir.yml \
+  -target={{ mimir_target }}
+
+WorkingDirectory={{ mimir_data_dir }}
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

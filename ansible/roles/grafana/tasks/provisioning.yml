@@ -1,0 +1,79 @@
+---
+# Grafana provisioning configuration
+
+- name: Deploy datasources provisioning configuration
+  ansible.builtin.template:
+    src: datasources.yml.j2
+    dest: "{{ grafana_provisioning_dir }}/datasources/datasources.yml"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0644'
+  when: grafana_datasources_enabled | bool
+  notify: Restart grafana
+
+- name: Deploy dashboards provisioning configuration
+  ansible.builtin.template:
+    src: dashboards.yml.j2
+    dest: "{{ grafana_provisioning_dir }}/dashboards/dashboards.yml"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0644'
+  when: grafana_dashboards_enabled | bool
+  notify: Restart grafana
+
+- name: Ensure dashboard directory exists
+  ansible.builtin.file:
+    path: "{{ grafana_dashboards_dir }}"
+    state: directory
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0755'
+  when: grafana_dashboards_enabled | bool
+
+- name: Copy custom dashboard files
+  ansible.builtin.copy:
+    src: "{{ item.file }}"
+    dest: "{{ grafana_dashboards_dir }}/{{ item.name }}.json"
+    owner: "{{ grafana_user }}"
+    group: "{{ grafana_group }}"
+    mode: '0644'
+  loop: "{{ grafana_dashboards_custom }}"
+  when:
+    - grafana_dashboards_enabled | bool
+    - grafana_dashboards_custom | length > 0
+  notify: Restart grafana
+
+- name: Wait for Grafana to start
+  ansible.builtin.wait_for:
+    host: "{{ grafana_server_http_addr }}"
+    port: "{{ grafana_server_http_port }}"
+    delay: 5
+    timeout: 60
+  when: grafana_dashboards_import | length > 0
+
+- name: Import dashboards from grafana.com
+  ansible.builtin.uri:
+    url: "http://{{ grafana_server_http_addr }}:{{ grafana_server_http_port }}/api/dashboards/import"
+    method: POST
+    user: "{{ grafana_security_admin_user }}"
+    password: "{{ grafana_security_admin_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      dashboard:
+        id: "{{ item.dashboard_id }}"
+        revision: "{{ item.revision | default(1) }}"
+      overwrite: true
+      inputs:
+        - name: "DS_PROMETHEUS"
+          type: "datasource"
+          pluginId: "{{ item.datasource | lower }}"
+          value: "{{ item.datasource }}"
+    status_code: [200, 412]
+  loop: "{{ grafana_dashboards_import }}"
+  when:
+    - item.enabled | default(true) | bool
+    - grafana_dashboards_enabled | bool
+  register: dashboard_import
+  failed_when: false
+  changed_when: dashboard_import.status == 200

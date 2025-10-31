@@ -1,0 +1,3 @@
+---
+# RedHat-specific variables
+elk_package_state: present

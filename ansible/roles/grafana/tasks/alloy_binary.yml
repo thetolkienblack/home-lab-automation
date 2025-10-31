@@ -1,0 +1,59 @@
+---
+# Install Grafana Alloy from binary
+
+- name: Create Alloy directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: alloy
+    group: alloy
+    mode: '0755'
+  loop:
+    - "{{ alloy_config_dir }}"
+    - "{{ alloy_data_dir }}"
+
+- name: Download Alloy binary
+  ansible.builtin.get_url:
+    url: "{{ alloy_binary_url }}"
+    dest: /tmp/alloy.zip
+    mode: '0644'
+
+- name: Unzip Alloy binary
+  ansible.builtin.unarchive:
+    src: /tmp/alloy.zip
+    dest: "{{ grafana_binary_install_dir }}"
+    remote_src: true
+    mode: '0755'
+
+- name: Rename Alloy binary
+  ansible.builtin.copy:
+    src: "{{ grafana_binary_install_dir }}/alloy-linux-amd64"
+    dest: "{{ grafana_binary_install_dir }}/alloy"
+    mode: '0755'
+    remote_src: true
+
+- name: Deploy Alloy configuration
+  ansible.builtin.template:
+    src: config.alloy.j2
+    dest: "{{ alloy_config_file }}"
+    owner: alloy
+    group: alloy
+    mode: '0644'
+  notify: Restart alloy
+
+- name: Deploy Alloy systemd service file
+  ansible.builtin.template:
+    src: alloy.service.j2
+    dest: /etc/systemd/system/alloy.service
+    mode: '0644'
+  notify: Restart alloy
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Enable and start Alloy service
+  ansible.builtin.systemd:
+    name: alloy
+    enabled: "{{ alloy_service_enabled }}"
+    state: "{{ alloy_service_state }}"

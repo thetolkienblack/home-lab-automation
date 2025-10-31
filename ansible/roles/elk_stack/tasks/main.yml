@@ -1,0 +1,88 @@
+---
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Validate deployment configuration
+  ansible.builtin.assert:
+    that:
+      - elk_deployment_mode in ['single', 'cluster']
+      - elk_version is defined
+    fail_msg: "Invalid ELK deployment configuration"
+
+- name: Install Java (required for ELK)
+  ansible.builtin.include_tasks: install_java.yml
+  when: elk_install_java | bool
+
+- name: Add Elastic APT repository key (Debian)
+  ansible.builtin.get_url:
+    url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    dest: /usr/share/keyrings/elasticsearch-keyring.asc
+    mode: '0644'
+  when:
+    - ansible_os_family == "Debian"
+
+- name: Add Elastic APT repository (Debian)
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.asc] https://artifacts.elastic.co/packages/8.x/apt stable main"
+    state: present
+    filename: elastic-8.x
+  when:
+    - ansible_os_family == "Debian"
+
+- name: Import Elastic GPG key (RedHat)
+  ansible.builtin.rpm_key:
+    key: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    state: present
+  when:
+    - ansible_os_family == "RedHat"
+
+- name: Add Elastic YUM repository (RedHat)
+  ansible.builtin.yum_repository:
+    name: elasticsearch
+    description: Elasticsearch repository for 8.x packages
+    baseurl: https://artifacts.elastic.co/packages/8.x/yum
+    gpgcheck: true
+    gpgkey: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    enabled: true
+  when:
+    - ansible_os_family == "RedHat"
+
+- name: Install and configure Elasticsearch
+  ansible.builtin.include_tasks: elasticsearch.yml
+  when: elk_install_elasticsearch | bool
+
+- name: Install and configure Logstash
+  ansible.builtin.include_tasks: logstash.yml
+  when: elk_install_logstash | bool
+
+- name: Install and configure Kibana
+  ansible.builtin.include_tasks: kibana.yml
+  when: elk_install_kibana | bool
+
+- name: Install monitoring exporters
+  ansible.builtin.include_tasks: exporters.yml
+  when:
+    - elk_install_prometheus_exporter | bool or
+      elk_install_checkmk_agent | bool or
+      elk_install_grafana_dashboards | bool
+
+- name: Configure firewall rules
+  ansible.builtin.include_tasks: firewall.yml
+  when: elk_configure_firewall | bool
+
+- name: Display deployment summary
+  ansible.builtin.debug:
+    msg:
+      - "========================================="
+      - "ELK Stack Deployment Complete"
+      - "========================================="
+      - "Elasticsearch: {{ 'Installed' if elk_install_elasticsearch else 'Skipped' }}"
+      - "  - URL: http://{{ elasticsearch_network_host }}:{{ elasticsearch_http_port }}"
+      - "Logstash: {{ 'Installed' if elk_install_logstash else 'Skipped' }}"
+      - "  - Beats input: {{ logstash_beats_port }}"
+      - "  - API: http://{{ logstash_http_host }}:{{ logstash_http_port }}"
+      - "Kibana: {{ 'Installed' if elk_install_kibana else 'Skipped' }}"
+      - "  - URL: http://{{ kibana_server_host }}:{{ kibana_server_port }}"
+      - "Prometheus Exporter: {{ 'Installed' if elk_install_prometheus_exporter else 'Skipped' }}"
+      - "  - Metrics: http://localhost:{{ elk_prometheus_exporter_port }}/metrics"
+      - "========================================="

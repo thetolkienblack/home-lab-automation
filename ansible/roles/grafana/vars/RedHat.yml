@@ -1,0 +1,46 @@
+---
+# RedHat family specific variables
+
+# Package names
+grafana_package_name: grafana
+loki_package_name: loki
+tempo_package_name: tempo
+mimir_package_name: mimir
+alloy_package_name: alloy
+
+# System packages
+grafana_system_packages:
+  - wget
+  - curl
+  - unzip
+  - tar
+
+# PostgreSQL packages (if database setup is enabled)
+grafana_postgresql_packages:
+  - postgresql-server
+  - postgresql-contrib
+  - python3-psycopg2
+
+# MySQL packages (if using MySQL)
+grafana_mysql_packages:
+  - mariadb-server
+  - python3-PyMySQL
+
+# Grafana repository
+grafana_repo_key_url: https://rpm.grafana.com/gpg.key
+grafana_repo_name: grafana
+grafana_repo_description: Grafana Repository
+grafana_repo_baseurl: https://rpm.grafana.com
+grafana_repo_gpgkey: https://rpm.grafana.com/gpg.key
+grafana_repo_enabled: true
+grafana_repo_gpgcheck: true
+
+# Service names
+grafana_service_name: grafana-server
+loki_service_name: loki
+tempo_service_name: tempo
+mimir_service_name: mimir
+alloy_service_name: alloy
+
+# Firewall command
+grafana_firewall_tool: firewalld

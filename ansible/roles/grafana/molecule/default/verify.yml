@@ -1,0 +1,112 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Check if Grafana is installed
+      ansible.builtin.package:
+        name: grafana
+        state: present
+      check_mode: true
+      register: grafana_package
+      failed_when: grafana_package is changed
+
+    - name: Check if Grafana service exists
+      ansible.builtin.systemd:
+        name: grafana-server
+      register: grafana_service
+      failed_when: grafana_service.status.LoadState != "loaded"
+
+    - name: Check if Grafana service is running
+      ansible.builtin.systemd:
+        name: grafana-server
+      register: grafana_service_status
+      failed_when: grafana_service_status.status.ActiveState != "active"
+
+    - name: Wait for Grafana to be ready
+      ansible.builtin.uri:
+        url: "http://localhost:3000/api/health"
+        method: GET
+        status_code: 200
+      register: grafana_health
+      until: grafana_health.status == 200
+      retries: 30
+      delay: 2
+
+    - name: Verify Grafana health response
+      ansible.builtin.assert:
+        that:
+          - grafana_health.json is defined
+          - grafana_health.json.database == "ok"
+        fail_msg: "Grafana health check failed"
+        success_msg: "Grafana is healthy"
+
+    - name: Test Grafana API authentication
+      ansible.builtin.uri:
+        url: "http://localhost:3000/api/org"
+        method: GET
+        user: admin
+        password: "TestPassword123!"
+        force_basic_auth: true
+        status_code: 200
+      register: grafana_api_test
+
+    - name: Verify Grafana API response
+      ansible.builtin.assert:
+        that:
+          - grafana_api_test.json is defined
+          - grafana_api_test.json.name is defined
+        fail_msg: "Grafana API test failed"
+        success_msg: "Grafana API is working"
+
+    - name: Check Grafana configuration file
+      ansible.builtin.stat:
+        path: /etc/grafana/grafana.ini
+      register: grafana_config
+      failed_when: not grafana_config.stat.exists
+
+    - name: Check Grafana data directory
+      ansible.builtin.stat:
+        path: /var/lib/grafana
+      register: grafana_data
+      failed_when: not grafana_data.stat.exists or not grafana_data.stat.isdir
+
+    - name: Check Grafana logs directory
+      ansible.builtin.stat:
+        path: /var/log/grafana
+      register: grafana_logs
+      failed_when: not grafana_logs.stat.exists or not grafana_logs.stat.isdir
+
+    - name: Check Grafana provisioning directory
+      ansible.builtin.stat:
+        path: /etc/grafana/provisioning
+      register: grafana_provisioning
+      failed_when: not grafana_provisioning.stat.exists or not grafana_provisioning.stat.isdir
+
+    - name: Verify datasources provisioning file exists
+      ansible.builtin.stat:
+        path: /etc/grafana/provisioning/datasources/datasources.yml
+      register: datasources_file
+      failed_when: not datasources_file.stat.exists
+
+    - name: Verify dashboards provisioning file exists
+      ansible.builtin.stat:
+        path: /etc/grafana/provisioning/dashboards/dashboards.yml
+      register: dashboards_file
+      failed_when: not dashboards_file.stat.exists
+
+    - name: Display verification summary
+      ansible.builtin.debug:
+        msg:
+          - "========================================="
+          - "Grafana Verification Complete"
+          - "========================================="
+          - "Service: {{ grafana_service_status.status.ActiveState }}"
+          - "Health: {{ grafana_health.json.database }}"
+          - "API: Working"
+          - "Configuration: Present"
+          - "Data Directory: Present"
+          - "Provisioning: Configured"
+          - "========================================="

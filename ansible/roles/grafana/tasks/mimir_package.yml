@@ -1,0 +1,44 @@
+---
+# Install Mimir via package manager
+
+- name: Create Mimir directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: mimir
+    group: mimir
+    mode: '0755'
+  loop:
+    - "{{ mimir_config_dir }}"
+    - "{{ mimir_data_dir }}"
+    - "{{ mimir_storage_filesystem_dir }}"
+    - "{{ mimir_blocks_storage_tsdb_dir }}"
+
+- name: Install Mimir package (Debian)
+  ansible.builtin.apt:
+    name: "{{ mimir_package_name }}{% if mimir_version != 'latest' %}={{ mimir_version }}{% endif %}"
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Install Mimir package (RedHat)
+  ansible.builtin.yum:
+    name: "{{ mimir_package_name }}{% if mimir_version != 'latest' %}-{{ mimir_version }}{% endif %}"
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Deploy Mimir configuration
+  ansible.builtin.template:
+    src: mimir.yml.j2
+    dest: "{{ mimir_config_dir }}/mimir.yml"
+    owner: mimir
+    group: mimir
+    mode: '0644'
+  notify: Restart mimir
+
+- name: Ensure Mimir service is configured
+  ansible.builtin.systemd:
+    name: "{{ mimir_service_name }}"
+    enabled: "{{ mimir_service_enabled }}"
+    state: "{{ mimir_service_state }}"
+    daemon_reload: true

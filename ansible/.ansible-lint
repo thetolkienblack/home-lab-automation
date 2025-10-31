@@ -45,3 +45,5 @@ mock_roles:
   - trivy
   - wazuh
   - prometheus_stack
+  - elk_stack
+  - grafana

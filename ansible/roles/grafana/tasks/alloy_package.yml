@@ -1,0 +1,42 @@
+---
+# Install Grafana Alloy via package manager
+
+- name: Create Alloy directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: alloy
+    group: alloy
+    mode: '0755'
+  loop:
+    - "{{ alloy_config_dir }}"
+    - "{{ alloy_data_dir }}"
+
+- name: Install Alloy package (Debian)
+  ansible.builtin.apt:
+    name: "{{ alloy_package_name }}{% if alloy_version != 'latest' %}={{ alloy_version }}{% endif %}"
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Install Alloy package (RedHat)
+  ansible.builtin.yum:
+    name: "{{ alloy_package_name }}{% if alloy_version != 'latest' %}-{{ alloy_version }}{% endif %}"
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Deploy Alloy configuration
+  ansible.builtin.template:
+    src: config.alloy.j2
+    dest: "{{ alloy_config_file }}"
+    owner: alloy
+    group: alloy
+    mode: '0644'
+  notify: Restart alloy
+
+- name: Ensure Alloy service is configured
+  ansible.builtin.systemd:
+    name: "{{ alloy_service_name }}"
+    enabled: "{{ alloy_service_enabled }}"
+    state: "{{ alloy_service_state }}"
+    daemon_reload: true

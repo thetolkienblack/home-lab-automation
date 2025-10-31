@@ -1,0 +1,45 @@
+---
+# Install Loki via package manager
+
+- name: Create Loki directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: loki
+    group: loki
+    mode: '0755'
+  loop:
+    - "{{ loki_config_dir }}"
+    - "{{ loki_data_dir }}"
+    - "{{ loki_wal_dir }}"
+    - "{{ loki_rules_dir }}"
+    - "{{ loki_storage_filesystem_directory }}"
+
+- name: Install Loki package (Debian)
+  ansible.builtin.apt:
+    name: "{{ loki_package_name }}{% if loki_version != 'latest' %}={{ loki_version }}{% endif %}"
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Install Loki package (RedHat)
+  ansible.builtin.yum:
+    name: "{{ loki_package_name }}{% if loki_version != 'latest' %}-{{ loki_version }}{% endif %}"
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Deploy Loki configuration
+  ansible.builtin.template:
+    src: loki.yml.j2
+    dest: "{{ loki_config_dir }}/loki.yml"
+    owner: loki
+    group: loki
+    mode: '0644'
+  notify: Restart loki
+
+- name: Ensure Loki service is configured
+  ansible.builtin.systemd:
+    name: "{{ loki_service_name }}"
+    enabled: "{{ loki_service_enabled }}"
+    state: "{{ loki_service_state }}"
+    daemon_reload: true

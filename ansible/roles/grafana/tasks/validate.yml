@@ -1,0 +1,50 @@
+---
+# Validation tasks
+
+- name: Validate installation method
+  ansible.builtin.assert:
+    that:
+      - grafana_install_method in ['package', 'binary', 'docker']
+    fail_msg: "grafana_install_method must be 'package', 'binary', or 'docker'"
+    success_msg: "Installation method is valid"
+
+- name: Validate database type
+  ansible.builtin.assert:
+    that:
+      - grafana_database_type in ['sqlite3', 'mysql', 'postgres']
+    fail_msg: "grafana_database_type must be 'sqlite3', 'mysql', or 'postgres'"
+    success_msg: "Database type is valid"
+  when: grafana_install_server | bool
+
+- name: Validate at least one component is selected
+  ansible.builtin.assert:
+    that:
+      - grafana_install_server | bool or
+        grafana_install_loki | bool or
+        grafana_install_tempo | bool or
+        grafana_install_mimir | bool or
+        grafana_install_alloy | bool
+    fail_msg: "At least one Grafana component must be enabled for installation"
+    success_msg: "Component selection is valid"
+
+- name: Check for required vault variables when using non-sqlite database
+  ansible.builtin.assert:
+    that:
+      - grafana_database_password is defined
+      - grafana_database_password | length > 0
+    fail_msg: "grafana_database_password must be defined in vault when using {{ grafana_database_type }} database"
+    success_msg: "Database password is defined"
+  when:
+    - grafana_install_server | bool
+    - grafana_database_type != 'sqlite3'
+
+- name: Check for required vault variables for Grafana server
+  ansible.builtin.assert:
+    that:
+      - grafana_security_admin_password is defined
+      - grafana_security_admin_password | length > 0
+      - grafana_security_secret_key is defined
+      - grafana_security_secret_key | length > 0
+    fail_msg: "grafana_security_admin_password and grafana_security_secret_key must be defined in vault"
+    success_msg: "Grafana security variables are defined"
+  when: grafana_install_server | bool

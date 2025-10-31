@@ -1,0 +1,110 @@
+---
+# Verify Grafana stack services
+
+- name: Wait for Grafana to be ready
+  ansible.builtin.uri:
+    url: "http://{{ grafana_server_http_addr }}:{{ grafana_server_http_port }}/api/health"
+    method: GET
+    status_code: 200
+  register: grafana_health
+  until: grafana_health.status == 200
+  retries: 12
+  delay: 5
+  when: grafana_install_server | bool
+
+- name: Display Grafana health status
+  ansible.builtin.debug:
+    msg: "Grafana is healthy: {{ grafana_health.json }}"
+  when:
+    - grafana_install_server | bool
+    - grafana_health.json is defined
+
+- name: Wait for Loki to be ready
+  ansible.builtin.uri:
+    url: "http://{{ loki_http_listen_address }}:{{ loki_http_listen_port }}/ready"
+    method: GET
+    status_code: 200
+  register: loki_health
+  until: loki_health.status == 200
+  retries: 12
+  delay: 5
+  when: grafana_install_loki | bool
+  failed_when: false
+
+- name: Display Loki status
+  ansible.builtin.debug:
+    msg: "Loki is ready"
+  when:
+    - grafana_install_loki | bool
+    - loki_health.status == 200
+
+- name: Wait for Tempo to be ready
+  ansible.builtin.uri:
+    url: "http://{{ tempo_http_listen_address }}:{{ tempo_http_listen_port }}/ready"
+    method: GET
+    status_code: 200
+  register: tempo_health
+  until: tempo_health.status == 200
+  retries: 12
+  delay: 5
+  when: grafana_install_tempo | bool
+  failed_when: false
+
+- name: Display Tempo status
+  ansible.builtin.debug:
+    msg: "Tempo is ready"
+  when:
+    - grafana_install_tempo | bool
+    - tempo_health.status == 200
+
+- name: Wait for Mimir to be ready
+  ansible.builtin.uri:
+    url: "http://{{ mimir_http_listen_address }}:{{ mimir_http_listen_port }}/ready"
+    method: GET
+    status_code: 200
+  register: mimir_health
+  until: mimir_health.status == 200
+  retries: 12
+  delay: 5
+  when: grafana_install_mimir | bool
+  failed_when: false
+
+- name: Display Mimir status
+  ansible.builtin.debug:
+    msg: "Mimir is ready"
+  when:
+    - grafana_install_mimir | bool
+    - mimir_health.status == 200
+
+- name: Check Alloy service status
+  ansible.builtin.systemd:
+    name: alloy
+  register: alloy_service
+  when: grafana_install_alloy | bool
+  failed_when: false
+
+- name: Display Alloy service status
+  ansible.builtin.debug:
+    msg: "Alloy service is {{ alloy_service.status.ActiveState }}"
+  when:
+    - grafana_install_alloy | bool
+    - alloy_service.status is defined
+
+- name: Display deployment summary
+  ansible.builtin.debug:
+    msg:
+      - "========================================="
+      - "Grafana Stack Deployment Complete"
+      - "========================================="
+      - "Grafana: {{ 'Installed' if grafana_install_server else 'Skipped' }}"
+      - "  - URL: http://{{ ansible_default_ipv4.address | default('localhost') }}:{{ grafana_server_http_port }}"
+      - "  - Admin User: {{ grafana_security_admin_user }}"
+      - "Loki: {{ 'Installed' if grafana_install_loki else 'Skipped' }}"
+      - "  - URL: http://{{ ansible_default_ipv4.address | default('localhost') }}:{{ loki_http_listen_port }}"
+      - "Tempo: {{ 'Installed' if grafana_install_tempo else 'Skipped' }}"
+      - "  - URL: http://{{ ansible_default_ipv4.address | default('localhost') }}:{{ tempo_http_listen_port }}"
+      - "Mimir: {{ 'Installed' if grafana_install_mimir else 'Skipped' }}"
+      - "  - URL: http://{{ ansible_default_ipv4.address | default('localhost') }}:{{ mimir_http_listen_port }}"
+      - "Alloy: {{ 'Installed' if grafana_install_alloy else 'Skipped' }}"
+      - "  - URL: http://{{ ansible_default_ipv4.address | default('localhost') }}:{{ alloy_http_listen_port }}"
+      - "========================================="

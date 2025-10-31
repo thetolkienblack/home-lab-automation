@@ -1,0 +1,14 @@
+{
+  "dashboard": {
+    "title": "Logstash Metrics",
+    "tags": ["logstash", "elk"],
+    "timezone": "browser",
+    "panels": [],
+    "schemaVersion": 16,
+    "version": 0,
+    "annotations": {
+      "list": []
+    }
+  },
+  "overwrite": false
+}

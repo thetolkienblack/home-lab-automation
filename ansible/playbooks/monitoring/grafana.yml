@@ -1,0 +1,133 @@
+---
+- name: Deploy Grafana Stack
+  hosts: grafana_servers
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Validate system requirements
+      ansible.builtin.assert:
+        that:
+          - ansible_memtotal_mb >= 2048
+          - ansible_processor_vcpus >= 2
+        fail_msg: |
+          Grafana Stack requires minimum:
+          - 2GB RAM (found: {{ ansible_memtotal_mb }}MB)
+          - 2 CPU cores (found: {{ ansible_processor_vcpus }})
+        success_msg: "System meets Grafana Stack requirements"
+
+    - name: Check disk space
+      ansible.builtin.shell: df -h / | tail -1 | awk '{print $5}' | sed 's/%//'
+      register: disk_usage
+      changed_when: false
+
+    - name: Warn if disk space is low
+      ansible.builtin.debug:
+        msg: "WARNING: Disk usage is {{ disk_usage.stdout }}%. Grafana Stack requires significant disk space."
+      when: disk_usage.stdout | int > 80
+
+    - name: Include vault variables
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../roles/grafana/vars/vault.yml"
+      when: grafana_vault_file is defined
+      tags:
+        - always
+
+  roles:
+    - role: grafana
+
+  post_tasks:
+    - name: Wait for all services to stabilize
+      ansible.builtin.pause:
+        seconds: 30
+        prompt: "Waiting for Grafana Stack services to stabilize..."
+
+    - name: Verify Grafana is accessible
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address | default('localhost') }}:{{ grafana_server_http_port }}/api/health"
+        method: GET
+        return_content: true
+      register: grafana_health
+      until: grafana_health.json.database == 'ok'
+      retries: 10
+      delay: 10
+      when: grafana_install_server | default(true) | bool
+
+    - name: Display Grafana health info
+      ansible.builtin.debug:
+        msg:
+          - "Grafana Status: {{ grafana_health.json }}"
+      when:
+        - grafana_install_server | default(true) | bool
+        - grafana_health.json is defined
+
+    - name: Get Grafana datasources
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address | default('localhost') }}:{{ grafana_server_http_port }}/api/datasources"
+        method: GET
+        user: "{{ grafana_security_admin_user }}"
+        password: "{{ grafana_security_admin_password }}"
+        force_basic_auth: true
+        return_content: true
+      register: grafana_datasources_list
+      when: grafana_install_server | default(true) | bool
+      failed_when: false
+
+    - name: Display configured datasources
+      ansible.builtin.debug:
+        msg: "Configured datasources: {{ grafana_datasources_list.json | map(attribute='name') | list }}"
+      when:
+        - grafana_install_server | default(true) | bool
+        - grafana_datasources_list.json is defined
+
+    - name: Check Loki readiness
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address | default('localhost') }}:{{ loki_http_listen_port }}/ready"
+        method: GET
+      register: loki_ready
+      when: grafana_install_loki | default(false) | bool
+      failed_when: false
+
+    - name: Check Tempo readiness
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address | default('localhost') }}:{{ tempo_http_listen_port }}/ready"
+        method: GET
+      register: tempo_ready
+      when: grafana_install_tempo | default(false) | bool
+      failed_when: false
+
+    - name: Check Mimir readiness
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address | default('localhost') }}:{{ mimir_http_listen_port }}/ready"
+        method: GET
+      register: mimir_ready
+      when: grafana_install_mimir | default(false) | bool
+      failed_when: false
+
+    - name: Display access URLs
+      ansible.builtin.debug:
+        msg:
+          - "========================================="
+          - "Grafana Stack Deployment Summary"
+          - "========================================="
+          - "Grafana: {{ 'Ready' if grafana_install_server | default(true) else 'Skipped' }}"
+          - "  - URL: http://{{ ansible_default_ipv4.address }}:{{ grafana_server_http_port }}"
+          - "  - Username: {{ grafana_security_admin_user }}"
+          - "  - Password: (from vault)"
+          - "Loki: {{ 'Ready' if (grafana_install_loki | default(false) and loki_ready.status == 200) else 'Not Installed' }}"
+          - "  - URL: http://{{ ansible_default_ipv4.address }}:{{ loki_http_listen_port }}"
+          - "Tempo: {{ 'Ready' if (grafana_install_tempo | default(false) and tempo_ready.status == 200) else 'Not Installed' }}"
+          - "  - URL: http://{{ ansible_default_ipv4.address }}:{{ tempo_http_listen_port }}"
+          - "  - OTLP gRPC: {{ ansible_default_ipv4.address }}:4317"
+          - "  - OTLP HTTP: {{ ansible_default_ipv4.address }}:4318"
+          - "Mimir: {{ 'Ready' if (grafana_install_mimir | default(false) and mimir_ready.status == 200) else 'Not Installed' }}"
+          - "  - URL: http://{{ ansible_default_ipv4.address }}:{{ mimir_http_listen_port }}"
+          - "Alloy: {{ 'Installed' if grafana_install_alloy | default(false) else 'Not Installed' }}"
+          - "  - URL: http://{{ ansible_default_ipv4.address }}:{{ alloy_http_listen_port }}"
+          - "========================================="
+          - "Next Steps:"
+          - "1. Access Grafana at http://{{ ansible_default_ipv4.address }}:{{ grafana_server_http_port }}"
+          - "2. Login with admin credentials from vault"
+          - "3. Explore pre-configured datasources and dashboards"
+          - "4. Configure additional integrations as needed"
+          - "========================================="

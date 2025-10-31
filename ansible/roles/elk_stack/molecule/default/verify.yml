@@ -1,0 +1,144 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Verify Elasticsearch is running
+      ansible.builtin.assert:
+        that:
+          - "'elasticsearch.service' in ansible_facts.services"
+          - "ansible_facts.services['elasticsearch.service'].state == 'running'"
+        fail_msg: "Elasticsearch service is not running"
+        success_msg: "Elasticsearch service is running"
+
+    - name: Verify Logstash is running
+      ansible.builtin.assert:
+        that:
+          - "'logstash.service' in ansible_facts.services"
+          - "ansible_facts.services['logstash.service'].state == 'running'"
+        fail_msg: "Logstash service is not running"
+        success_msg: "Logstash service is running"
+
+    - name: Verify Kibana is running
+      ansible.builtin.assert:
+        that:
+          - "'kibana.service' in ansible_facts.services"
+          - "ansible_facts.services['kibana.service'].state == 'running'"
+        fail_msg: "Kibana service is not running"
+        success_msg: "Kibana service is running"
+
+    - name: Check Elasticsearch HTTP endpoint
+      ansible.builtin.uri:
+        url: http://localhost:9200
+        method: GET
+        status_code: 200
+        timeout: 30
+      register: es_http
+      retries: 10
+      delay: 5
+      until: es_http.status == 200
+
+    - name: Verify Elasticsearch cluster health
+      ansible.builtin.uri:
+        url: http://localhost:9200/_cluster/health
+        method: GET
+        return_content: true
+      register: es_health
+
+    - name: Assert Elasticsearch cluster is healthy
+      ansible.builtin.assert:
+        that:
+          - es_health.json.status in ['green', 'yellow']
+          - es_health.json.number_of_nodes >= 1
+        fail_msg: "Elasticsearch cluster is not healthy"
+        success_msg: "Elasticsearch cluster is healthy"
+
+    - name: Check Logstash API endpoint
+      ansible.builtin.uri:
+        url: http://localhost:9600
+        method: GET
+        status_code: 200
+        timeout: 30
+      register: logstash_http
+      retries: 10
+      delay: 5
+      until: logstash_http.status == 200
+
+    - name: Check Kibana API endpoint
+      ansible.builtin.uri:
+        url: http://localhost:5601/api/status
+        method: GET
+        status_code: 200
+        timeout: 30
+      register: kibana_http
+      retries: 15
+      delay: 10
+      until: kibana_http.status == 200
+
+    - name: Verify Kibana is operational
+      ansible.builtin.assert:
+        that:
+          - kibana_http.json.status.overall.level == 'available'
+        fail_msg: "Kibana is not operational"
+        success_msg: "Kibana is operational"
+
+    - name: Check Elasticsearch Exporter metrics endpoint
+      ansible.builtin.uri:
+        url: http://localhost:9114/metrics
+        method: GET
+        status_code: 200
+      register: exporter_metrics
+      retries: 5
+      delay: 3
+      until: exporter_metrics.status == 200
+
+    - name: Verify Elasticsearch Exporter is providing metrics
+      ansible.builtin.assert:
+        that:
+          - "'elasticsearch_cluster_health_status' in exporter_metrics.content"
+        fail_msg: "Elasticsearch Exporter is not providing valid metrics"
+        success_msg: "Elasticsearch Exporter is working correctly"
+
+    - name: Check Elasticsearch data directory exists
+      ansible.builtin.stat:
+        path: /var/lib/elasticsearch
+      register: es_data_dir
+
+    - name: Verify Elasticsearch data directory
+      ansible.builtin.assert:
+        that:
+          - es_data_dir.stat.exists
+          - es_data_dir.stat.isdir
+        fail_msg: "Elasticsearch data directory does not exist"
+        success_msg: "Elasticsearch data directory exists"
+
+    - name: Check Logstash config directory exists
+      ansible.builtin.stat:
+        path: /etc/logstash/conf.d
+      register: logstash_conf_dir
+
+    - name: Verify Logstash pipeline configs exist
+      ansible.builtin.assert:
+        that:
+          - logstash_conf_dir.stat.exists
+          - logstash_conf_dir.stat.isdir
+        fail_msg: "Logstash config directory does not exist"
+        success_msg: "Logstash config directory exists"
+
+    - name: Display verification summary
+      ansible.builtin.debug:
+        msg:
+          - "========================================="
+          - "ELK Stack Verification Complete"
+          - "========================================="
+          - "All services are running and operational"
+          - "Elasticsearch: http://localhost:9200"
+          - "Logstash: http://localhost:9600"
+          - "Kibana: http://localhost:5601"
+          - "Metrics: http://localhost:9114/metrics"
+          - "========================================="

@@ -1,0 +1,28 @@
+---
+- name: Restart Elasticsearch
+  ansible.builtin.systemd:
+    name: elasticsearch
+    state: restarted
+    daemon_reload: true
+  listen: Restart Elasticsearch
+
+- name: Restart Logstash
+  ansible.builtin.systemd:
+    name: logstash
+    state: restarted
+    daemon_reload: true
+  listen: Restart Logstash
+
+- name: Restart Kibana
+  ansible.builtin.systemd:
+    name: kibana
+    state: restarted
+    daemon_reload: true
+  listen: Restart Kibana
+
+- name: Restart Elasticsearch Exporter
+  ansible.builtin.systemd:
+    name: elasticsearch_exporter
+    state: restarted
+    daemon_reload: true
+  listen: Restart Elasticsearch Exporter

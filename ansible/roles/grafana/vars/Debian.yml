@@ -1,0 +1,45 @@
+---
+# Debian family specific variables
+
+# Package names
+grafana_package_name: grafana
+loki_package_name: loki
+tempo_package_name: tempo
+mimir_package_name: mimir
+alloy_package_name: alloy
+
+# System packages
+grafana_system_packages:
+  - apt-transport-https
+  - software-properties-common
+  - wget
+  - gnupg
+  - curl
+  - unzip
+
+# PostgreSQL packages (if database setup is enabled)
+grafana_postgresql_packages:
+  - postgresql
+  - postgresql-contrib
+  - python3-psycopg2
+
+# MySQL packages (if using MySQL)
+grafana_mysql_packages:
+  - mariadb-server
+  - python3-pymysql
+
+# Grafana repository
+grafana_repo_key_url: https://apt.grafana.com/gpg.key
+grafana_repo_key_dest: /usr/share/keyrings/grafana-archive-keyring.gpg
+grafana_repo_url: "deb [signed-by=/usr/share/keyrings/grafana-archive-keyring.gpg] https://apt.grafana.com stable main"
+grafana_repo_file: /etc/apt/sources.list.d/grafana.list
+
+# Service names
+grafana_service_name: grafana-server
+loki_service_name: loki
+tempo_service_name: tempo
+mimir_service_name: mimir
+alloy_service_name: alloy
+
+# Firewall command
+grafana_firewall_tool: ufw

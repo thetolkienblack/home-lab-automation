@@ -1,0 +1,87 @@
+---
+# Database backend setup for Grafana
+
+- name: Install PostgreSQL packages
+  ansible.builtin.package:
+    name: "{{ grafana_postgresql_packages }}"
+    state: present
+  when:
+    - grafana_database_type == 'postgres'
+    - grafana_database_setup | bool
+
+- name: Install MySQL/MariaDB packages
+  ansible.builtin.package:
+    name: "{{ grafana_mysql_packages }}"
+    state: present
+  when:
+    - grafana_database_type == 'mysql'
+    - grafana_database_setup | bool
+
+- name: Initialize PostgreSQL database (RedHat)
+  ansible.builtin.command: postgresql-setup initdb
+  when:
+    - ansible_os_family == "RedHat"
+    - grafana_database_type == 'postgres'
+    - grafana_database_setup | bool
+  register: postgres_init
+  failed_when: false
+  changed_when: postgres_init.rc == 0
+
+- name: Ensure PostgreSQL is running
+  ansible.builtin.systemd:
+    name: postgresql
+    state: started
+    enabled: true
+  when:
+    - grafana_database_type == 'postgres'
+    - grafana_database_setup | bool
+
+- name: Create Grafana PostgreSQL database
+  community.postgresql.postgresql_db:
+    name: "{{ grafana_database_name }}"
+    state: present
+  become: true
+  become_user: postgres
+  when:
+    - grafana_database_type == 'postgres'
+    - grafana_database_setup | bool
+
+- name: Create Grafana PostgreSQL user
+  community.postgresql.postgresql_user:
+    name: "{{ grafana_database_user }}"
+    password: "{{ grafana_database_password }}"
+    db: "{{ grafana_database_name }}"
+    priv: ALL
+    state: present
+  become: true
+  become_user: postgres
+  when:
+    - grafana_database_type == 'postgres'
+    - grafana_database_setup | bool
+
+- name: Ensure MySQL/MariaDB is running
+  ansible.builtin.systemd:
+    name: mariadb
+    state: started
+    enabled: true
+  when:
+    - grafana_database_type == 'mysql'
+    - grafana_database_setup | bool
+
+- name: Create Grafana MySQL database
+  community.mysql.mysql_db:
+    name: "{{ grafana_database_name }}"
+    state: present
+  when:
+    - grafana_database_type == 'mysql'
+    - grafana_database_setup | bool
+
+- name: Create Grafana MySQL user
+  community.mysql.mysql_user:
+    name: "{{ grafana_database_user }}"
+    password: "{{ grafana_database_password }}"
+    priv: "{{ grafana_database_name }}.*:ALL"
+    state: present
+  when:
+    - grafana_database_type == 'mysql'
+    - grafana_database_setup | bool
